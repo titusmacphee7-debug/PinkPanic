@@ -8,9 +8,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Guard = require(ReplicatedStorage.Shared.Net.Guard)
 local PlayerDataService = require(script.Services.PlayerDataService)
+local CombatService = require(script.Services.CombatService)
+local WeaponService = require(script.Services.WeaponService)
 
 Remotes.init()
 PlayerDataService.init()
+CombatService.init()
+WeaponService.init()
 
 Players.PlayerRemoving:Connect(function(player)
 	Guard.clearPlayer(player)

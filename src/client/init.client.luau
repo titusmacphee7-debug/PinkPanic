@@ -10,4 +10,10 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 -- so everything after this line can assume the remote surface exists.
 Remotes.event("RoundStateChanged")
 
+local WeaponController = require(script.Controllers.WeaponController)
+local HitFeedbackController = require(script.Controllers.HitFeedbackController)
+
+WeaponController.init()
+HitFeedbackController.init()
+
 print("[PinkPanic] Client booted 🎀")

@@ -13,10 +13,18 @@
       }
     },
     "StarterPlayer": {
+      "$properties": {
+        "CameraMode": "LockFirstPerson"
+      },
       "StarterPlayerScripts": {
         "Client": {
           "$path": "src/client"
         }
+      }
+    },
+    "Players": {
+      "$properties": {
+        "RespawnTime": 3
       }
     }
   }
