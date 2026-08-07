@@ -8,7 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local PistolModel = require(ReplicatedStorage.Shared.Assets.PistolModel)
+local WeaponModels = require(ReplicatedStorage.Shared.Assets.WeaponModels)
 local WeaponCosmetics = require(ReplicatedStorage.Shared.Assets.WeaponCosmetics)
 local ClientData = require(script.Parent.Parent.ClientData)
 
@@ -20,6 +20,7 @@ local KICK_MAX = 0.22
 local ViewmodelController = {}
 
 local model: Model? = nil
+local currentWeapon = "Pistol"
 local recoil = 0
 local swayX = 0
 local swayY = 0
@@ -40,7 +41,7 @@ local function ensureModel(): Model
 	if current and current.Parent then
 		return current
 	end
-	local built = PistolModel.build()
+	local built = WeaponModels.build(currentWeapon)
 	built.Name = "Viewmodel"
 	for _, part in built:GetDescendants() do
 		if part:IsA("BasePart") then
@@ -91,6 +92,15 @@ local function update(dt: number)
 		* CFrame.new(swayX, swayY + bob, recoil * 0.4)
 		* CFrame.Angles(recoil, swayX * 0.5, 0)
 	gun:PivotTo(cframe)
+end
+
+-- Called by WeaponController on weapon switch; rebuilds next frame.
+function ViewmodelController.setWeapon(weaponId: string)
+	if weaponId == currentWeapon then
+		return
+	end
+	currentWeapon = weaponId
+	hideModel()
 end
 
 -- Called by WeaponController on each shot.

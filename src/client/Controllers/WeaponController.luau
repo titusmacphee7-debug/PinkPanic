@@ -1,9 +1,10 @@
 --!strict
--- WeaponController — input + firing on the client (NOD-12 client half).
--- Applies spread locally and reports origin/direction to the server, which
--- makes the real hit decision. Local cooldown mirrors the server's fire rate
--- so honest clients rarely see rejected shots.
+-- WeaponController — input, firing, and weapon switching on the client
+-- (NOD-12/NOD-29 client half). Applies spread locally and reports
+-- origin/direction; the server makes the real hit decision. Keys 1–4 switch
+-- weapons, R reloads, left-click fires (held for automatics).
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -14,20 +15,34 @@ local EffectsController = require(script.Parent.EffectsController)
 local ViewmodelController = require(script.Parent.ViewmodelController)
 local ClientData = require(script.Parent.Parent.ClientData)
 
-local Players = game:GetService("Players")
+local KEY_TO_WEAPON: { [Enum.KeyCode]: string } = {
+	[Enum.KeyCode.One] = "Pistol",
+	[Enum.KeyCode.Two] = "Rifle",
+	[Enum.KeyCode.Three] = "Shotgun",
+	[Enum.KeyCode.Four] = "Knife",
+}
 
 local WeaponController = {}
 
 local rng = Random.new()
-local weaponId = "Pistol" -- loadout selection replaces this in M3
+local currentWeapon = "Pistol"
 local triggerHeld = false
 local lastShotAt = 0
+
+local function selectWeapon(weaponId: string)
+	if weaponId == currentWeapon then
+		return
+	end
+	currentWeapon = weaponId
+	ViewmodelController.setWeapon(weaponId)
+	Remotes.event("SelectWeapon"):FireServer(weaponId)
+end
 
 local function shoot()
 	if ClientData.shopOpen then
 		return
 	end
-	local config = WeaponConfig[weaponId]
+	local config = WeaponConfig[currentWeapon]
 	local now = os.clock()
 	if now - lastShotAt < 1 / config.fireRate then
 		return
@@ -46,17 +61,30 @@ local function shoot()
 	Remotes.event("FireWeapon"):FireServer(origin, aim.LookVector)
 
 	-- Immediate local feedback; the server independently decides the real hit.
+	ViewmodelController.kick()
+	if config.kind == "Melee" then
+		EffectsController.playShotSound(0.45) -- swing swish placeholder
+		return
+	end
+	EffectsController.playShotSound(0.6)
+
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	local character = Players.LocalPlayer.Character
 	params.FilterDescendantsInstances = if character then { character } else {}
-	local result = workspace:Raycast(origin, aim.LookVector * config.range, params)
-	local endpoint = if result then result.Position else origin + aim.LookVector * config.range
 	local muzzle = ViewmodelController.getMuzzlePosition()
 		or origin + camera.CFrame.RightVector * 0.6 - camera.CFrame.UpVector * 0.4
-	EffectsController.drawTracer(muzzle, endpoint)
-	EffectsController.playShotSound(0.6)
-	ViewmodelController.kick()
+	-- Shotguns draw a few visual pellets; the server rolls the real pattern.
+	local tracerCount = math.min(config.pellets, 3)
+	for pellet = 1, tracerCount do
+		local dir = aim.LookVector
+		if pellet > 1 then
+			dir = (aim * CFrame.Angles(rng:NextNumber(-spread, spread), rng:NextNumber(-spread, spread), 0)).LookVector
+		end
+		local result = workspace:Raycast(origin, dir * config.range, params)
+		local endpoint = if result then result.Position else origin + dir * config.range
+		EffectsController.drawTracer(muzzle, endpoint)
+	end
 end
 
 function WeaponController.init()
@@ -69,6 +97,11 @@ function WeaponController.init()
 			shoot()
 		elseif input.KeyCode == Enum.KeyCode.R then
 			Remotes.event("ReloadWeapon"):FireServer()
+		else
+			local weaponId = KEY_TO_WEAPON[input.KeyCode]
+			if weaponId then
+				selectWeapon(weaponId)
+			end
 		end
 	end)
 
@@ -78,9 +111,8 @@ function WeaponController.init()
 		end
 	end)
 
-	-- Automatic weapons (rifle, M3) keep firing while the trigger is held.
 	RunService.Heartbeat:Connect(function()
-		if triggerHeld and WeaponConfig[weaponId].auto then
+		if triggerHeld and WeaponConfig[currentWeapon].auto then
 			shoot()
 		end
 	end)

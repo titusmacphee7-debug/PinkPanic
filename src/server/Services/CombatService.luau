@@ -24,11 +24,23 @@ function CombatService.onDeathConnect(listener: (Player, Player?, string?) -> ()
 	table.insert(deathListeners, listener)
 end
 
+local SPAWN_PROTECTION_SECONDS = 3
+
 local function onCharacterAdded(player: Player, character: Model)
 	local humanoid = character:WaitForChild("Humanoid") :: Humanoid
 	humanoid.MaxHealth = MAX_HEALTH
 	humanoid.Health = MAX_HEALTH
 	lastDamage[player] = {}
+
+	-- Spawn protection (NOD-20): cap any ForceField (SpawnLocations grant a
+	-- 10s one by default) at our shorter window so fights resume quickly.
+	task.delay(SPAWN_PROTECTION_SECONDS, function()
+		for _, child in character:GetChildren() do
+			if child:IsA("ForceField") then
+				child:Destroy()
+			end
+		end
+	end)
 
 	humanoid.Died:Connect(function()
 		local record = lastDamage[player] or {}

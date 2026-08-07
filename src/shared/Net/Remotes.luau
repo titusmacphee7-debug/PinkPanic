@@ -15,6 +15,8 @@ local Definitions: { [string]: RemoteKind } = {
 	-- Combat (M1)
 	FireWeapon = "Event", -- client -> server: report a shot for validation
 	ReloadWeapon = "Event", -- client -> server: request reload
+	SelectWeapon = "Event", -- client -> server: switch carried weapon
+	AmmoChanged = "Event", -- server -> client: ammo/reload state for the HUD
 	ShotFired = "Event", -- server -> clients: a validated shot happened (tracers/sound)
 	DamageDealt = "Event", -- server -> client: hitmarker / damage number feedback
 	Killfeed = "Event", -- server -> clients: someone died

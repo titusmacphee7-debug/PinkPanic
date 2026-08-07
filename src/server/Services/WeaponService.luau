@@ -1,8 +1,9 @@
 --!strict
--- WeaponService — server-side firing: validation, hit registration, ammo,
--- reload (NOD-12, NOD-14). The client only *reports* a shot (origin +
--- direction); the server re-raycasts the world itself, so spoofed hits,
--- wall-bangs and impossible fire rates are rejected here.
+-- WeaponService — server-side arsenal: per-weapon ammo, firing validation,
+-- pellets, melee, reload, and switching (NOD-12, NOD-14, NOD-25..27, NOD-29).
+-- The client only *reports* a shot (origin + direction); the server
+-- re-raycasts the world itself, so spoofed hits, wall-bangs and impossible
+-- fire rates are rejected here.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,7 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Guard = require(ReplicatedStorage.Shared.Net.Guard)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
-local PistolModel = require(ReplicatedStorage.Shared.Assets.PistolModel)
+local WeaponModels = require(ReplicatedStorage.Shared.Assets.WeaponModels)
 local WeaponCosmetics = require(ReplicatedStorage.Shared.Assets.WeaponCosmetics)
 local CombatService = require(script.Parent.CombatService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
@@ -22,44 +23,69 @@ local FIRE_RATE_TOLERANCE = 0.9
 -- origin far from the head means teleported/spoofed shots.
 local MAX_ORIGIN_DRIFT = 8
 
+-- Everyone carries the full MVP arsenal; a picker UI can narrow this later.
+local LOADOUT = { "Pistol", "Rifle", "Shotgun", "Knife" }
+
 type WeaponState = {
-	ammo: number,
+	current: string,
+	ammo: { [string]: number },
 	lastShotAt: number,
 	reloadingUntil: number,
+	reloadToken: number,
 }
 
 local WeaponService = {}
 
 local states: { [Player]: WeaponState } = {}
-
--- M1: everyone carries the pistol. Loadout selection replaces this in M3.
-local function equippedWeaponId(_player: Player): string
-	return "Pistol"
-end
+local rng = Random.new()
 
 local function resetState(player: Player)
-	local config = WeaponConfig[equippedWeaponId(player)]
+	local ammo: { [string]: number } = {}
+	for _, weaponId in LOADOUT do
+		ammo[weaponId] = WeaponConfig[weaponId].magSize
+	end
 	states[player] = {
-		ammo = config.magSize,
+		current = "Pistol",
+		ammo = ammo,
 		lastShotAt = 0,
 		reloadingUntil = 0,
+		reloadToken = 0,
 	}
 end
 
--- Welds a pistol to the character's hand so other players see the weapon.
--- The shooter sees their own viewmodel instead (first-person hides the body).
+local function pushAmmo(player: Player)
+	local state = states[player]
+	if not state then
+		return
+	end
+	local config = WeaponConfig[state.current]
+	Remotes.event("AmmoChanged"):FireClient(player, {
+		weaponId = state.current,
+		ammo = state.ammo[state.current],
+		magSize = config.magSize,
+		reloading = os.clock() < state.reloadingUntil,
+	})
+end
+
+-- Welds the current weapon to the character's hand so other players see it.
+-- The owner sees their own viewmodel instead (first-person hides the body).
 local function attachWorldGun(player: Player, character: Model)
 	task.spawn(function()
+		local state = states[player]
+		local weaponId = if state then state.current else "Pistol"
+
+		local existing = character:FindFirstChild("WorldGun")
+		if existing then
+			existing:Destroy()
+		end
+
 		local hand = character:WaitForChild("RightHand", 5) or character:FindFirstChild("Right Arm")
 		local root = character:FindFirstChild("HumanoidRootPart")
 		if not hand or not hand:IsA("BasePart") or not root or not root:IsA("BasePart") then
 			return
 		end
-		if character:FindFirstChild("WorldGun") then
-			return
-		end
 
-		local gun = PistolModel.build()
+		local gun = WeaponModels.build(weaponId)
 		gun.Name = "WorldGun"
 		local data = PlayerDataService.get(player)
 		if data then
@@ -97,8 +123,9 @@ local function damageAtDistance(config: WeaponConfig.WeaponStats, distance: numb
 	return config.damage + (config.falloffEndDamage - config.damage) * alpha
 end
 
+type HitTotal = { damage: number, position: Vector3 }
+
 local function onFireWeapon(player: Player, origin: any, direction: any)
-	-- Cheap rejections first: spam, malformed args, dead/absent character.
 	if not Guard.checkRate(player, "FireWeapon", 25, 1) then
 		return
 	end
@@ -117,49 +144,82 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 		return
 	end
 
-	local config = WeaponConfig[equippedWeaponId(player)]
+	local config = WeaponConfig[state.current]
+	local isMelee = config.kind == "Melee"
 	local now = os.clock()
 	if now - state.lastShotAt < (1 / config.fireRate) * FIRE_RATE_TOLERANCE then
 		return
 	end
-	if now < state.reloadingUntil or state.ammo <= 0 then
-		return
+	if not isMelee then
+		if now < state.reloadingUntil or state.ammo[state.current] <= 0 then
+			return
+		end
 	end
 	state.lastShotAt = now
-	state.ammo -= 1
+	if not isMelee then
+		state.ammo[state.current] -= 1
+		pushAmmo(player)
+	end
 
-	-- The server's own raycast is the hit decision (NOD-14): walls block it,
-	-- range caps it, and the shooter's character is excluded.
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { character }
-	local result = workspace:Raycast(origin, direction * config.range, params)
 
-	-- Everyone else sees/hears the validated shot (the shooter already played
-	-- their own local effects at fire time).
-	local endpoint = if result then result.Position else origin + direction * config.range
-	Remotes.event("ShotFired"):FireAllClients(player, origin, endpoint)
+	-- Pellet 1 flies exactly where the client aimed; extra pellets get
+	-- server-rolled spread so clients can't choose their own pattern.
+	local totals: { [Player]: HitTotal } = {}
+	local firstEndpoint: Vector3? = nil
+	local spreadRad = math.rad(config.spread)
+	for pellet = 1, config.pellets do
+		local dir: Vector3 = direction
+		if pellet > 1 then
+			dir = (CFrame.lookAlong(Vector3.zero, direction) * CFrame.Angles(
+				rng:NextNumber(-spreadRad, spreadRad),
+				rng:NextNumber(-spreadRad, spreadRad),
+				0
+			)).LookVector
+		end
 
-	if not result then
-		return
+		local result = workspace:Raycast(origin, dir * config.range, params)
+		local endpoint = if result then result.Position else origin + dir * config.range
+		if not firstEndpoint then
+			firstEndpoint = endpoint
+		end
+		if not result then
+			continue
+		end
+
+		local hitModel = result.Instance:FindFirstAncestorOfClass("Model")
+		local victim = hitModel and Players:GetPlayerFromCharacter(hitModel)
+		if not victim or victim == player then
+			continue
+		end
+
+		local distance = (result.Position - origin).Magnitude
+		local pelletDamage = damageAtDistance(config, distance) / config.pellets
+		if result.Instance.Name == "Head" then
+			pelletDamage *= config.headshotMultiplier
+		end
+		local total = totals[victim]
+		if total then
+			total.damage += pelletDamage
+			total.position = result.Position
+		else
+			totals[victim] = { damage = pelletDamage, position = result.Position }
+		end
 	end
 
-	local hitModel = result.Instance:FindFirstAncestorOfClass("Model")
-	local victim = hitModel and Players:GetPlayerFromCharacter(hitModel)
-	if not victim or victim == player then
-		return
-	end
+	Remotes.event("ShotFired"):FireAllClients(player, origin, firstEndpoint or origin + direction * config.range)
 
-	local distance = (result.Position - origin).Magnitude
-	local damage = damageAtDistance(config, distance)
-	if result.Instance.Name == "Head" then
-		damage *= config.headshotMultiplier
-	end
-	damage = math.floor(damage + 0.5)
-
-	local applied, killed = CombatService.applyDamage(player, victim, damage, equippedWeaponId(player))
-	if applied then
-		Remotes.event("DamageDealt"):FireClient(player, damage, result.Position, killed)
+	for victim, total in totals do
+		local damage = math.floor(total.damage + 0.5)
+		if damage <= 0 then
+			continue
+		end
+		local applied, killed = CombatService.applyDamage(player, victim, damage, state.current)
+		if applied then
+			Remotes.event("DamageDealt"):FireClient(player, damage, total.position, killed)
+		end
 	end
 end
 
@@ -171,18 +231,52 @@ local function onReloadWeapon(player: Player)
 	if not state then
 		return
 	end
-	local config = WeaponConfig[equippedWeaponId(player)]
-	local now = os.clock()
-	if state.ammo >= config.magSize or now < state.reloadingUntil then
+	local weaponId = state.current
+	local config = WeaponConfig[weaponId]
+	if config.kind == "Melee" or config.magSize <= 0 then
 		return
 	end
+	local now = os.clock()
+	if state.ammo[weaponId] >= config.magSize or now < state.reloadingUntil then
+		return
+	end
+
+	state.reloadToken += 1
+	local token = state.reloadToken
 	state.reloadingUntil = now + config.reloadTime
+	pushAmmo(player)
 	task.delay(config.reloadTime, function()
-		-- Identity check: a respawn creates a fresh state table, cancelling this reload.
-		if states[player] == state then
-			state.ammo = config.magSize
+		-- A respawn (fresh state table) or a weapon switch (bumped token)
+		-- cancels the pending refill.
+		if states[player] == state and state.reloadToken == token then
+			state.ammo[weaponId] = config.magSize
+			state.reloadingUntil = 0
+			pushAmmo(player)
 		end
 	end)
+end
+
+local function onSelectWeapon(player: Player, weaponId: any)
+	if not Guard.checkRate(player, "SelectWeapon", 10, 1) then
+		return
+	end
+	if not Guard.isString(weaponId, 30) or not table.find(LOADOUT, weaponId) then
+		return
+	end
+	local state = states[player]
+	if not state or state.current == weaponId then
+		return
+	end
+
+	state.current = weaponId
+	state.reloadToken += 1 -- cancels any in-flight reload
+	state.reloadingUntil = 0
+	pushAmmo(player)
+
+	local character = aliveCharacter(player)
+	if character then
+		attachWorldGun(player, character)
+	end
 end
 
 function WeaponService.init()
@@ -191,6 +285,9 @@ function WeaponService.init()
 		player.CharacterAdded:Connect(function(character)
 			resetState(player)
 			attachWorldGun(player, character)
+			task.delay(1, function()
+				pushAmmo(player)
+			end)
 		end)
 		if player.Character then
 			attachWorldGun(player, player.Character)
@@ -207,6 +304,7 @@ function WeaponService.init()
 
 	Remotes.event("FireWeapon").OnServerEvent:Connect(onFireWeapon)
 	Remotes.event("ReloadWeapon").OnServerEvent:Connect(onReloadWeapon)
+	Remotes.event("SelectWeapon").OnServerEvent:Connect(onSelectWeapon)
 end
 
 return WeaponService

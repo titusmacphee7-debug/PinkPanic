@@ -89,7 +89,15 @@ local function pushWhenLoaded(player: Player)
 			if player.Parent ~= Players then
 				return
 			end
-			if PlayerDataService.get(player) then
+			local data = PlayerDataService.get(player)
+			if data then
+				-- New-player onboarding (NOD-43): starter coins, exactly once.
+				if not data.onboarded then
+					PlayerDataService.update(player, function(profile)
+						profile.onboarded = true
+						profile.coins += 100
+					end)
+				end
 				push(player)
 				return
 			end

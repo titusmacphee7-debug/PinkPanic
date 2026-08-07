@@ -106,13 +106,6 @@ function HitFeedbackController.init()
 		end
 	end)
 
-	-- Killfeed UI proper lands with the HUD (NOD-37); log entries until then.
-	Remotes.event("Killfeed").OnClientEvent:Connect(function(entry)
-		if type(entry) == "table" then
-			local killer = entry.killer or "the void"
-			print(`[Killfeed] {killer} → {entry.victim}`)
-		end
-	end)
 end
 
 return HitFeedbackController
