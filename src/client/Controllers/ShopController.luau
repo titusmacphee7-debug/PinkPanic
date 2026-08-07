@@ -31,6 +31,9 @@ local ShopController = {}
 local panel: Frame
 local grid: Frame
 local messageLabel: TextLabel
+-- Invisible Modal button: while visible, Roblox releases the first-person
+-- mouse lock — the sanctioned way to free the cursor for UI.
+local modalUnlock: TextButton
 local busy = false
 
 local function mkText(parent: Instance, textSize: number, color: Color3): TextLabel
@@ -53,10 +56,10 @@ end
 local function setOpen(open: boolean)
 	ClientData.shopOpen = open
 	panel.Visible = open
+	modalUnlock.Visible = open
+	modalUnlock.Modal = open
 	UserInputService.MouseIconEnabled = open
-	Players.LocalPlayer.CameraMode = if open then Enum.CameraMode.Classic else Enum.CameraMode.LockFirstPerson
 	if open then
-		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		messageLabel.Text = ""
 		ShopController.refresh()
 	end
@@ -216,6 +219,16 @@ local function buildGui()
 	local screen = Instance.new("ScreenGui")
 	screen.Name = "ShopUI"
 	screen.ResetOnSpawn = false
+
+	modalUnlock = Instance.new("TextButton")
+	modalUnlock.Name = "ModalUnlock"
+	modalUnlock.Size = UDim2.fromOffset(1, 1)
+	modalUnlock.Position = UDim2.new(0, -10, 0, -10)
+	modalUnlock.BackgroundTransparency = 1
+	modalUnlock.Text = ""
+	modalUnlock.Visible = false
+	modalUnlock.Modal = false
+	modalUnlock.Parent = screen
 
 	-- Bottom-left open button
 	local openButton = Instance.new("TextButton")
