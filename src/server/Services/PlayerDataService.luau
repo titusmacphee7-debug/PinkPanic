@@ -29,6 +29,9 @@ type Profile = {
 	data: PlayerData,
 	lockId: string,
 	loaded: boolean,
+	-- Studio fallback profile: playable but never written to the DataStore,
+	-- so it can't clobber real data or fight another session's lock.
+	ephemeral: boolean?,
 }
 
 local PlayerDataService = {}
@@ -99,6 +102,9 @@ end
 -- Writes the profile back, refreshing the lock (or releasing it on final save).
 -- Only writes if we still hold the lock — never clobbers another server's session.
 local function saveProfile(player: Player, profile: Profile, releaseLock: boolean): boolean
+	if profile.ephemeral then
+		return true
+	end
 	local dataStore = store
 	if not dataStore then
 		return true
@@ -154,6 +160,16 @@ local function onPlayerAdded(player: Player)
 
 	if profile then
 		profiles[player] = profile
+	elseif RunService:IsStudio() then
+		-- Studio testing: stale locks from abrupt stops are common and a kick
+		-- just disrupts iteration. Play on a throwaway profile that never saves.
+		warn(`[PlayerDataService] {player.Name}: profile unavailable — using ephemeral Studio profile (no saving)`)
+		profiles[player] = {
+			data = PlayerDataSchema.default(),
+			lockId = "",
+			loaded = true,
+			ephemeral = true,
+		}
 	else
 		-- Session locked elsewhere or DataStore outage. Kick rather than risk
 		-- playing on a profile that can't save (dupes, lost purchases).
