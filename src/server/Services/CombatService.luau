@@ -15,10 +15,14 @@ type DamageRecord = { attacker: Player?, weaponId: string? }
 
 local CombatService = {}
 
--- RoundService assigns this to receive every death (victim, attacker, weaponId).
-CombatService.onDeath = nil :: ((Player, Player?, string?) -> ())?
-
 local lastDamage: { [Player]: DamageRecord } = {}
+local deathListeners: { (Player, Player?, string?) -> () } = {}
+
+-- Round scoring, economy payouts, etc. subscribe here for every death
+-- (victim, attacker, weaponId).
+function CombatService.onDeathConnect(listener: (Player, Player?, string?) -> ())
+	table.insert(deathListeners, listener)
+end
 
 local function onCharacterAdded(player: Player, character: Model)
 	local humanoid = character:WaitForChild("Humanoid") :: Humanoid
@@ -33,9 +37,8 @@ local function onCharacterAdded(player: Player, character: Model)
 			killer = if record.attacker then record.attacker.Name else nil,
 			weaponId = record.weaponId,
 		})
-		local onDeath = CombatService.onDeath
-		if onDeath then
-			onDeath(player, record.attacker, record.weaponId)
+		for _, listener in deathListeners do
+			task.spawn(listener, player, record.attacker, record.weaponId)
 		end
 	end)
 end

@@ -1,0 +1,105 @@
+--!strict
+-- EconomyService — coins and XP, fully server-authoritative (NOD-30, NOD-31).
+-- Kills and round results are the only mints; the client can't request
+-- currency at all, it only receives DataChanged snapshots to display.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local EconomyConfig = require(ReplicatedStorage.Shared.Config.EconomyConfig)
+local PlayerDataService = require(script.Parent.PlayerDataService)
+local CombatService = require(script.Parent.CombatService)
+local RoundService = require(script.Parent.RoundService)
+
+local EconomyService = {}
+
+-- Sends the client everything it needs to render coins + level bar.
+local function push(player: Player)
+	local data = PlayerDataService.get(player)
+	if not data then
+		return
+	end
+	Remotes.event("DataChanged"):FireClient(player, {
+		coins = data.coins,
+		xp = data.xp,
+		level = data.level,
+		xpToNext = EconomyConfig.xpRequired(data.level),
+	})
+end
+
+local function grant(player: Player, coins: number, xp: number)
+	local changed = PlayerDataService.update(player, function(data)
+		data.coins += coins
+		data.xp += xp
+		while data.xp >= EconomyConfig.xpRequired(data.level) do
+			data.xp -= EconomyConfig.xpRequired(data.level)
+			data.level += 1
+		end
+	end)
+	if changed then
+		push(player)
+	end
+end
+
+local function onDeath(victim: Player, attacker: Player?, _weaponId: string?)
+	PlayerDataService.update(victim, function(data)
+		data.stats.deaths += 1
+	end)
+	if attacker and attacker ~= victim then
+		PlayerDataService.update(attacker, function(data)
+			data.stats.kills += 1
+		end)
+		grant(attacker, EconomyConfig.coinsPerKill, EconomyConfig.xpPerKill)
+	end
+end
+
+local function onRoundEnd(finalScores: { any }, winnerName: string?)
+	for _, row in finalScores do
+		local player = Players:GetPlayerByUserId(row.userId)
+		if not player then
+			continue
+		end
+		local won = row.name == winnerName
+		PlayerDataService.update(player, function(data)
+			data.stats.roundsPlayed += 1
+			if won then
+				data.stats.roundsWon += 1
+			end
+		end)
+		grant(
+			player,
+			EconomyConfig.coinsRoundPlayed + (if won then EconomyConfig.coinsRoundWin else 0),
+			EconomyConfig.xpRoundPlayed + (if won then EconomyConfig.xpRoundWin else 0)
+		)
+	end
+end
+
+-- Profiles load asynchronously; poll briefly so the HUD gets its first
+-- snapshot soon after join.
+local function pushWhenLoaded(player: Player)
+	task.spawn(function()
+		for _ = 1, 60 do
+			if player.Parent ~= Players then
+				return
+			end
+			if PlayerDataService.get(player) then
+				push(player)
+				return
+			end
+			task.wait(0.5)
+		end
+	end)
+end
+
+function EconomyService.init()
+	CombatService.onDeathConnect(onDeath)
+	RoundService.onRoundEnd = onRoundEnd
+
+	Players.PlayerAdded:Connect(pushWhenLoaded)
+	for _, player in Players:GetPlayers() do
+		pushWhenLoaded(player)
+	end
+end
+
+return EconomyService

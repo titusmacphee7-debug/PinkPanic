@@ -19,11 +19,13 @@ local ViewmodelController = require(script.Controllers.ViewmodelController)
 local WeaponController = require(script.Controllers.WeaponController)
 local HitFeedbackController = require(script.Controllers.HitFeedbackController)
 local RoundController = require(script.Controllers.RoundController)
+local EconomyController = require(script.Controllers.EconomyController)
 
 EffectsController.init()
 ViewmodelController.init()
 WeaponController.init()
 HitFeedbackController.init()
 RoundController.init()
+EconomyController.init()
 
 print("[PinkPanic] Client booted 🎀")

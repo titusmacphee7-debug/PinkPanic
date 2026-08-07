@@ -15,6 +15,9 @@ type Score = { kills: number, deaths: number }
 
 local RoundService = {}
 
+-- EconomyService assigns this to pay out round rewards (finalScores, winnerName).
+RoundService.onRoundEnd = nil :: (({ any }, string?) -> ())?
+
 local state = "Waiting"
 local endsAt = 0
 local scores: { [Player]: Score } = {}
@@ -123,17 +126,22 @@ local function runLoop()
 			task.wait(0.5)
 		end
 
-		-- RoundEnd: results screen, then loop.
+		-- RoundEnd: results screen, payouts, then loop.
 		state = "RoundEnd"
 		endsAt = now() + GameConfig.roundEndSeconds
 		local winner = topEntry()
-		broadcast({ winner = if winner then winner.name else nil })
+		local winnerName = if winner then winner.name else nil
+		local onRoundEnd = RoundService.onRoundEnd
+		if onRoundEnd then
+			task.spawn(onRoundEnd, serializeScores(), winnerName)
+		end
+		broadcast({ winner = winnerName })
 		task.wait(GameConfig.roundEndSeconds)
 	end
 end
 
 function RoundService.init()
-	CombatService.onDeath = onDeath
+	CombatService.onDeathConnect(onDeath)
 
 	Players.PlayerAdded:Connect(function(player)
 		if state == "Active" then
