@@ -26,6 +26,14 @@
       "$properties": {
         "RespawnTime": 3
       }
+    },
+    "Lighting": {
+      "$properties": {
+        "Brightness": 2.5,
+        "ClockTime": 14.5,
+        "Ambient": [0.55, 0.47, 0.52],
+        "OutdoorAmbient": [0.62, 0.52, 0.58]
+      }
     }
   }
 }

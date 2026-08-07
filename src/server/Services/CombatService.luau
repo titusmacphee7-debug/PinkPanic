@@ -32,8 +32,10 @@ local function onCharacterAdded(player: Player, character: Model)
 	humanoid.Health = MAX_HEALTH
 	lastDamage[player] = {}
 
-	-- Spawn protection (NOD-20): cap any ForceField (SpawnLocations grant a
-	-- 10s one by default) at our shorter window so fights resume quickly.
+	-- Spawn protection (NOD-20): our own short invuln window (map spawn pads
+	-- have Duration 0), and a sweep that also caps any foreign ForceField.
+	local protection = Instance.new("ForceField")
+	protection.Parent = character
 	task.delay(SPAWN_PROTECTION_SECONDS, function()
 		for _, child in character:GetChildren() do
 			if child:IsA("ForceField") then
