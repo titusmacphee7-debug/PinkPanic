@@ -1,0 +1,7 @@
+# Toolchain pins for Pink Panic. Install Rokit (https://github.com/rojo-rbx/rokit),
+# then run `rokit install` in this directory.
+
+[tools]
+rojo = "rojo-rbx/rojo@7.4.4"
+stylua = "JohnnyMorganz/StyLua@2.0.2"
+selene = "Kampfkarren/selene@0.28.0"

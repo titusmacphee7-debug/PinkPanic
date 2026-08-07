@@ -1,0 +1,20 @@
+# Roblox place/model builds (built from source via `rojo build`)
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+*.rbxl.lock
+*.rbxlx.lock
+
+# Rojo
+sourcemap.json
+
+# Tooling
+/Packages
+/ServerPackages
+/DevPackages
+wally.lock
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
