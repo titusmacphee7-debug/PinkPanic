@@ -15,6 +15,9 @@ type DamageRecord = { attacker: Player?, weaponId: string? }
 
 local CombatService = {}
 
+-- RoundService assigns this to receive every death (victim, attacker, weaponId).
+CombatService.onDeath = nil :: ((Player, Player?, string?) -> ())?
+
 local lastDamage: { [Player]: DamageRecord } = {}
 
 local function onCharacterAdded(player: Player, character: Model)
@@ -30,7 +33,10 @@ local function onCharacterAdded(player: Player, character: Model)
 			killer = if record.attacker then record.attacker.Name else nil,
 			weaponId = record.weaponId,
 		})
-		-- M2 (NOD-21) hooks kill/score tracking here; M4 (NOD-30) hooks coins.
+		local onDeath = CombatService.onDeath
+		if onDeath then
+			onDeath(player, record.attacker, record.weaponId)
+		end
 	end)
 end
 

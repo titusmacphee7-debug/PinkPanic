@@ -11,6 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
 local EffectsController = require(script.Parent.EffectsController)
+local ViewmodelController = require(script.Parent.ViewmodelController)
 
 local Players = game:GetService("Players")
 
@@ -47,11 +48,11 @@ local function shoot()
 	params.FilterDescendantsInstances = if character then { character } else {}
 	local result = workspace:Raycast(origin, aim.LookVector * config.range, params)
 	local endpoint = if result then result.Position else origin + aim.LookVector * config.range
-	-- Start the tracer just off-center (down-right) so it reads as a shot, not
-	-- a line drawn in your eye.
-	local muzzle = origin + camera.CFrame.RightVector * 0.6 - camera.CFrame.UpVector * 0.4
+	local muzzle = ViewmodelController.getMuzzlePosition()
+		or origin + camera.CFrame.RightVector * 0.6 - camera.CFrame.UpVector * 0.4
 	EffectsController.drawTracer(muzzle, endpoint)
 	EffectsController.playShotSound(0.6)
+	ViewmodelController.kick()
 end
 
 function WeaponController.init()

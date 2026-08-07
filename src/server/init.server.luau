@@ -10,11 +10,13 @@ local Guard = require(ReplicatedStorage.Shared.Net.Guard)
 local PlayerDataService = require(script.Services.PlayerDataService)
 local CombatService = require(script.Services.CombatService)
 local WeaponService = require(script.Services.WeaponService)
+local RoundService = require(script.Services.RoundService)
 
 Remotes.init()
 PlayerDataService.init()
 CombatService.init()
 WeaponService.init()
+RoundService.init()
 
 Players.PlayerRemoving:Connect(function(player)
 	Guard.clearPlayer(player)

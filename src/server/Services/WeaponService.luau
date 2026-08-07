@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Guard = require(ReplicatedStorage.Shared.Net.Guard)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
+local PistolModel = require(ReplicatedStorage.Shared.Assets.PistolModel)
 local CombatService = require(script.Parent.CombatService)
 
 -- Allow slightly faster than nominal fire rate so honest clients with jitter
@@ -41,6 +42,31 @@ local function resetState(player: Player)
 		lastShotAt = 0,
 		reloadingUntil = 0,
 	}
+end
+
+-- Welds a pistol to the character's hand so other players see the weapon.
+-- The shooter sees their own viewmodel instead (first-person hides the body).
+local function attachWorldGun(character: Model)
+	task.spawn(function()
+		local hand = character:WaitForChild("RightHand", 5) or character:FindFirstChild("Right Arm")
+		local root = character:FindFirstChild("HumanoidRootPart")
+		if not hand or not hand:IsA("BasePart") or not root or not root:IsA("BasePart") then
+			return
+		end
+		if character:FindFirstChild("WorldGun") then
+			return
+		end
+
+		local gun = PistolModel.build()
+		gun.Name = "WorldGun"
+		local grip = CFrame.lookAlong(hand.Position, root.CFrame.LookVector) * CFrame.new(0, -0.1, -0.45)
+		gun:PivotTo(grip)
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = gun.PrimaryPart
+		weld.Part1 = hand
+		weld.Parent = gun.PrimaryPart
+		gun.Parent = character
+	end)
 end
 
 local function aliveCharacter(player: Player): (Model?, BasePart?)
@@ -155,9 +181,13 @@ end
 function WeaponService.init()
 	local function hookPlayer(player: Player)
 		resetState(player)
-		player.CharacterAdded:Connect(function()
+		player.CharacterAdded:Connect(function(character)
 			resetState(player)
+			attachWorldGun(character)
 		end)
+		if player.Character then
+			attachWorldGun(player.Character)
+		end
 	end
 
 	Players.PlayerAdded:Connect(hookPlayer)
