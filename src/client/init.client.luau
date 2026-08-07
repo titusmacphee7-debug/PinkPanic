@@ -3,8 +3,12 @@
 -- here as they come online in M1+.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+
+-- First-person shooter: the pink crosshair is the cursor.
+UserInputService.MouseIconEnabled = false
 
 -- Touching any remote here blocks until the server has finished Remotes.init,
 -- so everything after this line can assume the remote surface exists.
