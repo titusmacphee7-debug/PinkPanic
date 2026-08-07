@@ -28,12 +28,13 @@ Studio settings to enable by hand (not synced by Rojo):
 
 Studio ships a built-in MCP server (see the [official docs](https://create.roblox.com/docs/studio/mcp)),
 which lets Claude Code read the data model, insert instances, and run code in
-the open place. Repo config lives in `.mcp.json`, so setup is:
+the open place. Repo config lives in `.mcp.json` (Windows: launches Studio's
+`%LOCALAPPDATA%\Roblox\mcp.bat` over stdio), so setup is:
 
 1. In Studio: **File → Studio Settings → Beta Features → enable MCP Server**, then restart Studio.
-2. Run `claude` from this folder — it picks up the `roblox-studio` server from `.mcp.json`
-   (expects Studio listening on `localhost:3004`; if Studio's MCP settings show a different
-   port/endpoint, mirror it in `.mcp.json`).
+2. Run `claude` from this folder and approve the `Roblox_Studio` server it picks up
+   from `.mcp.json`. (Equivalent manual registration:
+   `claude mcp add --transport stdio Roblox_Studio -- "cmd.exe" "/c" "cd /d %LOCALAPPDATA%\Roblox && .\mcp.bat"`)
 3. Verify with `/mcp`, then ask Claude to list the children of `Workspace`.
 
 ## Project structure
