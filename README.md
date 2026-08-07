@@ -24,6 +24,18 @@ Studio settings to enable by hand (not synced by Rojo):
 - **Game Settings → Security → Enable Studio Access to API Services** (required for DataStores).
 - First-person camera comes later (M1); no Studio changes needed yet.
 
+## Claude Code ↔ Studio (MCP)
+
+Studio ships a built-in MCP server (see the [official docs](https://create.roblox.com/docs/studio/mcp)),
+which lets Claude Code read the data model, insert instances, and run code in
+the open place. Repo config lives in `.mcp.json`, so setup is:
+
+1. In Studio: **File → Studio Settings → Beta Features → enable MCP Server**, then restart Studio.
+2. Run `claude` from this folder — it picks up the `roblox-studio` server from `.mcp.json`
+   (expects Studio listening on `localhost:3004`; if Studio's MCP settings show a different
+   port/endpoint, mirror it in `.mcp.json`).
+3. Verify with `/mcp`, then ask Claude to list the children of `Workspace`.
+
 ## Project structure
 
 ```
