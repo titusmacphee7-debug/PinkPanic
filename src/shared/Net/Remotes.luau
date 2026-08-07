@@ -28,6 +28,7 @@ local Definitions: { [string]: RemoteKind } = {
 	-- Economy (M4)
 	PurchaseItem = "Function", -- client -> server: buy from catalog, returns result
 	EquipItem = "Function", -- client -> server: equip owned cosmetic, returns result
+	UpdateSettings = "Function", -- client -> server: persist sensitivity/volume/starting weapon
 	DataChanged = "Event", -- server -> client: profile replication (coins, xp, owned)
 }
 

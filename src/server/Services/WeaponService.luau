@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Guard = require(ReplicatedStorage.Shared.Net.Guard)
+local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
 local WeaponModels = require(ReplicatedStorage.Shared.Assets.WeaponModels)
 local WeaponCosmetics = require(ReplicatedStorage.Shared.Assets.WeaponCosmetics)
@@ -23,8 +24,9 @@ local FIRE_RATE_TOLERANCE = 0.9
 -- origin far from the head means teleported/spoofed shots.
 local MAX_ORIGIN_DRIFT = 8
 
--- Everyone carries the full MVP arsenal; a picker UI can narrow this later.
-local LOADOUT = { "Pistol", "Rifle", "Shotgun", "Knife" }
+-- Everyone carries the full MVP arsenal; the loadout choice picks which one
+-- you spawn holding.
+local LOADOUT = GameConfig.loadout
 
 type WeaponState = {
 	current: string,
@@ -44,8 +46,16 @@ local function resetState(player: Player)
 	for _, weaponId in LOADOUT do
 		ammo[weaponId] = WeaponConfig[weaponId].magSize
 	end
+
+	-- Spawn holding the persisted loadout choice (NOD-28).
+	local data = PlayerDataService.get(player)
+	local starting = data and data.equipped.weapon
+	if not starting or not table.find(LOADOUT, starting) then
+		starting = "Pistol"
+	end
+
 	states[player] = {
-		current = "Pistol",
+		current = starting,
 		ammo = ammo,
 		lastShotAt = 0,
 		reloadingUntil = 0,

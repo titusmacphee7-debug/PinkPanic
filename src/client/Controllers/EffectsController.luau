@@ -10,6 +10,7 @@ local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local ClientData = require(script.Parent.Parent.ClientData)
 
 local SHOT_SOUND = "rbxasset://sounds/snap.mp3"
 local HIT_SOUND = "rbxasset://sounds/electronicpingshort.wav"
@@ -17,10 +18,18 @@ local TRACER_PINK = Color3.fromRGB(255, 150, 200)
 
 local EffectsController = {}
 
+-- Player-set volume from settings scales every effect sound.
+local function volumeMultiplier(): number
+	local snap = ClientData.snapshot
+	local settings = snap and snap.settings
+	local value = settings and settings.volume
+	return if type(value) == "number" then math.clamp(value, 0, 1) else 1
+end
+
 local function playSound(soundId: string, volume: number, playbackSpeed: number)
 	local sound = Instance.new("Sound")
 	sound.SoundId = soundId
-	sound.Volume = volume
+	sound.Volume = volume * volumeMultiplier()
 	sound.PlaybackSpeed = playbackSpeed
 	SoundService:PlayLocalSound(sound)
 	task.delay(2, function()

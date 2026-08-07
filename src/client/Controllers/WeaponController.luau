@@ -39,7 +39,7 @@ local function selectWeapon(weaponId: string)
 end
 
 local function shoot()
-	if ClientData.shopOpen then
+	if ClientData.menuOpen() then
 		return
 	end
 	local config = WeaponConfig[currentWeapon]
@@ -114,6 +114,17 @@ function WeaponController.init()
 	RunService.Heartbeat:Connect(function()
 		if triggerHeld and WeaponConfig[currentWeapon].auto then
 			shoot()
+		end
+	end)
+
+	-- The server is the authority on the held weapon (persisted loadout choice
+	-- on spawn, validated switches). Adopt whatever it reports.
+	Remotes.event("AmmoChanged").OnClientEvent:Connect(function(data)
+		if type(data) == "table" and type(data.weaponId) == "string" and WeaponConfig[data.weaponId] then
+			if data.weaponId ~= currentWeapon then
+				currentWeapon = data.weaponId
+				ViewmodelController.setWeapon(data.weaponId)
+			end
 		end
 	end)
 end

@@ -37,6 +37,11 @@ the open place. Repo config lives in `.mcp.json` (Windows: launches Studio's
    `claude mcp add --transport stdio Roblox_Studio -- "cmd.exe" "/c" "cd /d %LOCALAPPDATA%\Roblox && .\mcp.bat"`)
 3. Verify with `/mcp`, then ask Claude to list the children of `Workspace`.
 
+## Controls
+
+Left-click fire (hold for automatics) · **R** reload · **1–4** switch weapon ·
+**Tab** scoreboard · **B** shop · **⚙️** settings (sensitivity, volume, starting weapon)
+
 ## Project structure
 
 ```

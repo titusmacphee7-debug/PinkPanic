@@ -58,7 +58,7 @@ local function setOpen(open: boolean)
 	panel.Visible = open
 	modalUnlock.Visible = open
 	modalUnlock.Modal = open
-	UserInputService.MouseIconEnabled = open
+	UserInputService.MouseIconEnabled = open or ClientData.settingsOpen
 	if open then
 		messageLabel.Text = ""
 		ShopController.refresh()

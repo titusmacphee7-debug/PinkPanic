@@ -7,4 +7,7 @@ return {
 	roundSeconds = 180,
 	roundEndSeconds = 8,
 	scoreTarget = 10,
+	-- Every carried weapon, in hotbar order (keys 1..n). Also the valid set
+	-- for the starting-weapon loadout choice.
+	loadout = { "Pistol", "Rifle", "Shotgun", "Knife" },
 }

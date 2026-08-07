@@ -14,6 +14,12 @@ local ClientData = {}
 ClientData.snapshot = nil :: any
 ClientData.changed = changedEvent.Event
 ClientData.shopOpen = false
+ClientData.settingsOpen = false
+
+-- True while any modal menu should block gameplay input.
+function ClientData.menuOpen(): boolean
+	return ClientData.shopOpen or ClientData.settingsOpen
+end
 
 function ClientData.equippedSkin(): string?
 	local snap = ClientData.snapshot
