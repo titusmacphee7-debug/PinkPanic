@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local EffectsController = require(script.Parent.EffectsController)
 
 local PINK = Color3.fromRGB(255, 105, 180)
 local KILL_RED = Color3.fromRGB(255, 64, 96)
@@ -99,6 +100,7 @@ function HitFeedbackController.init()
 
 	Remotes.event("DamageDealt").OnClientEvent:Connect(function(amount, worldPosition, killed)
 		flashHitmarker(killed == true)
+		EffectsController.playHitSound()
 		if type(amount) == "number" and typeof(worldPosition) == "Vector3" then
 			showDamageNumber(amount, worldPosition, killed == true)
 		end

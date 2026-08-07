@@ -33,7 +33,10 @@ type Profile = {
 
 local PlayerDataService = {}
 
-local store = DataStoreService:GetDataStore(STORE_NAME)
+-- Acquired in init() behind a pcall: GetDataStore throws in Studio when API
+-- access is disabled, and that must degrade to no-persistence mode, not kill
+-- the server boot.
+local store: DataStore? = nil
 local profiles: { [Player]: Profile } = {}
 
 local function keyFor(player: Player): string
@@ -59,12 +62,18 @@ end
 -- Attempts to acquire the session lock and load the profile in one UpdateAsync.
 -- Returns nil if another live server holds the lock or the DataStore is down.
 local function loadProfile(player: Player): Profile?
+	local dataStore = store
+	if not dataStore then
+		-- No-persistence mode (Studio without API access): fresh default profile.
+		return { data = PlayerDataSchema.default(), lockId = "local", loaded = true }
+	end
+
 	local lockId = HttpService:GenerateGUID(false)
 	local acquired = false
 	local loadedData: PlayerData? = nil
 
 	local ok = withRetries(LOAD_RETRIES, function()
-		store:UpdateAsync(keyFor(player), function(record: Record?)
+		dataStore:UpdateAsync(keyFor(player), function(record: Record?)
 			local now = os.time()
 			if record and record.lock and now - record.lock.timestamp < LOCK_TIMEOUT then
 				-- Someone else (a live server) owns this profile; do not touch it.
@@ -90,8 +99,13 @@ end
 -- Writes the profile back, refreshing the lock (or releasing it on final save).
 -- Only writes if we still hold the lock — never clobbers another server's session.
 local function saveProfile(player: Player, profile: Profile, releaseLock: boolean): boolean
+	local dataStore = store
+	if not dataStore then
+		return true
+	end
+
 	local ok = withRetries(SAVE_RETRIES, function()
-		store:UpdateAsync(keyFor(player), function(record: Record?)
+		dataStore:UpdateAsync(keyFor(player), function(record: Record?)
 			if record and record.lock and record.lock.id ~= profile.lockId then
 				return nil -- lock was stolen (we must have hung); keep their data
 			end
@@ -156,6 +170,15 @@ local function onPlayerRemoving(player: Player)
 end
 
 function PlayerDataService.init()
+	local ok, result = pcall(function()
+		return DataStoreService:GetDataStore(STORE_NAME)
+	end)
+	if ok then
+		store = result
+	else
+		warn("[PlayerDataService] DataStores unavailable — running without persistence. " .. tostring(result))
+	end
+
 	Players.PlayerAdded:Connect(function(player)
 		task.spawn(onPlayerAdded, player)
 	end)

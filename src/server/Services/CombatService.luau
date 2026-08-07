@@ -34,12 +34,17 @@ local function onCharacterAdded(player: Player, character: Model)
 	end)
 end
 
--- Applies damage from attacker to victim. Returns true if this damage killed.
-function CombatService.applyDamage(attacker: Player, victim: Player, amount: number, weaponId: string): boolean
+-- Applies damage from attacker to victim. Returns (applied, killed) — applied
+-- is false when a ForceField (spawn protection) blocked the damage, so callers
+-- don't show hit feedback for shots that did nothing.
+function CombatService.applyDamage(attacker: Player, victim: Player, amount: number, weaponId: string): (boolean, boolean)
 	local character = victim.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 then
-		return false
+	if not character or not humanoid or humanoid.Health <= 0 then
+		return false, false
+	end
+	if character:FindFirstChildOfClass("ForceField") then
+		return false, false
 	end
 
 	local record = lastDamage[victim]
@@ -49,7 +54,7 @@ function CombatService.applyDamage(attacker: Player, victim: Player, amount: num
 	end
 
 	humanoid:TakeDamage(amount)
-	return humanoid.Health <= 0
+	return true, humanoid.Health <= 0
 end
 
 function CombatService.init()

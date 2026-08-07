@@ -10,6 +10,9 @@ local UserInputService = game:GetService("UserInputService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
+local EffectsController = require(script.Parent.EffectsController)
+
+local Players = game:GetService("Players")
 
 local WeaponController = {}
 
@@ -34,7 +37,21 @@ local function shoot()
 	local spread = math.rad(config.spread)
 	local aim = camera.CFrame
 		* CFrame.Angles(rng:NextNumber(-spread, spread), rng:NextNumber(-spread, spread), 0)
-	Remotes.event("FireWeapon"):FireServer(camera.CFrame.Position, aim.LookVector)
+	local origin = camera.CFrame.Position
+	Remotes.event("FireWeapon"):FireServer(origin, aim.LookVector)
+
+	-- Immediate local feedback; the server independently decides the real hit.
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local character = Players.LocalPlayer.Character
+	params.FilterDescendantsInstances = if character then { character } else {}
+	local result = workspace:Raycast(origin, aim.LookVector * config.range, params)
+	local endpoint = if result then result.Position else origin + aim.LookVector * config.range
+	-- Start the tracer just off-center (down-right) so it reads as a shot, not
+	-- a line drawn in your eye.
+	local muzzle = origin + camera.CFrame.RightVector * 0.6 - camera.CFrame.UpVector * 0.4
+	EffectsController.drawTracer(muzzle, endpoint)
+	EffectsController.playShotSound(0.6)
 end
 
 function WeaponController.init()

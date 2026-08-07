@@ -101,6 +101,12 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { character }
 	local result = workspace:Raycast(origin, direction * config.range, params)
+
+	-- Everyone else sees/hears the validated shot (the shooter already played
+	-- their own local effects at fire time).
+	local endpoint = if result then result.Position else origin + direction * config.range
+	Remotes.event("ShotFired"):FireAllClients(player, origin, endpoint)
+
 	if not result then
 		return
 	end
@@ -118,8 +124,10 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 	end
 	damage = math.floor(damage + 0.5)
 
-	local killed = CombatService.applyDamage(player, victim, damage, equippedWeaponId(player))
-	Remotes.event("DamageDealt"):FireClient(player, damage, result.Position, killed)
+	local applied, killed = CombatService.applyDamage(player, victim, damage, equippedWeaponId(player))
+	if applied then
+		Remotes.event("DamageDealt"):FireClient(player, damage, result.Position, killed)
+	end
 end
 
 local function onReloadWeapon(player: Player)
