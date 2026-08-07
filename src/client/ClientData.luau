@@ -4,10 +4,14 @@
 -- subscribing to the remote.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 
 local changedEvent = Instance.new("BindableEvent")
+local UNLOCK_BIND = "PinkPanicMouseUnlock"
+local unlockBound = false
 
 local ClientData = {}
 
@@ -19,6 +23,26 @@ ClientData.settingsOpen = false
 -- True while any modal menu should block gameplay input.
 function ClientData.menuOpen(): boolean
 	return ClientData.shopOpen or ClientData.settingsOpen
+end
+
+-- Call after toggling shopOpen/settingsOpen. The first-person camera scripts
+-- re-lock the mouse every render step, so while a menu is open we bind AFTER
+-- them (RenderPriority.Last) and force the cursor free each frame — the only
+-- approach that reliably wins that fight.
+function ClientData.updateMouseUnlock()
+	local shouldUnlock = ClientData.menuOpen()
+	if shouldUnlock and not unlockBound then
+		unlockBound = true
+		RunService:BindToRenderStep(UNLOCK_BIND, Enum.RenderPriority.Last.Value, function()
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+			UserInputService.MouseIconEnabled = true
+		end)
+	elseif not shouldUnlock and unlockBound then
+		unlockBound = false
+		RunService:UnbindFromRenderStep(UNLOCK_BIND)
+		UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+		UserInputService.MouseIconEnabled = false
+	end
 end
 
 function ClientData.equippedSkin(): string?
