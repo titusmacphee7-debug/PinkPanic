@@ -14,8 +14,9 @@ local RoundService = require(script.Parent.RoundService)
 
 local EconomyService = {}
 
--- Sends the client everything it needs to render coins + level bar.
-local function push(player: Player)
+-- Sends the client everything it needs to render coins, level bar, and shop
+-- ownership/equip state. Public so ShopService can push after purchases.
+function EconomyService.push(player: Player)
 	local data = PlayerDataService.get(player)
 	if not data then
 		return
@@ -25,8 +26,13 @@ local function push(player: Player)
 		xp = data.xp,
 		level = data.level,
 		xpToNext = EconomyConfig.xpRequired(data.level),
+		ownedSkins = data.ownedSkins,
+		ownedCharms = data.ownedCharms,
+		equipped = data.equipped,
 	})
 end
+
+local push = EconomyService.push
 
 local function grant(player: Player, coins: number, xp: number)
 	local changed = PlayerDataService.update(player, function(data)

@@ -14,18 +14,22 @@ UserInputService.MouseIconEnabled = false
 -- so everything after this line can assume the remote surface exists.
 Remotes.event("RoundStateChanged")
 
+local ClientData = require(script.ClientData)
 local EffectsController = require(script.Controllers.EffectsController)
 local ViewmodelController = require(script.Controllers.ViewmodelController)
 local WeaponController = require(script.Controllers.WeaponController)
 local HitFeedbackController = require(script.Controllers.HitFeedbackController)
 local RoundController = require(script.Controllers.RoundController)
 local EconomyController = require(script.Controllers.EconomyController)
+local ShopController = require(script.Controllers.ShopController)
 
+ClientData.init()
 EffectsController.init()
 ViewmodelController.init()
 WeaponController.init()
 HitFeedbackController.init()
 RoundController.init()
 EconomyController.init()
+ShopController.init()
 
 print("[PinkPanic] Client booted 🎀")

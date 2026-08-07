@@ -9,6 +9,8 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local PistolModel = require(ReplicatedStorage.Shared.Assets.PistolModel)
+local WeaponCosmetics = require(ReplicatedStorage.Shared.Assets.WeaponCosmetics)
+local ClientData = require(script.Parent.Parent.ClientData)
 
 local BASE_OFFSET = CFrame.new(1.05, -0.85, -1.55)
 local SWAY_LIMIT = 0.06
@@ -28,6 +30,11 @@ local function localCharacterAlive(): boolean
 	return humanoid ~= nil and humanoid.Health > 0
 end
 
+local function applyCosmetics(gun: Model)
+	WeaponCosmetics.applySkin(gun, ClientData.equippedSkin())
+	WeaponCosmetics.applyCharm(gun, ClientData.equippedCharm())
+end
+
 local function ensureModel(): Model
 	local current = model
 	if current and current.Parent then
@@ -40,6 +47,7 @@ local function ensureModel(): Model
 			part.Anchored = true
 		end
 	end
+	applyCosmetics(built)
 	built.Parent = workspace.CurrentCamera
 	model = built
 	return built
@@ -103,6 +111,13 @@ end
 
 function ViewmodelController.init()
 	RunService:BindToRenderStep("PinkPanicViewmodel", Enum.RenderPriority.Camera.Value + 1, update)
+
+	-- Equip changes re-dress the in-hand gun live.
+	ClientData.changed:Connect(function()
+		if model then
+			applyCosmetics(model)
+		end
+	end)
 end
 
 return ViewmodelController

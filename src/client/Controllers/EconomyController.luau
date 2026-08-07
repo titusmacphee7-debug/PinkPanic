@@ -7,7 +7,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
-local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local ClientData = require(script.Parent.Parent.ClientData)
 
 local HOT_PINK = Color3.fromRGB(255, 92, 168)
 local DEEP_PINK = Color3.fromRGB(214, 66, 143)
@@ -140,7 +140,10 @@ end
 
 function EconomyController.init()
 	buildGui()
-	Remotes.event("DataChanged").OnClientEvent:Connect(applySnapshot)
+	ClientData.changed:Connect(applySnapshot)
+	if ClientData.snapshot then
+		applySnapshot(ClientData.snapshot)
+	end
 end
 
 return EconomyController

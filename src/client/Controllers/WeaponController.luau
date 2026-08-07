@@ -12,6 +12,7 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
 local EffectsController = require(script.Parent.EffectsController)
 local ViewmodelController = require(script.Parent.ViewmodelController)
+local ClientData = require(script.Parent.Parent.ClientData)
 
 local Players = game:GetService("Players")
 
@@ -23,6 +24,9 @@ local triggerHeld = false
 local lastShotAt = 0
 
 local function shoot()
+	if ClientData.shopOpen then
+		return
+	end
 	local config = WeaponConfig[weaponId]
 	local now = os.clock()
 	if now - lastShotAt < 1 / config.fireRate then
