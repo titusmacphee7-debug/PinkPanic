@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics=""><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""><link href="https://fonts.googleapis.com/css2?family=Fredoka+One&amp;display=swap" rel="stylesheet"><style>
+html,body{margin:0;height:100%;background:#2A1A24;font-family:'Fredoka One',system-ui,sans-serif}
+a{color:#D6428F;text-decoration:none}a:hover{color:#FF5CA8}
+@keyframes ppFloat{0%{opacity:0;transform:translate(-50%,0) scale(.7)}18%{opacity:1;transform:translate(-50%,-14px) scale(1.08)}100%{opacity:0;transform:translate(-50%,-64px) scale(.95)}}
+@keyframes ppHit{0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(0deg)}25%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(8deg)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5) rotate(14deg)}}
+@keyframes ppFeed{0%{opacity:0;transform:translateX(-26px)}12%{opacity:1;transform:translateX(0)}80%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(-10px)}}
+@keyframes ppPop{0%{opacity:0;transform:translateY(6px) scale(.8)}25%{opacity:1;transform:translateY(-2px) scale(1.05)}100%{opacity:0;transform:translateY(-18px) scale(1)}}
+@keyframes ppSpark{0%,100%{opacity:.25;transform:scale(.85)}50%{opacity:.9;transform:scale(1.15)}}
+@keyframes ppBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.04)}}
+@keyframes ppOpen{0%{opacity:0;transform:scale(.94)}100%{opacity:1;transform:scale(1)}}
+@keyframes ppDrift{0%{transform:translateY(0)}100%{transform:translateY(-38px)}}
+</style></helmet>
+<div style="position:absolute;inset:0;overflow:hidden;background:radial-gradient(120% 100% at 50% 0%,#3A2331 0%,#241722 100%);display:grid;place-items:center;padding-bottom:52px;box-sizing:border-box">
+
+<div style="width:{{ wrapW }}px;height:{{ wrapH }}px">
+<div style="transform:scale({{ scale }});transform-origin:top left">
+
+<sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+<div data-stage="desktop" style="width:1920px;height:1080px;position:relative;overflow:hidden;border-radius:6px;font-family:'Fredoka One',sans-serif;user-select:none">
+
+  <sc-if value="{{ inLobby }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,#FFE9F5 0%,#FFD6EB 34%,#FFC4E0 56%,#F7B0D3 100%)">
+      <div style="position:absolute;left:6%;top:6%;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.6),rgba(255,255,255,0) 70%);filter:blur(8px)"></div>
+      <div style="position:absolute;right:8%;top:4%;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.45),rgba(255,255,255,0) 70%);filter:blur(8px)"></div>
+      <div style="position:absolute;left:0;right:0;top:600px;bottom:0;background:linear-gradient(180deg,#FFDCEE 0%,#FBC8E2 44%,#F3B6D6 100%)"></div>
+      <div style="position:absolute;left:50%;top:642px;transform:translateX(-50%);width:1360px;height:400px;border-radius:50% 50% 0 0 / 90px 90px 0 0;background:rgba(255,245,250,.55)"></div>
+      <div style="position:absolute;left:50%;top:700px;transform:translateX(-50%);width:520px;height:330px;border-radius:50%;background:repeating-linear-gradient(90deg,rgba(255,255,255,.7) 0 44px,rgba(255,214,235,.7) 44px 88px);opacity:.6"></div>
+
+      <div onClick="{{ enterBowtique }}" style="position:absolute;left:150px;top:286px;width:376px;cursor:pointer;display:flex;flex-direction:column;align-items:center" style-hover="filter:brightness(1.04)">
+        <div style="width:300px;padding:10px 0;border-radius:14px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);border:3px solid #FFF5FA;box-shadow:0 6px 0 rgba(198,52,124,.5);text-align:center">
+          <span style="font-size:26px;color:#fff;letter-spacing:.04em">🎀 The Bow-tique</span>
+        </div>
+        <div style="width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:14px solid #FF5CA8;margin-top:-2px"></div>
+        <div style="width:340px;height:60px;border-radius:12px 12px 0 0;background:repeating-linear-gradient(90deg,#FF5CA8 0 34px,#FFF5FA 34px 68px);border:3px solid #FFF5FA;border-bottom:none;margin-top:6px"></div>
+        <div style="width:322px;height:206px;background:#FFE3F0;border:3px solid #FF9ACB;border-top:none;border-radius:0 0 16px 16px;display:flex;align-items:flex-end;justify-content:center;gap:16px;padding-bottom:0;box-shadow:0 14px 30px rgba(148,52,102,.22)">
+          <div style="width:74px;height:104px;border-radius:14px 14px 0 0;background:#FFF5FA;border:3px solid #FF9ACB;border-bottom:none"></div>
+          <div style="width:82px;height:128px;border-radius:44px 44px 0 0;background:linear-gradient(180deg,#FFB7DA,#FF8CC3);border:3px solid #FF9ACB;border-bottom:none;display:grid;place-items:center;padding-bottom:14px">
+            <span style="font-size:30px">🚪</span>
+          </div>
+          <div style="width:74px;height:104px;border-radius:14px 14px 0 0;background:#FFF5FA;border:3px solid #FF9ACB;border-bottom:none"></div>
+        </div>
+        <span style="margin-top:10px;font-size:17px;color:#B03A78;letter-spacing:.08em">walk in to shop</span>
+      </div>
+
+      <div onClick="{{ enterArmory }}" style="position:absolute;left:672px;top:322px;width:376px;cursor:pointer;display:flex;flex-direction:column;align-items:center" style-hover="filter:brightness(1.04)">
+        <div style="width:308px;padding:10px 0;border-radius:14px;background:linear-gradient(180deg,#FFB765,#FF9A3C);border:3px solid #FFF5FA;box-shadow:0 6px 0 rgba(196,116,32,.5);text-align:center">
+          <span style="font-size:26px;color:#fff;letter-spacing:.04em">🍭 Candy Armory</span>
+        </div>
+        <div style="width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:14px solid #FF9A3C;margin-top:-2px"></div>
+        <div style="width:344px;height:56px;border-radius:12px 12px 0 0;background:repeating-linear-gradient(90deg,#FF9A3C 0 34px,#FFF5FA 34px 68px);border:3px solid #FFF5FA;border-bottom:none;margin-top:6px"></div>
+        <div style="width:326px;height:180px;background:#FFF0E0;border:3px solid #FFC58A;border-top:none;border-radius:0 0 16px 16px;display:flex;align-items:flex-end;justify-content:center;gap:18px;box-shadow:0 14px 30px rgba(148,52,102,.2)">
+          <div style="width:88px;height:100px;border-radius:12px 12px 0 0;background:#FFF5FA;border:3px solid #FFC58A;border-bottom:none;display:grid;place-items:center;padding-bottom:12px"><span style="font-size:26px">🍬</span></div>
+          <div style="width:82px;height:122px;border-radius:42px 42px 0 0;background:linear-gradient(180deg,#FFD3A0,#FFB165);border:3px solid #FFC58A;border-bottom:none;display:grid;place-items:center;padding-bottom:14px"><span style="font-size:30px">🚪</span></div>
+          <div style="width:88px;height:100px;border-radius:12px 12px 0 0;background:#FFF5FA;border:3px solid #FFC58A;border-bottom:none;display:grid;place-items:center;padding-bottom:12px"><span style="font-size:26px">🍭</span></div>
+        </div>
+        <span style="margin-top:10px;font-size:17px;color:#A9631E;letter-spacing:.08em">walk in for loadout</span>
+      </div>
+
+      <div onClick="{{ enterRange }}" style="position:absolute;left:1108px;top:352px;width:330px;cursor:pointer;display:flex;flex-direction:column;align-items:center" style-hover="filter:brightness(1.04)">
+        <div style="width:296px;padding:9px 0;border-radius:14px;background:linear-gradient(180deg,#D97CE0,#BE55CC);border:3px solid #FFF5FA;box-shadow:0 6px 0 rgba(140,50,160,.5);text-align:center">
+          <span style="font-size:24px;color:#fff;letter-spacing:.04em">💘 Heartbreaker Range</span>
+        </div>
+        <div style="width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:14px solid #BE55CC;margin-top:-2px"></div>
+        <div style="width:300px;height:150px;margin-top:8px;border-radius:16px;background:#F7E4FA;border:3px solid #D9A6E4;display:flex;align-items:center;justify-content:center;gap:18px;box-shadow:0 14px 30px rgba(148,52,102,.2)">
+          <sc-for list="{{ balloons }}" as="b" hint-placeholder-count="3">
+            <div onClick="{{ b.onClick }}" style="display:flex;flex-direction:column;align-items:center;cursor:pointer;opacity:{{ b.opacity }};animation:{{ b.anim }}">
+              <div style="width:54px;height:66px;border-radius:50% 50% 46% 46%;background:{{ b.color }};border:3px solid rgba(255,255,255,.75);box-shadow:0 5px 12px rgba(148,52,102,.25)"></div>
+              <div style="width:2px;height:22px;background:rgba(96,56,78,.4)"></div>
+            </div>
+          </sc-for>
+        </div>
+        <span style="margin-top:10px;font-size:17px;color:#8A3C9C;letter-spacing:.08em">click a balloon to pop</span>
+      </div>
+
+      <div style="position:absolute;left:838px;bottom:118px;display:flex;flex-direction:column;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;padding:9px 18px;border-radius:16px;background:rgba(255,245,250,.95);border:2px solid rgba(255,92,168,.6);box-shadow:0 6px 16px rgba(148,52,102,.25)">
+          <span style="font-size:23px;color:#D6428F;line-height:1">cutiegracie</span>
+          <span style="font-size:20px;line-height:1">💗</span>
+        </div>
+        <div style="width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:11px solid rgba(255,92,168,.75);margin-top:-4px"></div>
+        <div style="width:104px;height:190px;border-radius:26px;background:repeating-linear-gradient(135deg,#FFE0EF 0 8px,#FFF2F8 8px 16px);border:2px dashed rgba(214,66,143,.5);display:grid;place-items:end center;padding-bottom:10px">
+          <span style="font:11px ui-monospace,Menlo,monospace;color:rgba(214,66,143,.7)">you</span>
+        </div>
+      </div>
+
+      <div style="position:absolute;left:560px;bottom:170px;display:flex;flex-direction:column;align-items:center;gap:7px">
+        <div style="display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:14px;background:rgba(255,245,250,.9);border:2px solid rgba(255,92,168,.4);box-shadow:0 5px 13px rgba(148,52,102,.2)">
+          <span style="font-size:19px;color:#D6428F;line-height:1">bubblybri</span>
+          <span style="font-size:17px;line-height:1">💗</span>
+        </div>
+        <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid rgba(255,92,168,.5);margin-top:-4px"></div>
+        <div style="width:84px;height:154px;border-radius:22px;background:repeating-linear-gradient(135deg,#FFE0EF 0 8px,#FFF2F8 8px 16px);border:2px dashed rgba(214,66,143,.4)"></div>
+      </div>
+
+      <div style="position:absolute;left:1058px;bottom:196px;display:flex;flex-direction:column;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:13px;background:rgba(255,245,250,.88);border:2px solid rgba(255,92,168,.35)">
+          <span style="font-size:17px;color:#D6428F;line-height:1">luvlylani</span>
+          <span style="font-size:15px;line-height:1">💗</span>
+        </div>
+        <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid rgba(255,92,168,.45);margin-top:-4px"></div>
+        <div style="width:72px;height:132px;border-radius:20px;background:repeating-linear-gradient(135deg,#FFE0EF 0 8px,#FFF2F8 8px 16px);border:2px dashed rgba(214,66,143,.35)"></div>
+      </div>
+    </div>
+
+    <sc-if value="{{ zoneActive }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:50%;top:104px;transform:translateX(-50%);display:flex;align-items:center;animation:ppOpen .26s ease-out">
+        <div style="width:0;height:0;border-top:31px solid transparent;border-bottom:31px solid transparent;border-right:26px solid {{ zoneDark }}"></div>
+        <div style="display:flex;align-items:center;gap:16px;padding:14px 40px;background:linear-gradient(180deg,{{ zoneLight }},{{ zoneColor }});border-top:3px solid rgba(255,255,255,.85);border-bottom:3px solid rgba(255,255,255,.85);box-shadow:0 10px 26px rgba(60,20,40,.3)">
+          <span style="font-size:22px;animation:ppSpark 1.6s ease-in-out infinite">✨</span>
+          <span style="font-size:34px;color:#fff;letter-spacing:.06em;text-shadow:0 3px 0 rgba(0,0,0,.18);white-space:nowrap">{{ zoneName }}</span>
+          <span style="font-size:22px;animation:ppSpark 1.6s ease-in-out .8s infinite">✨</span>
+        </div>
+        <div style="width:0;height:0;border-top:31px solid transparent;border-bottom:31px solid transparent;border-left:26px solid {{ zoneDark }}"></div>
+      </div>
+      <div onClick="{{ leaveZone }}" style="position:absolute;left:50%;top:180px;transform:translateX(-50%);padding:9px 26px;border-radius:14px;background:rgba(255,245,250,.94);border:2px solid rgba(255,92,168,.5);box-shadow:0 5px 14px rgba(148,52,102,.22);cursor:pointer" style-hover="filter:brightness(1.05)">
+        <span style="font-size:18px;color:#D6428F;letter-spacing:.06em">← walk out</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ newsOpen }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;right:36px;top:680px;width:392px;border-radius:24px;background:#FFE3F0;border:3px solid rgba(255,92,168,.7);box-shadow:0 14px 34px rgba(148,52,102,.3);overflow:hidden;animation:ppOpen .24s ease-out">
+        <div style="padding:13px 18px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="position:relative;width:26px;height:24px">
+              <div style="position:absolute;left:0;top:0;width:26px;height:17px;border-radius:6px;background:#fff"></div>
+              <div style="position:absolute;left:5px;bottom:0;width:0;height:0;border-left:4px solid transparent;border-right:7px solid transparent;border-top:8px solid #fff"></div>
+              <div style="position:absolute;left:5px;top:6px;width:4px;height:4px;border-radius:50%;background:#FF5CA8"></div>
+              <div style="position:absolute;left:11px;top:6px;width:4px;height:4px;border-radius:50%;background:#FF5CA8"></div>
+              <div style="position:absolute;left:17px;top:6px;width:4px;height:4px;border-radius:50%;background:#FF5CA8"></div>
+            </div>
+            <span style="font-size:21px;color:#fff;letter-spacing:.12em">NEWS</span>
+          </div>
+          <div onClick="{{ closeNews }}" style="width:28px;height:28px;border-radius:9px;background:rgba(255,255,255,.28);display:grid;place-items:center;font-size:17px;color:#fff;cursor:pointer" style-hover="background:rgba(255,255,255,.45)">✕</div>
+        </div>
+        <div style="padding:16px">
+          <div style="border-radius:18px;background:#FFF5FA;border:2px solid rgba(255,92,168,.4);padding:18px;display:flex;flex-direction:column;gap:12px">
+            <span style="font-size:23px;color:#D6428F;line-height:1.25;text-wrap:pretty">{{ news.title }}</span>
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ news.bullets }}" as="b" hint-placeholder-count="3">
+                <div style="display:flex;align-items:flex-start;gap:9px">
+                  <span style="width:8px;height:8px;border-radius:50%;background:#FF5CA8;margin-top:8px;flex:none"></span>
+                  <span style="font-size:17px;color:#60384E;line-height:1.4">{{ b }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <span style="font:11px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.45);margin-top:2px">src/shared/Config/NewsConfig.luau</span>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ newsClosed }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ openNews }}" style="position:absolute;right:36px;top:680px;padding:11px 22px;border-radius:16px;background:rgba(255,245,250,.94);border:2px solid rgba(255,92,168,.55);box-shadow:0 6px 16px rgba(148,52,102,.25);cursor:pointer" style-hover="filter:brightness(1.05)">
+        <span style="font-size:18px;color:#D6428F;letter-spacing:.1em">NEWS</span>
+      </div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{ inCombat }}" hint-placeholder-val="{{ true }}">
+  <div onClick="{{ fire }}" style="position:absolute;inset:0;cursor:crosshair;background:linear-gradient(180deg,#FFD8EC 0%,#FFC2E0 34%,#FFB4D8 52%,#F7A8CF 68%,#EE9BC6 100%)">
+    <div style="position:absolute;left:8%;top:10%;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.55),rgba(255,255,255,0) 70%);filter:blur(6px)"></div>
+    <div style="position:absolute;right:12%;top:6%;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.4),rgba(255,255,255,0) 70%);filter:blur(8px)"></div>
+    <div style="position:absolute;left:34%;top:20%;width:560px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(255,92,168,.28),rgba(255,92,168,0) 70%);filter:blur(14px)"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;height:38%;background:linear-gradient(180deg,rgba(255,238,247,.0) 0%,rgba(255,238,247,.65) 45%,rgba(255,232,244,.9) 100%)"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;height:22%;background:repeating-linear-gradient(90deg,rgba(214,66,143,.05) 0 78px,rgba(214,66,143,0) 78px 156px)"></div>
+
+    <div style="position:absolute;left:50%;top:31%;transform:translateX(-50%);width:520px;height:200px;border-radius:24px;border:2px dashed rgba(214,66,143,.4);background:rgba(255,255,255,.22);display:grid;place-items:center;gap:6px;align-content:center">
+      <span style="font:13px/1.4 ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">3D lobby renders here</span>
+      <span style="font:11px/1.4 ui-monospace,Menlo,monospace;color:rgba(96,56,78,.42);letter-spacing:.04em">fountain · cherry blossom · shooting range</span>
+    </div>
+
+    <div style="position:absolute;left:640px;bottom:150px;display:flex;flex-direction:column;align-items:center;gap:8px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:9px 16px;border-radius:16px;background:rgba(255,245,250,.94);border:2px solid rgba(255,92,168,.55);box-shadow:0 6px 18px rgba(148,52,102,.22)">
+        <span style="font-size:22px;color:#D6428F;line-height:1">cutiegracie</span>
+        <span style="font-size:16px;color:#60384E;line-height:1">💗 Level 27</span>
+      </div>
+      <div style="width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:11px solid rgba(255,92,168,.7);margin-top:-4px"></div>
+      <div style="width:104px;height:196px;border-radius:26px;background:repeating-linear-gradient(135deg,#FFE0EF 0 8px,#FFF2F8 8px 16px);border:1.5px dashed rgba(214,66,143,.45);display:grid;place-items:end center;padding-bottom:10px">
+        <span style="font:11px ui-monospace,Menlo,monospace;color:rgba(214,66,143,.7)">character</span>
+      </div>
+    </div>
+
+    <div style="position:absolute;left:1120px;bottom:196px;display:flex;flex-direction:column;align-items:center;gap:8px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 14px;border-radius:14px;background:rgba(255,245,250,.9);border:2px solid rgba(255,92,168,.35);box-shadow:0 5px 14px rgba(148,52,102,.18)">
+        <span style="font-size:19px;color:#D6428F;line-height:1">bubblybri</span>
+        <span style="font-size:14px;color:#60384E;line-height:1">💗 Level 45</span>
+      </div>
+      <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid rgba(255,92,168,.5);margin-top:-4px"></div>
+      <div style="width:86px;height:158px;border-radius:22px;background:repeating-linear-gradient(135deg,#FFE0EF 0 8px,#FFF2F8 8px 16px);border:1.5px dashed rgba(214,66,143,.35);display:grid;place-items:end center;padding-bottom:8px">
+        <span style="font:10px ui-monospace,Menlo,monospace;color:rgba(214,66,143,.6)">character</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:34px;height:34px;pointer-events:none">
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:5px;height:5px;border-radius:50%;background:#FF5CA8;box-shadow:0 0 0 2px rgba(255,255,255,.85)"></div>
+    <div style="position:absolute;left:50%;top:0;transform:translateX(-50%);width:3px;height:10px;border-radius:2px;background:rgba(255,92,168,.9);box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+    <div style="position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:3px;height:10px;border-radius:2px;background:rgba(255,92,168,.9);box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+    <div style="position:absolute;top:50%;left:0;transform:translateY(-50%);width:10px;height:3px;border-radius:2px;background:rgba(255,92,168,.9);box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+    <div style="position:absolute;top:50%;right:0;transform:translateY(-50%);width:10px;height:3px;border-radius:2px;background:rgba(255,92,168,.9);box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+  </div>
+
+  </sc-if>
+
+  <sc-for list="{{ hits }}" as="h" hint-placeholder-count="0">
+    <div style="position:absolute;pointer-events:none;left:{{ h.x }}px;top:{{ h.y }}px">
+      <div style="position:absolute;left:0;top:0;font-size:34px;color:#FF5CA8;text-shadow:0 2px 0 rgba(255,255,255,.9);animation:ppHit .5s ease-out forwards">✕</div>
+      <div style="position:absolute;left:0;top:-10px;transform:translate(-50%,0);font-size:{{ h.size }}px;color:{{ h.color }};text-shadow:0 3px 0 rgba(255,255,255,.85),0 0 14px rgba(255,92,168,.5);animation:ppFloat .85s ease-out forwards;white-space:nowrap">{{ h.dmg }}</div>
+    </div>
+  </sc-for>
+
+  <sc-if value="{{ inCombat }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;left:36px;top:30px;display:flex;flex-direction:column;gap:18px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:8px;width:520px">
+      <sc-for list="{{ feed }}" as="k" hint-placeholder-count="2">
+        <div style="display:flex;align-items:center;gap:10px;align-self:flex-start;padding:9px 16px;border-radius:14px;background:rgba(255,245,250,.92);border:2px solid rgba(255,92,168,.35);box-shadow:0 4px 12px rgba(148,52,102,.18);animation:ppFeed 5s ease-out forwards">
+          <span style="font-size:19px;color:{{ k.killerColor }}">{{ k.killer }}</span>
+          <span style="width:30px;height:30px;border-radius:9px;background:rgba(255,92,168,.16);display:grid;place-items:center;font:10px ui-monospace,Menlo,monospace;color:#D6428F">{{ k.wep }}</span>
+          <span style="font-size:19px;color:#60384E;opacity:.85">{{ k.victim }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  </sc-if>
+
+  <sc-if value="{{ inCombat }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;left:50%;top:30px;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:11px 26px;border-radius:18px;background:rgba(255,245,250,.92);border:2px solid rgba(255,92,168,.45);box-shadow:0 6px 18px rgba(148,52,102,.2)">
+    <span style="font-size:21px;color:#D6428F;letter-spacing:.08em">FREE FOR ALL</span>
+    <span style="width:2px;height:22px;background:rgba(255,92,168,.3);border-radius:1px"></span>
+    <span style="font-size:23px;color:#60384E">{{ clock }}</span>
+    <span style="width:2px;height:22px;background:rgba(255,92,168,.3);border-radius:1px"></span>
+    <span style="font-size:19px;color:#FF5CA8">💗 {{ kills }} kills</span>
+  </div>
+
+  </sc-if>
+
+  <div style="position:absolute;right:36px;top:26px;display:flex;align-items:center;gap:14px">
+    <div style="display:flex;align-items:center;gap:14px;padding:9px 20px;border-radius:20px;background:linear-gradient(180deg,rgba(60,32,48,.82) 0%,rgba(44,24,38,.82) 100%);border:2px solid rgba(255,255,255,.28);box-shadow:0 6px 18px rgba(0,0,0,.25)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#FFE0A8,#FFC458 55%,#E39F35);border:2px solid rgba(255,255,255,.7);box-shadow:0 0 12px rgba(255,196,88,.55)"></div>
+        <span style="font-size:26px;color:#fff;letter-spacing:.02em">{{ coinsText }}</span>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:16px;padding:9px 12px 9px 22px;border-radius:20px;background:linear-gradient(180deg,rgba(60,32,48,.82) 0%,rgba(44,24,38,.82) 100%);border:2px solid rgba(255,255,255,.28);box-shadow:0 6px 18px rgba(0,0,0,.25)">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:30px">
+          <span style="font-size:20px;color:#fff">Level {{ level }}</span>
+          <span style="font-size:14px;color:rgba(255,255,255,.7)">{{ xpText }}</span>
+        </div>
+        <div style="width:252px;height:14px;border-radius:8px;background:rgba(0,0,0,.35);border:1.5px solid rgba(255,255,255,.22);overflow:hidden">
+          <div style="height:100%;border-radius:8px;background:linear-gradient(90deg,#FF82BE 0%,#FF5CA8 60%,#FFC458 100%);box-shadow:0 0 12px rgba(255,92,168,.7);transition:width .5s ease;width:{{ xpPct }}"></div>
+        </div>
+      </div>
+      <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);border:2px solid rgba(255,255,255,.8);display:grid;place-items:center;font:11px ui-monospace,Menlo,monospace;color:#fff;box-shadow:0 0 14px rgba(255,92,168,.55)">LVL</div>
+    </div>
+  </div>
+
+  <sc-if value="{{ gain }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;right:430px;top:86px;font-size:26px;color:#FFC458;text-shadow:0 2px 0 rgba(120,60,20,.35);animation:ppPop 1.2s ease-out forwards">{{ gain }}</div>
+  </sc-if>
+
+  <div style="position:absolute;right:36px;top:132px;width:396px;border-radius:20px;background:#FFE3F0;border:2px solid rgba(255,92,168,.65);box-shadow:0 12px 30px rgba(148,52,102,.28);overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(180deg,#FF7FBC 0%,#FF5CA8 100%)">
+      <span style="font-size:20px;color:#fff;letter-spacing:.1em">PLAYERS</span>
+      
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding:12px">
+      <sc-for list="{{ players }}" as="p" hint-placeholder-count="6">
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:14px;background:{{ p.bg }};border:2px solid {{ p.stroke }}">
+          <div style="width:42px;height:42px;border-radius:12px;flex:none;background:repeating-linear-gradient(135deg,#FFD9EC 0 6px,#FFEFF7 6px 12px);border:1.5px dashed rgba(214,66,143,.5);display:grid;place-items:center;font:10px ui-monospace,Menlo,monospace;color:rgba(214,66,143,.8)">{{ p.initial }}</div>
+          <span style="flex:1;font-size:20px;color:{{ p.nameColor }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.name }}</span>
+          <span style="font-size:17px;color:#60384E">💗 {{ p.kills }}</span>
+          <div style="width:11px;height:11px;border-radius:50%;background:#6FCF7F;box-shadow:0 0 8px rgba(111,207,127,.8)"></div>
+        </div>
+      </sc-for>
+      <div style="padding:4px 4px 2px;font:11px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.45)">avatar slot → Players:GetUserThumbnailAsync</div>
+    </div>
+  </div>
+
+  <sc-if value="{{ inCombat }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;left:36px;bottom:34px;display:flex;align-items:flex-end;gap:16px" data-screen-label="HUD">
+    <div style="width:330px;padding:16px 18px;border-radius:20px;background:rgba(255,245,250,.94);border:2px solid rgba(255,92,168,.5);box-shadow:0 10px 26px rgba(148,52,102,.25);display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between">
+        <span style="font-size:16px;color:#D6428F;letter-spacing:.1em">HEALTH</span>
+        <span style="font-size:24px;color:{{ hpColor }}">{{ hp }}</span>
+      </div>
+      <div style="height:20px;border-radius:10px;background:rgba(214,66,143,.16);border:2px solid rgba(255,92,168,.35);overflow:hidden">
+        <div style="height:100%;border-radius:8px;transition:width .35s ease;background:{{ hpFill }};width:{{ hpPct }}"></div>
+      </div>
+      <div style="height:2px;background:rgba(255,92,168,.2);border-radius:1px"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:44px;height:36px;border-radius:11px;background:rgba(255,92,168,.1);border:1.5px solid rgba(255,92,168,.25);display:grid;place-items:center">
+            <div style="position: relative; width: 34px; height: 22px; display: block">
+              <div style="position:absolute;left:0;top:7px;width:34px;height:6px;border-radius:2px;background:#5C4858"></div>
+              <div style="position:absolute;left:1px;top:3px;width:9px;height:5px;border-radius:2px 2px 0 0;background:#FF82BE"></div>
+              <div style="position:absolute;left:12px;top:12px;width:6px;height:10px;border-radius:0 0 2px 2px;background:#FF82BE;transform:skewX(-12deg)"></div>
+              <div style="position:absolute;left:20px;top:12px;width:6px;height:9px;border-radius:2px;background:#5C4858"></div>
+            </div>
+          </div>
+          <span style="font-size:19px;color:#60384E">{{ weapon }}</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <span style="font-size:30px;color:#D6428F">{{ ammo }}</span>
+          <span style="font-size:18px;color:rgba(96,56,78,.6)">/ {{ ammoMax }}</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:9px 16px;border-radius:14px;background:rgba(255,245,250,.85);border:2px solid rgba(255,92,168,.3);font:12px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6);line-height:1.7">click the world to fire · B shop · Tab scores<br>⚙️ settings · M menu</div>
+  </div>
+
+  </sc-if>
+
+  <div onClick="{{ openSettings }}" style="position:absolute;right:36px;bottom:34px;width:64px;height:64px;border-radius:20px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);border:2px solid rgba(255,255,255,.75);box-shadow:0 6px 0 rgba(198,52,124,.5),0 10px 22px rgba(148,52,102,.3);display:grid;place-items:center;cursor:pointer" style-hover="filter:brightness(1.08)" style-active="transform:translateY(3px);box-shadow:0 3px 0 rgba(198,52,124,.5)">
+    <div style="position:relative;width:34px;height:34px;display:grid;place-items:center">
+      <div style="position:absolute;left:50%;top:50%;width:8.5px;height:8.5px;margin:-4.25px;border-radius:3px;background:#fff;transform:rotate(0deg) translate(0,-12.5px)"></div>
+      <div style="position:absolute;left:50%;top:50%;width:8.5px;height:8.5px;margin:-4.25px;border-radius:3px;background:#fff;transform:rotate(60deg) translate(0,-12.5px)"></div>
+      <div style="position:absolute;left:50%;top:50%;width:8.5px;height:8.5px;margin:-4.25px;border-radius:3px;background:#fff;transform:rotate(120deg) translate(0,-12.5px)"></div>
+      <div style="position:absolute;left:50%;top:50%;width:8.5px;height:8.5px;margin:-4.25px;border-radius:3px;background:#fff;transform:rotate(180deg) translate(0,-12.5px)"></div>
+      <div style="position:absolute;left:50%;top:50%;width:8.5px;height:8.5px;margin:-4.25px;border-radius:3px;background:#fff;transform:rotate(240deg) translate(0,-12.5px)"></div>
+      <div style="position:absolute;left:50%;top:50%;width:8.5px;height:8.5px;margin:-4.25px;border-radius:3px;background:#fff;transform:rotate(300deg) translate(0,-12.5px)"></div>
+      <div style="position:relative;width:21px;height:21px;border-radius:50%;background:#fff;display:grid;place-items:center">
+        <div style="width:8px;height:8px;border-radius:50%;background:#FF5CA8"></div>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ scoreboard }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:rgba(44,24,38,.5);backdrop-filter:blur(3px);display:grid;place-items:center">
+      <div style="width:820px;border-radius:24px;background:#FFE3F0;border:3px solid rgba(255,92,168,.7);box-shadow:0 24px 60px rgba(60,20,40,.45);overflow:hidden;animation:ppOpen .18s ease-out">
+        <div style="padding:16px 26px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:26px;color:#fff;letter-spacing:.12em">SCOREBOARD</span>
+          <span style="font-size:18px;color:rgba(255,255,255,.85)">Free For All · {{ clock }}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:56px 1fr 110px 110px 130px;gap:0 12px;padding:14px 26px 6px;font-size:15px;color:rgba(96,56,78,.6);letter-spacing:.08em">
+          <span>#</span><span>PLAYER</span><span style="text-align:center">KILLS</span><span style="text-align:center">DEATHS</span><span style="text-align:center">SCORE</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;padding:0 20px 22px">
+          <sc-for list="{{ board }}" as="r" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:56px 1fr 110px 110px 130px;gap:0 12px;align-items:center;padding:10px 14px;border-radius:14px;background:{{ r.bg }};border:2px solid {{ r.stroke }}">
+              <span style="font-size:22px;color:{{ r.rankColor }}">{{ r.rank }}</span>
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:38px;height:38px;border-radius:11px;background:repeating-linear-gradient(135deg,#FFD9EC 0 6px,#FFEFF7 6px 12px);border:1.5px dashed rgba(214,66,143,.5);display:grid;place-items:center;font:10px ui-monospace,Menlo,monospace;color:rgba(214,66,143,.8)">{{ r.initial }}</div>
+                <span style="font-size:21px;color:{{ r.nameColor }}">{{ r.name }}</span>
+              </div>
+              <span style="text-align:center;font-size:21px;color:#D6428F">{{ r.kills }}</span>
+              <span style="text-align:center;font-size:21px;color:rgba(96,56,78,.7)">{{ r.deaths }}</span>
+              <span style="text-align:center;font-size:21px;color:#60384E">{{ r.score }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ shopOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:rgba(52,26,42,.3);display:flex;align-items:center;justify-content:flex-start;padding-left:64px">
+      <div style="width:1080px;border-radius:28px;background:#FFE3F0;border:3px solid rgba(255,92,168,.7);box-shadow:0 26px 66px rgba(60,20,40,.5);overflow:hidden;animation:ppOpen .2s ease-out">
+        <div style="padding:16px 28px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:27px;color:#fff;letter-spacing:.12em">🎀 SHOP</span>
+          <div style="display:flex;align-items:center;gap:20px">
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 16px;border-radius:14px;background:rgba(0,0,0,.22)">
+              <div style="width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#FFE0A8,#FFC458 55%,#E39F35);border:2px solid rgba(255,255,255,.7)"></div>
+              <span style="font-size:22px;color:#fff">{{ coinsText }}</span>
+            </div>
+            <div onClick="{{ closeModal }}" style="width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,.28);display:grid;place-items:center;font-size:21px;color:#fff;cursor:pointer" style-hover="background:rgba(255,255,255,.48)">✕</div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;padding:18px 28px 6px;flex-wrap:wrap">
+          <sc-for list="{{ tabsLive }}" as="t" hint-placeholder-count="2">
+            <div onClick="{{ t.onClick }}" style="padding:11px 30px;border-radius:16px;cursor:pointer;background:{{ t.bg }};border:2px solid {{ t.stroke }};box-shadow:{{ t.shadow }}">
+              <span style="font-size:20px;letter-spacing:.06em;color:{{ t.color }}">{{ t.label }}</span>
+            </div>
+          </sc-for>
+          <div style="width:2px;height:26px;background:rgba(214,66,143,.25);border-radius:1px;margin:0 6px"></div>
+          <sc-for list="{{ tabsSoon }}" as="t" hint-placeholder-count="4">
+            <div style="padding:10px 22px;border-radius:16px;background:rgba(255,245,250,.45);border:2px dashed rgba(214,66,143,.25);cursor:not-allowed;display:flex;align-items:center;gap:8px">
+              <span style="font-size:17px;letter-spacing:.06em;color:rgba(96,56,78,.42)">{{ t.label }}</span>
+              <span style="font-size:12px;color:rgba(96,56,78,.35)">soon 💗</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:18px 28px 6px">
+          <sc-for list="{{ cards }}" as="c" hint-placeholder-count="4">
+            <div style="border-radius:20px;background:#FFF5FA;border:3px solid {{ c.rarityColor }};box-shadow:0 0 0 4px {{ c.glow }},0 10px 24px rgba(148,52,102,.2);overflow:hidden;display:flex;flex-direction:column">
+              <div style="height:176px;margin:14px 14px 0;border-radius:16px;background:repeating-linear-gradient(135deg,#FFD9EC 0 8px,#FFEFF7 8px 16px);border:2px dashed rgba(214,66,143,.4);display:grid;place-items:center">
+                <span style="font:12px ui-monospace,Menlo,monospace;color:rgba(214,66,143,.7);text-align:center;padding:0 10px">{{ c.slot }}</span>
+              </div>
+              <div style="padding:14px;display:flex;flex-direction:column;gap:8px;align-items:center;flex:1">
+                <span style="font-size:21px;color:#60384E;text-align:center;line-height:1.2;text-wrap:pretty">{{ c.name }}</span>
+                <span style="font-size:15px;letter-spacing:.14em;color:{{ c.rarityColor }}">{{ c.rarity }}</span>
+                <div onClick="{{ c.onClick }}" style="margin-top:auto;width:100%;padding:11px 0;border-radius:14px;text-align:center;cursor:{{ c.cursor }};background:{{ c.actionBg }};border:2px solid {{ c.actionStroke }};box-shadow:{{ c.actionShadow }}" style-hover="filter:brightness(1.06)">
+                  <span style="font-size:20px;color:{{ c.actionColor }}">{{ c.action }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="padding:6px 28px 22px;min-height:44px;display:flex;align-items:center;justify-content:center">
+          <span style="font-size:18px;color:{{ msgColor }}">{{ msg }}</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ settingsOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:rgba(52,26,42,.3);display:flex;align-items:center;justify-content:flex-start;padding-left:64px">
+      <div style="width:720px;border-radius:26px;background:#FFE3F0;border:3px solid rgba(255,92,168,.7);box-shadow:0 24px 60px rgba(60,20,40,.45);overflow:hidden;animation:ppOpen .2s ease-out">
+        <div style="padding:16px 26px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="position:relative;width:26px;height:26px;display:grid;place-items:center">
+              <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#fff;transform:rotate(0deg) translate(0,-9.5px)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#fff;transform:rotate(60deg) translate(0,-9.5px)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#fff;transform:rotate(120deg) translate(0,-9.5px)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#fff;transform:rotate(180deg) translate(0,-9.5px)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#fff;transform:rotate(240deg) translate(0,-9.5px)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#fff;transform:rotate(300deg) translate(0,-9.5px)"></div>
+              <div style="position:relative;width:16px;height:16px;border-radius:50%;background:#fff;display:grid;place-items:center">
+                <div style="width:6px;height:6px;border-radius:50%;background:#FF5CA8"></div>
+              </div>
+            </div>
+            <span style="font-size:25px;color:#fff;letter-spacing:.12em">SETTINGS</span>
+          </div>
+          <div onClick="{{ closeModal }}" style="width:34px;height:34px;border-radius:11px;background:rgba(255,255,255,.28);display:grid;place-items:center;font-size:20px;color:#fff;cursor:pointer" style-hover="background:rgba(255,255,255,.48)">✕</div>
+        </div>
+        <div style="padding:24px;display:flex;flex-direction:column;gap:20px">
+          <div style="border-radius:18px;background:#FFF5FA;border:2px solid rgba(255,92,168,.35);padding:18px 20px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-size:21px;color:#D6428F">Mouse sensitivity</span>
+              <span style="font-size:20px;color:#60384E">{{ sensText }}</span>
+            </div>
+            <div onClick="{{ setSens }}" style="height:26px;display:flex;align-items:center;cursor:pointer">
+              <div style="position:relative;width:100%;height:14px;border-radius:8px;background:rgba(214,66,143,.16);border:2px solid rgba(255,92,168,.35)">
+                <div style="height:100%;border-radius:6px;background:linear-gradient(90deg,#FF82BE,#FF5CA8);width:{{ sensPct }}"></div>
+                <div style="position:absolute;top:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:#FFF5FA;border:3px solid #FF5CA8;box-shadow:0 3px 8px rgba(148,52,102,.35);left:{{ sensPct }}"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="border-radius:18px;background:#FFF5FA;border:2px solid rgba(255,92,168,.35);padding:18px 20px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-size:21px;color:#D6428F">Volume</span>
+              <span style="font-size:20px;color:#60384E">{{ volText }}</span>
+            </div>
+            <div onClick="{{ setVol }}" style="height:26px;display:flex;align-items:center;cursor:pointer">
+              <div style="position:relative;width:100%;height:14px;border-radius:8px;background:rgba(214,66,143,.16);border:2px solid rgba(255,92,168,.35)">
+                <div style="height:100%;border-radius:6px;background:linear-gradient(90deg,#FF82BE,#FF5CA8);width:{{ volPct }}"></div>
+                <div style="position:absolute;top:50%;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:#FFF5FA;border:3px solid #FF5CA8;box-shadow:0 3px 8px rgba(148,52,102,.35);left:{{ volPct }}"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="border-radius:18px;background:#FFF5FA;padding:18px 20px;display:flex;flex-direction:column;gap:14px;border:{{ loadoutRing }}">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-size:21px;color:#D6428F">Starting weapon</span>
+              <span style="font:12px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.45)">Candy Armory · gun store</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+              <div onClick="{{ wPistol.onClick }}" style="border-radius:16px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;background:#FFF5FA;border:3px solid {{ wPistol.frame }};box-shadow:0 0 0 3px {{ wPistol.glow }}" style-hover="filter:brightness(1.03)">
+                <div style="height:76px;margin:10px 10px 0;border-radius:12px;background:repeating-linear-gradient(135deg,#FFD9EC 0 8px,#FFEFF7 8px 16px);border:1.5px dashed rgba(214,66,143,.35);display:grid;place-items:center">
+                  <div style="position:relative;width:44px;height:34px">
+                    <div style="position:absolute;left:2px;top:7px;width:35px;height:11px;border-radius:3px;background:#5C4858"></div>
+                    <div style="position:absolute;left:30px;top:9px;width:14px;height:6px;border-radius:2px;background:#5C4858"></div>
+                    <div style="position:absolute;left:6px;top:17px;width:12px;height:17px;border-radius:0 0 6px 5px;background:#FF82BE;transform:skewX(-14deg)"></div>
+                    <div style="position:absolute;left:19px;top:18px;width:6px;height:8px;border-radius:0 0 2px 2px;background:#5C4858"></div>
+                  </div>
+                </div>
+                <div style="padding:9px 8px 11px;display:flex;flex-direction:column;align-items:center;gap:6px">
+                  <span style="font-size:18px;color:{{ wPistol.color }}">Pistol</span>
+                  <span style="font-size:12px;letter-spacing:.12em;color:{{ wPistol.tagColor }}">{{ wPistol.tag }}</span>
+                </div>
+              </div>
+
+              <div onClick="{{ wRifle.onClick }}" style="border-radius:16px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;background:#FFF5FA;border:3px solid {{ wRifle.frame }};box-shadow:0 0 0 3px {{ wRifle.glow }}" style-hover="filter:brightness(1.03)">
+                <div style="height:76px;margin:10px 10px 0;border-radius:12px;background:repeating-linear-gradient(135deg,#FFD9EC 0 8px,#FFEFF7 8px 16px);border:1.5px dashed rgba(214,66,143,.35);display:grid;place-items:center">
+                  <div style="position:relative;width:50px;height:34px">
+                    <div style="position:absolute;left:0;top:11px;width:50px;height:9px;border-radius:3px;background:#5C4858"></div>
+                    <div style="position:absolute;left:1px;top:5px;width:13px;height:7px;border-radius:3px 3px 0 0;background:#FF82BE"></div>
+                    <div style="position:absolute;left:18px;top:19px;width:9px;height:15px;border-radius:0 0 3px 3px;background:#FF82BE;transform:skewX(-12deg)"></div>
+                    <div style="position:absolute;left:30px;top:19px;width:8px;height:13px;border-radius:2px;background:#5C4858"></div>
+                    <div style="position:absolute;left:24px;top:4px;width:11px;height:5px;border-radius:2px;background:#5C4858"></div>
+                  </div>
+                </div>
+                <div style="padding:9px 8px 11px;display:flex;flex-direction:column;align-items:center;gap:6px">
+                  <span style="font-size:18px;color:{{ wRifle.color }}">Rifle</span>
+                  <span style="font-size:12px;letter-spacing:.12em;color:{{ wRifle.tagColor }}">{{ wRifle.tag }}</span>
+                </div>
+              </div>
+
+              <div onClick="{{ wShotgun.onClick }}" style="border-radius:16px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;background:#FFF5FA;border:3px solid {{ wShotgun.frame }};box-shadow:0 0 0 3px {{ wShotgun.glow }}" style-hover="filter:brightness(1.03)">
+                <div style="height:76px;margin:10px 10px 0;border-radius:12px;background:repeating-linear-gradient(135deg,#FFD9EC 0 8px,#FFEFF7 8px 16px);border:1.5px dashed rgba(214,66,143,.35);display:grid;place-items:center">
+                  <div style="position:relative;width:50px;height:34px">
+                    <div style="position:absolute;left:10px;top:8px;width:40px;height:7px;border-radius:3px;background:#5C4858"></div>
+                    <div style="position:absolute;left:10px;top:17px;width:40px;height:7px;border-radius:3px;background:#5C4858"></div>
+                    <div style="position:absolute;left:0;top:10px;width:15px;height:13px;border-radius:5px;background:#FF82BE;transform:rotate(-10deg)"></div>
+                    <div style="position:absolute;left:19px;top:24px;width:8px;height:10px;border-radius:0 0 3px 3px;background:#FF82BE"></div>
+                  </div>
+                </div>
+                <div style="padding:9px 8px 11px;display:flex;flex-direction:column;align-items:center;gap:6px">
+                  <span style="font-size:18px;color:{{ wShotgun.color }}">Shotgun</span>
+                  <span style="font-size:12px;letter-spacing:.12em;color:{{ wShotgun.tagColor }}">{{ wShotgun.tag }}</span>
+                </div>
+              </div>
+
+              <div onClick="{{ wKnife.onClick }}" style="border-radius:16px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;background:#FFF5FA;border:3px solid {{ wKnife.frame }};box-shadow:0 0 0 3px {{ wKnife.glow }}" style-hover="filter:brightness(1.03)">
+                <div style="height:76px;margin:10px 10px 0;border-radius:12px;background:repeating-linear-gradient(135deg,#FFD9EC 0 8px,#FFEFF7 8px 16px);border:1.5px dashed rgba(214,66,143,.35);display:grid;place-items:center">
+                  <div style="position:relative;width:44px;height:40px">
+                    <div style="position:absolute;left:5px;top:7px;width:31px;height:14px;background:#5C4858;clip-path:polygon(0% 0%,80% 22%,100% 50%,80% 78%,0% 100%);transform:rotate(-24deg)"></div>
+                    <div style="position:absolute;left:2px;bottom:6px;width:18px;height:8px;border-radius:3px;background:#FF82BE;transform:rotate(-24deg)"></div>
+                  </div>
+                </div>
+                <div style="padding:9px 8px 11px;display:flex;flex-direction:column;align-items:center;gap:6px">
+                  <span style="font-size:18px;color:{{ wKnife.color }}">Knife</span>
+                  <span style="font-size:12px;letter-spacing:.12em;color:{{ wKnife.tagColor }}">{{ wKnife.tag }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <span style="font:12px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.45);text-align:center">changes fire UpdateSettings — sensitivity · volume · startingWeapon</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</sc-if>
+
+<sc-if value="{{ isPhone }}" hint-placeholder-val="{{ false }}">
+<div data-stage="phone" style="width:896px;height:414px;position:relative;overflow:hidden;border-radius:30px;font-family:'Fredoka One',sans-serif;user-select:none;border:9px solid #1D1219;box-shadow:0 22px 54px rgba(0,0,0,.5)">
+
+  <sc-if value="{{ inCombat }}" hint-placeholder-val="{{ true }}">
+  <div onClick="{{ fire }}" style="position:absolute;inset:0;cursor:crosshair;background:linear-gradient(180deg,#FFD8EC 0%,#FFC2E0 36%,#FFB4D8 56%,#EE9BC6 100%)">
+    <div style="position:absolute;left:10%;top:6%;width:250px;height:250px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.5),rgba(255,255,255,0) 70%);filter:blur(6px)"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;height:40%;background:linear-gradient(180deg,rgba(255,238,247,0),rgba(255,232,244,.9))"></div>
+    <div style="position:absolute;left:50%;top:36%;transform:translateX(-50%);padding:10px 24px;border-radius:14px;border:2px dashed rgba(214,66,143,.4);background:rgba(255,255,255,.2)">
+      <span style="font:11px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">3D lobby renders here</span>
+    </div>
+    <div style="position:absolute;left:296px;bottom:58px;display:flex;flex-direction:column;align-items:center;gap:5px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 12px;border-radius:12px;background:rgba(255,245,250,.94);border:2px solid rgba(255,92,168,.5)">
+        <span style="font-size:15px;color:#D6428F;line-height:1">bubblybri</span>
+        <span style="font-size:12px;color:#60384E;line-height:1">💗 Level 45</span>
+      </div>
+      <div style="width:58px;height:96px;border-radius:18px;background:repeating-linear-gradient(135deg,#FFE0EF 0 7px,#FFF2F8 7px 14px);border:1.5px dashed rgba(214,66,143,.4)"></div>
+    </div>
+  </div>
+
+  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:26px;height:26px;pointer-events:none">
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:4px;height:4px;border-radius:50%;background:#FF5CA8;box-shadow:0 0 0 2px rgba(255,255,255,.85)"></div>
+    <div style="position:absolute;left:50%;top:0;transform:translateX(-50%);width:3px;height:8px;border-radius:2px;background:rgba(255,92,168,.9);box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+    <div style="position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:3px;height:8px;border-radius:2px;background:rgba(255,92,168,.9);box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+    <div style="position:absolute;top:50%;left:0;transform:translateY(-50%);width:8px;height:3px;border-radius:2px;background:rgba(255,92,168,.9);box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+    <div style="position:absolute;top:50%;right:0;transform:translateY(-50%);width:8px;height:3px;border-radius:2px;background:rgba(255,92,168,.9);box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+  </div>
+
+  </sc-if>
+
+  <sc-for list="{{ hits }}" as="h" hint-placeholder-count="0">
+    <div style="position:absolute;pointer-events:none;left:{{ h.x }}px;top:{{ h.y }}px">
+      <div style="position:absolute;left:0;top:0;font-size:26px;color:#FF5CA8;text-shadow:0 2px 0 rgba(255,255,255,.9);animation:ppHit .5s ease-out forwards">✕</div>
+      <div style="position:absolute;left:0;top:-8px;transform:translate(-50%,0);font-size:24px;color:{{ h.color }};text-shadow:0 2px 0 rgba(255,255,255,.85);animation:ppFloat .85s ease-out forwards;white-space:nowrap">{{ h.dmg }}</div>
+    </div>
+  </sc-for>
+
+  <sc-if value="{{ inCombat }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;left:18px;top:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <sc-for list="{{ feed }}" as="k" hint-placeholder-count="2">
+        <div style="display:flex;align-items:center;gap:7px;align-self:flex-start;padding:6px 11px;border-radius:11px;background:rgba(255,245,250,.92);border:2px solid rgba(255,92,168,.35);animation:ppFeed 5s ease-out forwards">
+          <span style="font-size:14px;color:{{ k.killerColor }}">{{ k.killer }}</span>
+          <span style="width:22px;height:22px;border-radius:7px;background:rgba(255,92,168,.16);display:grid;place-items:center;font:8px ui-monospace,Menlo,monospace;color:#D6428F">{{ k.wep }}</span>
+          <span style="font-size:14px;color:#60384E;opacity:.85">{{ k.victim }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  </sc-if>
+
+  <sc-if value="{{ inCombat }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;left:50%;top:16px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:7px 18px;border-radius:14px;background:rgba(255,245,250,.92);border:2px solid rgba(255,92,168,.45)">
+    <span style="font-size:14px;color:#D6428F;letter-spacing:.06em">FFA</span>
+    <span style="width:2px;height:15px;background:rgba(255,92,168,.3)"></span>
+    <span style="font-size:16px;color:#60384E">{{ clock }}</span>
+    <span style="width:2px;height:15px;background:rgba(255,92,168,.3)"></span>
+    <span style="font-size:14px;color:#FF5CA8">💗 {{ kills }}</span>
+  </div>
+
+  </sc-if>
+
+  <div style="position:absolute;right:18px;top:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+    <div style="display:flex;align-items:center;gap:9px;padding:6px 14px;border-radius:14px;background:linear-gradient(180deg,rgba(60,32,48,.82),rgba(44,24,38,.82));border:2px solid rgba(255,255,255,.28)">
+      <div style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#FFE0A8,#FFC458 55%,#E39F35);border:1.5px solid rgba(255,255,255,.7)"></div>
+      <span style="font-size:17px;color:#fff">{{ coinsText }}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 8px 6px 14px;border-radius:14px;background:linear-gradient(180deg,rgba(60,32,48,.82),rgba(44,24,38,.82));border:2px solid rgba(255,255,255,.28)">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px">
+          <span style="font-size:13px;color:#fff">Level {{ level }}</span>
+          <span style="font-size:10px;color:rgba(255,255,255,.65)">{{ xpText }}</span>
+        </div>
+        <div style="width:150px;height:9px;border-radius:5px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.22);overflow:hidden">
+          <div style="height:100%;border-radius:5px;background:linear-gradient(90deg,#FF82BE,#FF5CA8 60%,#FFC458);transition:width .5s ease;width:{{ xpPct }}"></div>
+        </div>
+      </div>
+      <div style="width:30px;height:30px;border-radius:10px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);border:1.5px solid rgba(255,255,255,.8);display:grid;place-items:center;font:8px ui-monospace,Menlo,monospace;color:#fff">LVL</div>
+    </div>
+
+    <div style="width:236px;border-radius:14px;background:#FFE3F0;border:2px solid rgba(255,92,168,.6);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 11px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8)">
+        <span style="font-size:13px;color:#fff;letter-spacing:.1em">PLAYERS</span>
+        <span style="font-size:12px;color:rgba(255,255,255,.8)">6</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;padding:7px">
+        <sc-for list="{{ playersShort }}" as="p" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:10px;background:{{ p.bg }};border:1.5px solid {{ p.stroke }}">
+            <div style="width:24px;height:24px;border-radius:8px;flex:none;background:repeating-linear-gradient(135deg,#FFD9EC 0 5px,#FFEFF7 5px 10px);border:1px dashed rgba(214,66,143,.5);display:grid;place-items:center;font:7px ui-monospace,Menlo,monospace;color:rgba(214,66,143,.8)">{{ p.initial }}</div>
+            <span style="flex:1;font-size:14px;color:{{ p.nameColor }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.name }}</span>
+            <span style="font-size:12px;color:#60384E">💗 {{ p.kills }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ inCombat }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;left:18px;bottom:18px;width:218px;padding:11px 13px;border-radius:15px;background:rgba(255,245,250,.94);border:2px solid rgba(255,92,168,.5);display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between">
+      <span style="font-size:12px;color:#D6428F;letter-spacing:.1em">HEALTH</span>
+      <span style="font-size:17px;color:{{ hpColor }}">{{ hp }}</span>
+    </div>
+    <div style="height:13px;border-radius:7px;background:rgba(214,66,143,.16);border:1.5px solid rgba(255,92,168,.35);overflow:hidden">
+      <div style="height:100%;border-radius:6px;transition:width .35s ease;background:{{ hpFill }};width:{{ hpPct }}"></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;color:#60384E">{{ weapon }}</span>
+      <div style="display:flex;align-items:baseline;gap:3px">
+        <span style="font-size:21px;color:#D6428F">{{ ammo }}</span>
+        <span style="font-size:13px;color:rgba(96,56,78,.6)">/ {{ ammoMax }}</span>
+      </div>
+    </div>
+  </div>
+
+  </sc-if>
+
+  <div style="position:absolute;right:18px;bottom:18px;display:flex;align-items:flex-end;gap:12px">
+    <div onClick="{{ openSettings }}" style="width:52px;height:52px;border-radius:16px;background:rgba(255,245,250,.9);border:2px solid rgba(255,92,168,.5);display:grid;place-items:center;cursor:pointer">
+      <div style="position:relative;width:26px;height:26px;display:grid;place-items:center">
+        <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#FF5CA8;transform:rotate(0deg) translate(0,-9.5px)"></div>
+        <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#FF5CA8;transform:rotate(60deg) translate(0,-9.5px)"></div>
+        <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#FF5CA8;transform:rotate(120deg) translate(0,-9.5px)"></div>
+        <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#FF5CA8;transform:rotate(180deg) translate(0,-9.5px)"></div>
+        <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#FF5CA8;transform:rotate(240deg) translate(0,-9.5px)"></div>
+        <div style="position:absolute;left:50%;top:50%;width:6.5px;height:6.5px;margin:-3.25px;border-radius:2px;background:#FF5CA8;transform:rotate(300deg) translate(0,-9.5px)"></div>
+        <div style="position:relative;width:16px;height:16px;border-radius:50%;background:#FF5CA8;display:grid;place-items:center">
+          <div style="width:6px;height:6px;border-radius:50%;background:#FFF5FA"></div>
+        </div>
+      </div>
+    </div>
+    <sc-if value="{{ inCombat }}" hint-placeholder-val="{{ true }}">
+      <div onClick="{{ reload }}" style="width:52px;height:52px;border-radius:16px;background:rgba(255,245,250,.9);border:2px solid rgba(255,92,168,.5);display:grid;place-items:center;cursor:pointer">
+        <span style="font-size:13px;color:#D6428F">RELOAD</span>
+      </div>
+      <div onClick="{{ fire }}" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);border:3px solid rgba(255,255,255,.85);box-shadow:0 6px 0 rgba(198,52,124,.55);display:grid;place-items:center;cursor:pointer" style-active="transform:translateY(3px);box-shadow:0 3px 0 rgba(198,52,124,.55)">
+        <span style="font-size:16px;color:#fff;letter-spacing:.08em">FIRE</span>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ inCombat }}" hint-placeholder-val="{{ true }}">
+    <div style="position:absolute;left:322px;bottom:16px;width:80px;height:80px;border-radius:50%;border:2px dashed rgba(96,56,78,.3);display:grid;place-items:center;pointer-events:none">
+      <div style="width:34px;height:34px;border-radius:50%;background:rgba(255,245,250,.55);border:2px solid rgba(255,92,168,.4)"></div>
+      <span style="position:absolute;bottom:-13px;font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.45);white-space:nowrap">touch joystick</span>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ inLobby }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,#FFE9F5 0%,#FFD6EB 36%,#FFC4E0 58%,#F7B0D3 100%)">
+      <div style="position:absolute;left:8%;top:4%;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.55),rgba(255,255,255,0) 70%);filter:blur(6px)"></div>
+      <div style="position:absolute;left:0;right:0;top:250px;bottom:0;background:linear-gradient(180deg,#FFDCEE,#F3B6D6)"></div>
+      <div style="position:absolute;left:50%;top:268px;transform:translateX(-50%);width:700px;height:180px;border-radius:50% 50% 0 0 / 44px 44px 0 0;background:rgba(255,245,250,.55)"></div>
+
+      <div onClick="{{ enterBowtique }}" style="position:absolute;left:96px;top:96px;width:210px;cursor:pointer;display:flex;flex-direction:column;align-items:center">
+        <div style="width:180px;padding:6px 0;border-radius:10px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);border:2px solid #FFF5FA;box-shadow:0 4px 0 rgba(198,52,124,.5);text-align:center">
+          <span style="font-size:15px;color:#fff">🎀 The Bow-tique</span>
+        </div>
+        <div style="width:196px;height:30px;border-radius:8px 8px 0 0;background:repeating-linear-gradient(90deg,#FF5CA8 0 20px,#FFF5FA 20px 40px);border:2px solid #FFF5FA;border-bottom:none;margin-top:6px"></div>
+        <div style="width:184px;height:96px;background:#FFE3F0;border:2px solid #FF9ACB;border-top:none;border-radius:0 0 12px 12px;display:flex;align-items:flex-end;justify-content:center">
+          <div style="width:46px;height:62px;border-radius:24px 24px 0 0;background:linear-gradient(180deg,#FFB7DA,#FF8CC3);border:2px solid #FF9ACB;border-bottom:none;display:grid;place-items:center;padding-bottom:8px"><span style="font-size:18px">🚪</span></div>
+        </div>
+      </div>
+
+      <div onClick="{{ enterArmory }}" style="position:absolute;left:352px;top:118px;width:210px;cursor:pointer;display:flex;flex-direction:column;align-items:center">
+        <div style="width:186px;padding:6px 0;border-radius:10px;background:linear-gradient(180deg,#FFB765,#FF9A3C);border:2px solid #FFF5FA;box-shadow:0 4px 0 rgba(196,116,32,.5);text-align:center">
+          <span style="font-size:15px;color:#fff">🍭 Candy Armory</span>
+        </div>
+        <div style="width:196px;height:28px;border-radius:8px 8px 0 0;background:repeating-linear-gradient(90deg,#FF9A3C 0 20px,#FFF5FA 20px 40px);border:2px solid #FFF5FA;border-bottom:none;margin-top:6px"></div>
+        <div style="width:184px;height:86px;background:#FFF0E0;border:2px solid #FFC58A;border-top:none;border-radius:0 0 12px 12px;display:flex;align-items:flex-end;justify-content:center">
+          <div style="width:46px;height:58px;border-radius:23px 23px 0 0;background:linear-gradient(180deg,#FFD3A0,#FFB165);border:2px solid #FFC58A;border-bottom:none;display:grid;place-items:center;padding-bottom:8px"><span style="font-size:18px">🚪</span></div>
+        </div>
+      </div>
+
+      <div onClick="{{ enterRange }}" style="position:absolute;left:610px;top:134px;width:200px;cursor:pointer;display:flex;flex-direction:column;align-items:center">
+        <div style="width:190px;padding:6px 0;border-radius:10px;background:linear-gradient(180deg,#D97CE0,#BE55CC);border:2px solid #FFF5FA;box-shadow:0 4px 0 rgba(140,50,160,.5);text-align:center">
+          <span style="font-size:14px;color:#fff">💘 Heartbreaker Range</span>
+        </div>
+        <div style="width:186px;height:76px;margin-top:6px;border-radius:12px;background:#F7E4FA;border:2px solid #D9A6E4;display:flex;align-items:center;justify-content:center;gap:12px">
+          <sc-for list="{{ balloons }}" as="b" hint-placeholder-count="3">
+            <div onClick="{{ b.onClick }}" style="display:flex;flex-direction:column;align-items:center;cursor:pointer;opacity:{{ b.opacity }};animation:{{ b.anim }}">
+              <div style="width:30px;height:38px;border-radius:50% 50% 46% 46%;background:{{ b.color }};border:2px solid rgba(255,255,255,.75)"></div>
+              <div style="width:2px;height:12px;background:rgba(96,56,78,.4)"></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="position:absolute;left:404px;bottom:24px;display:flex;flex-direction:column;align-items:center;gap:5px">
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:12px;background:rgba(255,245,250,.95);border:2px solid rgba(255,92,168,.6)">
+          <span style="font-size:15px;color:#D6428F;line-height:1">cutiegracie</span>
+          <span style="font-size:13px;line-height:1">💗</span>
+        </div>
+        <div style="width:58px;height:96px;border-radius:18px;background:repeating-linear-gradient(135deg,#FFE0EF 0 7px,#FFF2F8 7px 14px);border:2px dashed rgba(214,66,143,.45)"></div>
+      </div>
+    </div>
+
+    <sc-if value="{{ zoneActive }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:50%;top:52px;transform:translateX(-50%);display:flex;align-items:center;animation:ppOpen .26s ease-out">
+        <div style="width:0;height:0;border-top:19px solid transparent;border-bottom:19px solid transparent;border-right:16px solid {{ zoneDark }}"></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 24px;background:linear-gradient(180deg,{{ zoneLight }},{{ zoneColor }});border-top:2px solid rgba(255,255,255,.85);border-bottom:2px solid rgba(255,255,255,.85)">
+          <span style="font-size:14px;animation:ppSpark 1.6s ease-in-out infinite">✨</span>
+          <span style="font-size:20px;color:#fff;white-space:nowrap">{{ zoneName }}</span>
+          <span style="font-size:14px;animation:ppSpark 1.6s ease-in-out .8s infinite">✨</span>
+        </div>
+        <div style="width:0;height:0;border-top:19px solid transparent;border-bottom:19px solid transparent;border-left:16px solid {{ zoneDark }}"></div>
+      </div>
+      <div onClick="{{ leaveZone }}" style="position:absolute;left:50%;top:98px;transform:translateX(-50%);padding:6px 18px;border-radius:11px;background:rgba(255,245,250,.94);border:2px solid rgba(255,92,168,.5);cursor:pointer">
+        <span style="font-size:13px;color:#D6428F">← walk out</span>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ newsOpen }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;right:18px;bottom:18px;width:246px;border-radius:16px;background:#FFE3F0;border:2px solid rgba(255,92,168,.7);overflow:hidden">
+        <div style="padding:7px 13px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:13px;color:#fff;letter-spacing:.1em">NEWS</span>
+          <div onClick="{{ closeNews }}" style="width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.28);display:grid;place-items:center;font-size:13px;color:#fff;cursor:pointer">✕</div>
+        </div>
+        <div style="padding:10px 13px;display:flex;flex-direction:column;gap:5px">
+          <span style="font-size:15px;color:#D6428F;line-height:1.2">{{ news.title }}</span>
+          <sc-for list="{{ news.bullets }}" as="b" hint-placeholder-count="3">
+            <span style="font-size:12px;color:#60384E">• {{ b }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ newsClosed }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ openNews }}" style="position:absolute;right:18px;bottom:18px;padding:8px 18px;border-radius:12px;background:rgba(255,245,250,.94);border:2px solid rgba(255,92,168,.55);cursor:pointer">
+        <span style="font-size:13px;color:#D6428F;letter-spacing:.1em">NEWS</span>
+      </div>
+    </sc-if>
+  </sc-if>
+
+  <sc-if value="{{ shopOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:rgba(52,26,42,.66);backdrop-filter:blur(6px);display:grid;place-items:center;padding:14px">
+      <div style="width:820px;border-radius:20px;background:#FFE3F0;border:2px solid rgba(255,92,168,.7);overflow:hidden;animation:ppOpen .2s ease-out">
+        <div style="padding:9px 16px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:17px;color:#fff;letter-spacing:.12em">🎀 SHOP</span>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="display:flex;align-items:center;gap:7px;padding:4px 11px;border-radius:10px;background:rgba(0,0,0,.22)">
+              <div style="width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#FFE0A8,#FFC458 55%,#E39F35);border:1.5px solid rgba(255,255,255,.7)"></div>
+              <span style="font-size:15px;color:#fff">{{ coinsText }}</span>
+            </div>
+            <div onClick="{{ closeModal }}" style="width:28px;height:28px;border-radius:9px;background:rgba(255,255,255,.28);display:grid;place-items:center;font-size:16px;color:#fff;cursor:pointer">✕</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;padding:11px 16px 4px;flex-wrap:wrap">
+          <sc-for list="{{ tabsLive }}" as="t" hint-placeholder-count="2">
+            <div onClick="{{ t.onClick }}" style="padding:7px 20px;border-radius:12px;cursor:pointer;background:{{ t.bg }};border:2px solid {{ t.stroke }};box-shadow:{{ t.shadow }}">
+              <span style="font-size:14px;letter-spacing:.06em;color:{{ t.color }}">{{ t.label }}</span>
+            </div>
+          </sc-for>
+          <div style="width:2px;height:18px;background:rgba(214,66,143,.25);margin:0 4px"></div>
+          <sc-for list="{{ tabsSoon }}" as="t" hint-placeholder-count="4">
+            <div style="padding:6px 14px;border-radius:12px;background:rgba(255,245,250,.45);border:2px dashed rgba(214,66,143,.25)">
+              <span style="font-size:12px;letter-spacing:.06em;color:rgba(96,56,78,.42)">{{ t.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:10px 16px 4px">
+          <sc-for list="{{ cards }}" as="c" hint-placeholder-count="4">
+            <div style="border-radius:14px;background:#FFF5FA;border:2px solid {{ c.rarityColor }};box-shadow:0 0 0 3px {{ c.glow }};overflow:hidden;display:flex;flex-direction:column">
+              <div style="height:74px;margin:9px 9px 0;border-radius:11px;background:repeating-linear-gradient(135deg,#FFD9EC 0 6px,#FFEFF7 6px 12px);border:1.5px dashed rgba(214,66,143,.4);display:grid;place-items:center">
+                <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(214,66,143,.7);text-align:center;padding:0 6px">{{ c.slot }}</span>
+              </div>
+              <div style="padding:9px;display:flex;flex-direction:column;gap:5px;align-items:center;flex:1">
+                <span style="font-size:14px;color:#60384E;text-align:center;line-height:1.15">{{ c.name }}</span>
+                <span style="font-size:10px;letter-spacing:.14em;color:{{ c.rarityColor }}">{{ c.rarity }}</span>
+                <div onClick="{{ c.onClick }}" style="margin-top:auto;width:100%;padding:8px 0;border-radius:11px;text-align:center;cursor:{{ c.cursor }};background:{{ c.actionBg }};border:2px solid {{ c.actionStroke }};box-shadow:{{ c.actionShadow }}">
+                  <span style="font-size:14px;color:{{ c.actionColor }}">{{ c.action }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="padding:4px 16px 12px;min-height:24px;text-align:center">
+          <span style="font-size:13px;color:{{ msgColor }}">{{ msg }}</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ settingsOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:rgba(52,26,42,.66);backdrop-filter:blur(6px);display:grid;place-items:center;padding:14px">
+      <div style="width:560px;border-radius:20px;background:#FFE3F0;border:2px solid rgba(255,92,168,.7);overflow:hidden;animation:ppOpen .2s ease-out">
+        <div style="padding:9px 16px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:9px">
+            <div style="position:relative;width:20px;height:20px;display:grid;place-items:center">
+              <div style="position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:2px;background:#fff;transform:rotate(0deg) translate(0,-7.5px)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:2px;background:#fff;transform:rotate(60deg) translate(0,-7.5px)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:2px;background:#fff;transform:rotate(120deg) translate(0,-7.5px)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:2px;background:#fff;transform:rotate(180deg) translate(0,-7.5px)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:2px;background:#fff;transform:rotate(240deg) translate(0,-7.5px)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:2px;background:#fff;transform:rotate(300deg) translate(0,-7.5px)"></div>
+              <div style="position:relative;width:12px;height:12px;border-radius:50%;background:#fff;display:grid;place-items:center">
+                <div style="width:4px;height:4px;border-radius:50%;background:#FF5CA8"></div>
+              </div>
+            </div>
+            <span style="font-size:16px;color:#fff;letter-spacing:.12em">SETTINGS</span>
+          </div>
+          <div onClick="{{ closeModal }}" style="width:28px;height:28px;border-radius:9px;background:rgba(255,255,255,.28);display:grid;place-items:center;font-size:16px;color:#fff;cursor:pointer">✕</div>
+        </div>
+        <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="border-radius:13px;background:#FFF5FA;border:2px solid rgba(255,92,168,.35);padding:11px 13px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-size:14px;color:#D6428F">Sensitivity</span>
+              <span style="font-size:13px;color:#60384E">{{ sensText }}</span>
+            </div>
+            <div onClick="{{ setSens }}" style="height:24px;display:flex;align-items:center;cursor:pointer">
+              <div style="position:relative;width:100%;height:10px;border-radius:6px;background:rgba(214,66,143,.16);border:1.5px solid rgba(255,92,168,.35)">
+                <div style="height:100%;border-radius:5px;background:linear-gradient(90deg,#FF82BE,#FF5CA8);width:{{ sensPct }}"></div>
+                <div style="position:absolute;top:50%;transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;background:#FFF5FA;border:3px solid #FF5CA8;left:{{ sensPct }}"></div>
+              </div>
+            </div>
+          </div>
+          <div style="border-radius:13px;background:#FFF5FA;border:2px solid rgba(255,92,168,.35);padding:11px 13px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <span style="font-size:14px;color:#D6428F">Volume</span>
+              <span style="font-size:13px;color:#60384E">{{ volText }}</span>
+            </div>
+            <div onClick="{{ setVol }}" style="height:24px;display:flex;align-items:center;cursor:pointer">
+              <div style="position:relative;width:100%;height:10px;border-radius:6px;background:rgba(214,66,143,.16);border:1.5px solid rgba(255,92,168,.35)">
+                <div style="height:100%;border-radius:5px;background:linear-gradient(90deg,#FF82BE,#FF5CA8);width:{{ volPct }}"></div>
+                <div style="position:absolute;top:50%;transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;background:#FFF5FA;border:3px solid #FF5CA8;left:{{ volPct }}"></div>
+              </div>
+            </div>
+          </div>
+          <div style="grid-column:1 / -1;border-radius:13px;background:#FFF5FA;padding:11px 13px;display:flex;flex-direction:column;gap:9px;border:{{ loadoutRing }}">
+            <span style="font-size:14px;color:#D6428F">Starting weapon</span>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">
+              <sc-for list="{{ weapons }}" as="w" hint-placeholder-count="4">
+                <div onClick="{{ w.onClick }}" style="padding:9px 6px;border-radius:11px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;background:{{ w.bg }};border:2px solid {{ w.stroke }};min-height:46px;box-sizing:border-box">
+                  <div style="width:26px;height:26px;border-radius:9px;background:repeating-linear-gradient(135deg,#FFD9EC 0 5px,#FFEFF7 5px 10px);border:1px dashed rgba(214,66,143,.45);display:grid;place-items:center;font:7px ui-monospace,Menlo,monospace;color:rgba(214,66,143,.8)">{{ w.code }}</div>
+                  <span style="font-size:13px;color:{{ w.color }}">{{ w.name }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</sc-if>
+
+<sc-if value="{{ isAssets }}" hint-placeholder-val="{{ false }}">
+<div style="width:1600px;height:1560px;position:relative;overflow:hidden;border-radius:8px;font-family:'Fredoka One',sans-serif;user-select:none;background:#FFF5FA;padding:34px;box-sizing:border-box;display:flex;flex-direction:column;gap:22px">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:3px solid rgba(255,92,168,.35);padding-bottom:14px">
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <span style="font-size:34px;color:#D6428F;letter-spacing:.04em">HUD ASSET SHEET</span>
+      <span style="font:12px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.55)">every element code-built · shown 1:1 · Fredoka One · no external images</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <div style="padding:6px 12px;border-radius:9px;background:#FF5CA8;display:flex;flex-direction:column;align-items:center"><span style="font:9px ui-monospace,Menlo,monospace;color:#fff">HOT PINK</span><span style="font:10px ui-monospace,Menlo,monospace;color:rgba(255,255,255,.85)">FF5CA8</span></div>
+      <div style="padding:6px 12px;border-radius:9px;background:#D6428F;display:flex;flex-direction:column;align-items:center"><span style="font:9px ui-monospace,Menlo,monospace;color:#fff">DEEP</span><span style="font:10px ui-monospace,Menlo,monospace;color:rgba(255,255,255,.85)">D6428F</span></div>
+      <div style="padding:6px 12px;border-radius:9px;background:#FFC458;display:flex;flex-direction:column;align-items:center"><span style="font:9px ui-monospace,Menlo,monospace;color:#7A4A12">GOLD</span><span style="font:10px ui-monospace,Menlo,monospace;color:rgba(122,74,18,.8)">FFC458</span></div>
+      <div style="padding:6px 12px;border-radius:9px;background:#DC3C50;display:flex;flex-direction:column;align-items:center"><span style="font:9px ui-monospace,Menlo,monospace;color:#fff">ERROR</span><span style="font:10px ui-monospace,Menlo,monospace;color:rgba(255,255,255,.85)">DC3C50</span></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px;flex:1;min-height:0">
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="border-radius:18px;border:2px solid rgba(255,92,168,.3);background:#FFE3F0;padding:16px;display:flex;flex-direction:column;gap:13px">
+        <span style="font-size:19px;color:#D6428F;letter-spacing:.1em">CROSSHAIR — 4 STATES</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+          <div style="border-radius:14px;overflow:hidden;background:linear-gradient(180deg,#FFC2E0,#EE9BC6);height:132px;position:relative;display:grid;place-items:center">
+            <div style="position:relative;width:34px;height:34px">
+              <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:5px;height:5px;border-radius:50%;background:#FF5CA8;box-shadow:0 0 0 2px rgba(255,255,255,.85)"></div>
+              <div style="position:absolute;left:50%;top:0;transform:translateX(-50%);width:3px;height:10px;border-radius:2px;background:#FF5CA8;box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+              <div style="position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:3px;height:10px;border-radius:2px;background:#FF5CA8;box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+              <div style="position:absolute;top:50%;left:0;transform:translateY(-50%);width:10px;height:3px;border-radius:2px;background:#FF5CA8;box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+              <div style="position:absolute;top:50%;right:0;transform:translateY(-50%);width:10px;height:3px;border-radius:2px;background:#FF5CA8;box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+            </div>
+            <span style="position:absolute;left:9px;bottom:7px;font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.7)">idle · 34px box</span>
+          </div>
+
+          <div style="border-radius:14px;overflow:hidden;background:linear-gradient(180deg,#FFC2E0,#EE9BC6);height:132px;position:relative;display:grid;place-items:center">
+            <div style="position:relative;width:52px;height:52px">
+              <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:5px;height:5px;border-radius:50%;background:#FF5CA8;box-shadow:0 0 0 2px rgba(255,255,255,.85)"></div>
+              <div style="position:absolute;left:50%;top:0;transform:translateX(-50%);width:3px;height:12px;border-radius:2px;background:#FF5CA8;box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+              <div style="position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:3px;height:12px;border-radius:2px;background:#FF5CA8;box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+              <div style="position:absolute;top:50%;left:0;transform:translateY(-50%);width:12px;height:3px;border-radius:2px;background:#FF5CA8;box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+              <div style="position:absolute;top:50%;right:0;transform:translateY(-50%);width:12px;height:3px;border-radius:2px;background:#FF5CA8;box-shadow:0 0 0 1px rgba(255,255,255,.7)"></div>
+            </div>
+            <span style="position:absolute;left:9px;bottom:7px;font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.7)">firing · arms +9px</span>
+          </div>
+
+          <div style="border-radius:14px;overflow:hidden;background:linear-gradient(180deg,#FFC2E0,#EE9BC6);height:132px;position:relative;display:grid;place-items:center">
+            <div style="position:relative;width:34px;height:34px">
+              <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:34px;color:#FF5CA8;text-shadow:0 2px 0 rgba(255,255,255,.9);line-height:1">✕</div>
+            </div>
+            <span style="position:absolute;left:9px;bottom:7px;font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.7)">hit · marker overlay</span>
+          </div>
+
+          <div style="border-radius:14px;overflow:hidden;background:linear-gradient(180deg,#FFC2E0,#EE9BC6);height:132px;position:relative;display:grid;place-items:center">
+            <div style="width:38px;height:38px;border-radius:50%;border:4px solid rgba(255,255,255,.55);border-top-color:#FF5CA8;border-right-color:#FF5CA8"></div>
+            <span style="position:absolute;left:9px;bottom:7px;font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.7)">reload · arc sweep</span>
+          </div>
+        </div>
+        <span style="font:11px/1.6 ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">arms 3×10px r2 · dot 5px · stroke 1px rgba(255,255,255,.70)<br>idle→firing 0.08s, firing→idle 0.16s · reload arc = full turn over reload time</span>
+      </div>
+
+      <div style="border-radius:18px;border:2px solid rgba(255,92,168,.3);background:#FFE3F0;padding:16px;display:flex;flex-direction:column;gap:13px;flex:1">
+        <span style="font-size:19px;color:#D6428F;letter-spacing:.1em">HITMARKER — 3 TIERS</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;flex:1">
+          <div style="border-radius:14px;background:linear-gradient(180deg,#FFC2E0,#EE9BC6);position:relative;display:grid;place-items:center;min-height:120px">
+            <span style="font-size:34px;color:#FF5CA8;text-shadow:0 2px 0 rgba(255,255,255,.9);transform:rotate(8deg)">✕</span>
+            <span style="position:absolute;left:8px;bottom:7px;font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.7)">hit · 34px</span>
+          </div>
+          <div style="border-radius:14px;background:linear-gradient(180deg,#FFC2E0,#EE9BC6);position:relative;display:grid;place-items:center;min-height:120px">
+            <span style="font-size:44px;color:#FFC458;text-shadow:0 2px 0 rgba(255,255,255,.9),0 0 14px rgba(255,196,88,.8);transform:rotate(8deg)">✕</span>
+            <span style="position:absolute;left:8px;bottom:7px;font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.7)">crit · 44px</span>
+          </div>
+          <div style="border-radius:14px;background:linear-gradient(180deg,#FFC2E0,#EE9BC6);position:relative;display:grid;place-items:center;min-height:120px">
+            <div style="position:relative;display:grid;place-items:center">
+              <div style="position:absolute;width:58px;height:58px;border-radius:50%;border:3px solid rgba(220,60,80,.75)"></div>
+              <span style="font-size:40px;color:#DC3C50;text-shadow:0 2px 0 rgba(255,255,255,.9);transform:rotate(8deg)">✕</span>
+            </div>
+            <span style="position:absolute;left:8px;bottom:7px;font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.7)">kill · + ring</span>
+          </div>
+        </div>
+        <span style="font:11px/1.6 ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">scale 0.40 → 1.15 → 1.50 · alpha 0 → 1 → 0 · 0.50s ease-out · rotate 0 → 14°</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="border-radius:18px;border:2px solid rgba(255,92,168,.3);background:#FFE3F0;padding:16px;display:flex;flex-direction:column;gap:13px">
+        <span style="font-size:19px;color:#D6428F;letter-spacing:.1em">DAMAGE NUMBERS</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div style="border-radius:14px;background:linear-gradient(180deg,#FFC2E0,#EE9BC6);height:128px;position:relative;display:grid;place-items:center">
+            <span style="font-size:32px;color:#FF5CA8;text-shadow:0 3px 0 rgba(255,255,255,.85)">28</span>
+            <span style="position:absolute;left:8px;bottom:7px;font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.7)">body · 32px</span>
+          </div>
+          <div style="border-radius:14px;background:linear-gradient(180deg,#FFC2E0,#EE9BC6);height:128px;position:relative;display:grid;place-items:center">
+            <span style="font-size:44px;color:#FFC458;text-shadow:0 3px 0 rgba(255,255,255,.85),0 0 14px rgba(255,196,88,.6);white-space:nowrap">84 ✦</span>
+            <span style="position:absolute;left:8px;bottom:7px;font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.7)">crit · 44px</span>
+          </div>
+          <div style="border-radius:14px;background:linear-gradient(180deg,#FFC2E0,#EE9BC6);height:128px;position:relative;display:grid;place-items:center">
+            <span style="font-size:30px;color:#DC3C50;text-shadow:0 3px 0 rgba(255,255,255,.85)">KO</span>
+            <span style="position:absolute;left:8px;bottom:7px;font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.7)">kill · 30px</span>
+          </div>
+        </div>
+        <span style="font:11px/1.6 ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">rise 64px · alpha 0 → 1 (0.15s) → 0 · 0.85s ease-out · random x-jitter ±14px<br>spawn at hit world-point projected to screen</span>
+      </div>
+
+      <div style="border-radius:18px;border:2px solid rgba(255,92,168,.3);background:#FFE3F0;padding:16px;display:flex;flex-direction:column;gap:13px;flex:1">
+        <span style="font-size:19px;color:#D6428F;letter-spacing:.1em">KILLFEED ROW — 3 CASES</span>
+        <div style="display:flex;flex-direction:column;gap:11px">
+          <div style="display:flex;align-items:center;gap:10px;align-self:flex-start;padding:9px 16px;border-radius:14px;background:rgba(255,245,250,.92);border:2px solid rgba(255,92,168,.35);box-shadow:0 4px 12px rgba(148,52,102,.18)">
+            <span style="font-size:19px;color:#D6428F">cutiegracie</span>
+            <span style="width:30px;height:30px;border-radius:9px;background:rgba(255,92,168,.16);display:grid;place-items:center;font:10px ui-monospace,Menlo,monospace;color:#D6428F">RIF</span>
+            <span style="font-size:19px;color:#60384E;opacity:.85">xoxosky</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;align-self:flex-start;padding:9px 16px;border-radius:14px;background:rgba(255,245,250,.92);border:2px solid rgba(255,92,168,.35);box-shadow:0 4px 12px rgba(148,52,102,.18)">
+            <span style="font-size:19px;color:#60384E">bubblybri</span>
+            <span style="width:30px;height:30px;border-radius:9px;background:rgba(255,92,168,.16);display:grid;place-items:center;font:10px ui-monospace,Menlo,monospace;color:#D6428F">KNF</span>
+            <span style="font-size:19px;color:#60384E;opacity:.85">luvlylani</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;align-self:flex-start;padding:9px 16px;border-radius:14px;background:rgba(255,245,250,.92);border:2px solid rgba(220,60,80,.55);box-shadow:0 4px 12px rgba(148,52,102,.18)">
+            <span style="font-size:19px;color:#60384E">pinkangel</span>
+            <span style="width:30px;height:30px;border-radius:9px;background:rgba(220,60,80,.14);display:grid;place-items:center;font:10px ui-monospace,Menlo,monospace;color:#DC3C50">SHT</span>
+            <span style="font-size:19px;color:#DC3C50">cutiegracie</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:2px">
+          <div style="flex:1;height:2px;background:rgba(255,92,168,.25)"></div>
+          <span style="font:10px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.5)">weapon chip = 30×30 r9, 3-letter code</span>
+          <div style="flex:1;height:2px;background:rgba(255,92,168,.25)"></div>
+        </div>
+        <span style="font:11px/1.6 ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">slide in from −26px over 0.6s ease-out · hold 4.0s · fade 1.0s<br>your kill = killer in D6428F · your death = victim + stroke in DC3C50 · max 5 rows</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="border-radius:18px;border:2px solid rgba(255,92,168,.3);background:#FFE3F0;padding:16px;display:flex;flex-direction:column;gap:13px">
+        <span style="font-size:19px;color:#D6428F;letter-spacing:.1em">ICONS &amp; BADGES</span>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          <div style="border-radius:14px;background:#FFF5FA;height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+            <div style="width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#FFE0A8,#FFC458 55%,#E39F35);border:2px solid rgba(255,255,255,.7);box-shadow:0 0 12px rgba(255,196,88,.55)"></div>
+            <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">coin 38px</span>
+          </div>
+          <div style="border-radius:14px;background:#FFF5FA;height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+            <div style="width:42px;height:42px;border-radius:13px;background:linear-gradient(180deg,#FF7FBC,#FF5CA8);border:2px solid rgba(255,255,255,.8);display:grid;place-items:center;font:10px ui-monospace,Menlo,monospace;color:#fff;box-shadow:0 0 14px rgba(255,92,168,.55)">LVL</div>
+            <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">level badge</span>
+          </div>
+          <div style="border-radius:14px;background:#FFF5FA;height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+            <div style="width:42px;height:42px;border-radius:12px;background:repeating-linear-gradient(135deg,#FFD9EC 0 6px,#FFEFF7 6px 12px);border:1.5px dashed rgba(214,66,143,.5);display:grid;place-items:center;font:9px ui-monospace,Menlo,monospace;color:rgba(214,66,143,.8)">AV</div>
+            <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">avatar 42px</span>
+          </div>
+          <div style="border-radius:14px;background:#FFF5FA;height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+            <span style="font-size:30px;line-height:1">💗</span>
+            <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">heart glyph</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <span style="font:11px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">XP bar · 252×14 r8 · track rgba(0,0,0,.35) · fill FF82BE → FF5CA8 → FFC458</span>
+          <div style="width:100%;height:14px;border-radius:8px;background:rgba(60,32,48,.8);border:1.5px solid rgba(255,255,255,.22);overflow:hidden">
+            <div style="height:100%;width:49%;border-radius:8px;background:linear-gradient(90deg,#FF82BE,#FF5CA8 60%,#FFC458);box-shadow:0 0 12px rgba(255,92,168,.7)"></div>
+          </div>
+          <span style="font:11px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">health bar · 20px r10 · fill flips to DC3C50 at ≤30</span>
+          <div style="width:100%;height:20px;border-radius:10px;background:rgba(214,66,143,.16);border:2px solid rgba(255,92,168,.35);overflow:hidden">
+            <div style="height:100%;width:82%;border-radius:8px;background:linear-gradient(90deg,#FF82BE,#FF5CA8)"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-radius:18px;border:2px solid rgba(255,92,168,.3);background:#FFE3F0;padding:16px;display:flex;flex-direction:column;gap:13px;flex:1">
+        <span style="font-size:19px;color:#D6428F;letter-spacing:.1em">RARITY FRAMES</span>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:11px;flex:1">
+          <div style="border-radius:14px;background:#FFF5FA;border:3px solid #96828F;box-shadow:0 0 0 4px #96828F33;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px">
+            <div style="width:100%;flex:1;min-height:52px;border-radius:10px;background:repeating-linear-gradient(135deg,#FFD9EC 0 7px,#FFEFF7 7px 14px);border:1.5px dashed rgba(214,66,143,.35)"></div>
+            <span style="font-size:12px;letter-spacing:.12em;color:#96828F">COMMON</span>
+            <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.5)">96828F</span>
+          </div>
+          <div style="border-radius:14px;background:#FFF5FA;border:3px solid #5A8CEB;box-shadow:0 0 0 4px #5A8CEB33;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px">
+            <div style="width:100%;flex:1;min-height:52px;border-radius:10px;background:repeating-linear-gradient(135deg,#FFD9EC 0 7px,#FFEFF7 7px 14px);border:1.5px dashed rgba(214,66,143,.35)"></div>
+            <span style="font-size:12px;letter-spacing:.12em;color:#5A8CEB">RARE</span>
+            <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.5)">5A8CEB</span>
+          </div>
+          <div style="border-radius:14px;background:#FFF5FA;border:3px solid #AA5ADC;box-shadow:0 0 0 4px #AA5ADC33;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px">
+            <div style="width:100%;flex:1;min-height:52px;border-radius:10px;background:repeating-linear-gradient(135deg,#FFD9EC 0 7px,#FFEFF7 7px 14px);border:1.5px dashed rgba(214,66,143,.35)"></div>
+            <span style="font-size:12px;letter-spacing:.12em;color:#AA5ADC">EPIC</span>
+            <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.5)">AA5ADC</span>
+          </div>
+          <div style="border-radius:14px;background:#FFF5FA;border:3px solid #EBA032;box-shadow:0 0 0 4px #EBA03233;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px">
+            <div style="width:100%;flex:1;min-height:52px;border-radius:10px;background:repeating-linear-gradient(135deg,#FFD9EC 0 7px,#FFEFF7 7px 14px);border:1.5px dashed rgba(214,66,143,.35)"></div>
+            <span style="font-size:12px;letter-spacing:.12em;color:#EBA032">LEGENDARY</span>
+            <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.5)">EBA032</span>
+          </div>
+        </div>
+        <span style="font:11px/1.6 ui-monospace,Menlo,monospace;color:rgba(96,56,78,.6)">card stroke 3px in rarity color · outer glow 4px at 20% alpha · label letterspacing 0.12em</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="border-radius:18px;border:2px solid rgba(255,92,168,.3);background:#FFE3F0;padding:18px;display:flex;flex-direction:column;gap:15px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between">
+      <span style="font-size:19px;color:#D6428F;letter-spacing:.1em">ICON SET</span>
+      <span style="font:11px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.55)">2–8 Frames + UICorner each · 72px tile · ~34px artwork · one accent color per icon</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:16px">
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="width:36px;height:36px;box-sizing:border-box;border-radius:50%;border:4px solid #FF5CA8;display:grid;place-items:center">
+            <div style="width:18px;height:18px;box-sizing:border-box;border-radius:50%;border:3px solid #FF5CA8;display:grid;place-items:center">
+              <div style="width:5px;height:5px;border-radius:50%;background:#FF5CA8"></div>
+            </div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">PLAY</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:38px;height:34px">
+            <div style="position:absolute;left:4px;top:9px;width:30px;height:16px;border-radius:3px 3px 8px 8px;background:#FF5CA8"></div>
+            <div style="position:absolute;left:0;top:5px;width:11px;height:4px;border-radius:2px;background:#FF5CA8;transform:rotate(-26deg);transform-origin:left center"></div>
+            <div style="position:absolute;left:9px;bottom:0;width:8px;height:8px;border-radius:50%;background:#FF5CA8"></div>
+            <div style="position:absolute;right:5px;bottom:0;width:8px;height:8px;border-radius:50%;background:#FF5CA8"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">SHOP</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:34px;height:34px">
+            <div style="position:absolute;left:7px;top:2px;width:20px;height:14px;box-sizing:border-box;border-radius:11px 11px 0 0;border:3px solid #FF5CA8;border-bottom:none"></div>
+            <div style="position:absolute;left:0;bottom:3px;width:34px;height:20px;border-radius:7px;background:#FF5CA8"></div>
+            <div style="position:absolute;left:14px;bottom:10px;width:6px;height:6px;border-radius:50%;background:#FFF5FA"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">LOADOUT</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:36px;height:36px;display:grid;place-items:center">
+            <div style="position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;border-radius:3px;background:#FF5CA8;transform:rotate(0deg) translate(0,-13px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;border-radius:3px;background:#FF5CA8;transform:rotate(60deg) translate(0,-13px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;border-radius:3px;background:#FF5CA8;transform:rotate(120deg) translate(0,-13px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;border-radius:3px;background:#FF5CA8;transform:rotate(180deg) translate(0,-13px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;border-radius:3px;background:#FF5CA8;transform:rotate(240deg) translate(0,-13px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;border-radius:3px;background:#FF5CA8;transform:rotate(300deg) translate(0,-13px)"></div>
+            <div style="position:relative;width:22px;height:22px;border-radius:50%;background:#FF5CA8;display:grid;place-items:center">
+              <div style="width:9px;height:9px;border-radius:50%;background:#FFF5FA"></div>
+            </div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">SETTINGS</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;width:32px;height:32px">
+            <div style="border-radius:5px;background:#FF5CA8"></div>
+            <div style="border-radius:5px;background:#FF5CA8"></div>
+            <div style="border-radius:5px;background:#FF5CA8"></div>
+            <div style="border-radius:5px;background:#FF82BE"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">INVENTORY</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="width:36px;height:36px;box-sizing:border-box;border-radius:50%;border:3px solid #FF5CA8;display:grid;place-items:center">
+            <div style="width:17px;height:17px;background:#FF5CA8;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">BATTLE PASS</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:32px;height:34px">
+            <div style="position:absolute;left:0;top:6px;right:0;bottom:0;box-sizing:border-box;border:3px solid #FF5CA8;border-radius:7px"></div>
+            <div style="position:absolute;left:0;top:6px;right:0;height:9px;background:#FF5CA8;border-radius:5px 5px 0 0"></div>
+            <div style="position:absolute;left:6px;top:0;width:5px;height:10px;border-radius:2px;background:#FF5CA8"></div>
+            <div style="position:absolute;right:6px;top:0;width:5px;height:10px;border-radius:2px;background:#FF5CA8"></div>
+            <div style="position:absolute;left:9px;bottom:6px;width:6px;height:6px;border-radius:2px;background:#FF82BE"></div>
+            <div style="position:absolute;right:9px;bottom:6px;width:6px;height:6px;border-radius:2px;background:#FF82BE"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">DAILY</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:34px;height:34px">
+            <div style="position:absolute;left:7px;top:2px;width:20px;height:17px;border-radius:0 0 10px 10px;background:#FFC458"></div>
+            <div style="position:absolute;left:0;top:3px;width:10px;height:10px;box-sizing:border-box;border-radius:50%;border:3px solid #FFC458"></div>
+            <div style="position:absolute;right:0;top:3px;width:10px;height:10px;box-sizing:border-box;border-radius:50%;border:3px solid #FFC458"></div>
+            <div style="position:absolute;left:15px;top:18px;width:4px;height:8px;background:#FFC458"></div>
+            <div style="position:absolute;left:6px;bottom:2px;width:22px;height:6px;border-radius:3px;background:#FFC458"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">RANKED</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:36px;height:26px;border-radius:7px;background:#FF5CA8">
+            <div style="position:absolute;left:-6px;top:50%;transform:translateY(-50%);width:12px;height:12px;border-radius:50%;background:#FFF5FA"></div>
+            <div style="position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:12px;height:12px;border-radius:50%;background:#FFF5FA"></div>
+            <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:3px;height:12px;border-radius:2px;background:rgba(255,245,250,.75)"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">CODES</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:34px;height:32px">
+            <div style="position:absolute;left:0;top:0;width:34px;height:23px;border-radius:8px;background:#FF5CA8"></div>
+            <div style="position:absolute;left:7px;bottom:0;width:0;height:0;border-left:5px solid transparent;border-right:9px solid transparent;border-top:10px solid #FF5CA8"></div>
+            <div style="position:absolute;left:8px;top:9px;width:5px;height:5px;border-radius:50%;background:#FFF5FA"></div>
+            <div style="position:absolute;left:15px;top:9px;width:5px;height:5px;border-radius:50%;background:#FFF5FA"></div>
+            <div style="position:absolute;left:22px;top:9px;width:5px;height:5px;border-radius:50%;background:#FFF5FA"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">NEWS</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:38px;height:30px">
+            <div style="position:absolute;left:2px;top:6px;width:30px;height:10px;border-radius:3px;background:#5C4858"></div>
+            <div style="position:absolute;left:26px;top:8px;width:12px;height:5px;border-radius:2px;background:#5C4858"></div>
+            <div style="position:absolute;left:5px;top:15px;width:10px;height:15px;border-radius:0 0 5px 4px;background:#FF82BE;transform:skewX(-14deg)"></div>
+            <div style="position:absolute;left:16px;top:16px;width:5px;height:7px;border-radius:0 0 2px 2px;background:#5C4858"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">PISTOL</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:42px;height:30px">
+            <div style="position:absolute;left:0;top:9px;width:42px;height:8px;border-radius:3px;background:#5C4858"></div>
+            <div style="position:absolute;left:1px;top:4px;width:11px;height:6px;border-radius:3px 3px 0 0;background:#FF82BE"></div>
+            <div style="position:absolute;left:15px;top:16px;width:8px;height:13px;border-radius:0 0 3px 3px;background:#FF82BE;transform:skewX(-12deg)"></div>
+            <div style="position:absolute;left:25px;top:16px;width:7px;height:11px;border-radius:2px;background:#5C4858"></div>
+            <div style="position:absolute;left:20px;top:4px;width:9px;height:4px;border-radius:2px;background:#5C4858"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">RIFLE</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:42px;height:28px">
+            <div style="position:absolute;left:8px;top:6px;width:34px;height:6px;border-radius:3px;background:#5C4858"></div>
+            <div style="position:absolute;left:8px;top:14px;width:34px;height:6px;border-radius:3px;background:#5C4858"></div>
+            <div style="position:absolute;left:0;top:8px;width:13px;height:11px;border-radius:4px;background:#FF82BE;transform:rotate(-10deg)"></div>
+            <div style="position:absolute;left:16px;top:20px;width:7px;height:8px;border-radius:0 0 3px 3px;background:#FF82BE"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">SHOTGUN</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:36px;height:36px">
+            <div style="position:absolute;left:4px;top:6px;width:26px;height:12px;background:#5C4858;clip-path:polygon(0% 0%,80% 22%,100% 50%,80% 78%,0% 100%);transform:rotate(-24deg)"></div>
+            <div style="position:absolute;left:2px;bottom:5px;width:15px;height:7px;border-radius:3px;background:#FF82BE;transform:rotate(-24deg)"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">KNIFE</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#FFE0A8,#FFC458 55%,#E39F35);border:2px solid rgba(255,255,255,.8);box-shadow:0 0 12px rgba(255,196,88,.5);display:grid;place-items:center">
+            <div style="width:18px;height:18px;box-sizing:border-box;border-radius:50%;border:3px solid rgba(200,140,40,.45)"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">COIN</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="width:27px;height:27px;border-radius:6px;transform:rotate(45deg);background:linear-gradient(135deg,#FFA8D6 0%,#FF5CA8 55%,#D6428F 100%);border:2px solid rgba(255,255,255,.7);box-shadow:0 0 12px rgba(255,92,168,.45)"></div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">GEM</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <span style="font-size:34px;line-height:1">💗</span>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">HEART · emoji</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:36px;height:36px;display:grid;place-items:center">
+            <div style="position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:#FF82BE;transform:rotate(0deg) translate(0,-10px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:#FF82BE;transform:rotate(72deg) translate(0,-10px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:#FF82BE;transform:rotate(144deg) translate(0,-10px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:#FF82BE;transform:rotate(216deg) translate(0,-10px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:#FF82BE;transform:rotate(288deg) translate(0,-10px)"></div>
+            <div style="position:relative;width:17px;height:17px;border-radius:50%;background:#FFC458;border:2px solid #fff"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">LEVEL</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="position:relative;width:36px;height:28px">
+            <div style="position:absolute;left:0;bottom:0;width:36px;height:8px;border-radius:3px;background:#FFC458"></div>
+            <div style="position:absolute;left:0;bottom:6px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:15px solid #FFC458"></div>
+            <div style="position:absolute;left:11px;bottom:6px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:21px solid #FFC458"></div>
+            <div style="position:absolute;right:0;bottom:6px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:15px solid #FFC458"></div>
+          </div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">CROWN</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:9px">
+        <div style="width:72px;height:72px;border-radius:20px;background:#FFF5FA;border:2px solid rgba(255,92,168,.28);display:grid;place-items:center">
+          <div style="width:34px;height:34px;background:#FFC458;clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)"></div>
+        </div>
+        <span style="font:9px ui-monospace,Menlo,monospace;color:rgba(96,56,78,.62);letter-spacing:.06em">STAR</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+</sc-if>
+</div>
+</div>
+
+<div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 16px;background:rgba(20,12,18,.72);border-top:1px solid rgba(255,255,255,.1);flex-wrap:wrap">
+  <span style="font:11px ui-monospace,Menlo,monospace;color:rgba(255,255,255,.42);letter-spacing:.04em">PROTOTYPE HARNESS</span>
+  <span style="width:1px;height:18px;background:rgba(255,255,255,.16)"></span>
+  <div onClick="{{ setLobby }}" style="padding:6px 14px;border-radius:9px;cursor:pointer;font:12px ui-monospace,Menlo,monospace;background:{{ lBg }};color:{{ lColor }};border:1px solid rgba(255,255,255,.2)">lobby</div>
+  <div onClick="{{ setCombat }}" style="padding:6px 14px;border-radius:9px;cursor:pointer;font:12px ui-monospace,Menlo,monospace;background:{{ cBg }};color:{{ cColor }};border:1px solid rgba(255,255,255,.2)">combat</div>
+  <span style="width:1px;height:18px;background:rgba(255,255,255,.16)"></span>
+  <div onClick="{{ setDesktop }}" style="padding:6px 14px;border-radius:9px;cursor:pointer;font:12px ui-monospace,Menlo,monospace;background:{{ dBg }};color:{{ dColor }};border:1px solid rgba(255,255,255,.2)">desktop 1920×1080</div>
+  <div onClick="{{ setPhone }}" style="padding:6px 14px;border-radius:9px;cursor:pointer;font:12px ui-monospace,Menlo,monospace;background:{{ pBg }};color:{{ pColor }};border:1px solid rgba(255,255,255,.2)">phone 896×414</div>
+  <div onClick="{{ setAssets }}" style="padding:6px 14px;border-radius:9px;cursor:pointer;font:12px ui-monospace,Menlo,monospace;background:{{ aBg }};color:{{ aColor }};border:1px solid rgba(255,255,255,.2)">asset sheet</div>
+  <span style="width:1px;height:18px;background:rgba(255,255,255,.16)"></span>
+  <span style="font:11px ui-monospace,Menlo,monospace;color:rgba(255,255,255,.5)">{{ flags }}</span>
+  <span style="width:1px;height:18px;background:rgba(255,255,255,.16)"></span>
+  <span style="font:11px ui-monospace,Menlo,monospace;color:rgba(255,255,255,.35)">click a building to walk in · B shop · Tab scores · Esc walk out</span>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:830},&quot;device&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;desktop&quot;,&quot;phone&quot;,&quot;assets&quot;],&quot;default&quot;:&quot;desktop&quot;,&quot;tsType&quot;:&quot;\&quot;desktop\&quot; | \&quot;phone\&quot; | \&quot;assets\&quot;&quot;},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;lobby&quot;,&quot;combat&quot;,&quot;shop&quot;],&quot;default&quot;:&quot;lobby&quot;,&quot;tsType&quot;:&quot;\&quot;lobby\&quot; | \&quot;combat\&quot; | \&quot;shop\&quot;&quot;}}">
+const C = {
+  hot: "#FF5CA8", deep: "#D6428F", bubble: "#FF82BE", blush: "#FFE3F0",
+  white: "#FFF5FA", plum: "#60384E", gold: "#FFC458", err: "#DC3C50",
+  common: "#96828F", rare: "#5A8CEB", epic: "#AA5ADC", legendary: "#EBA032",
+};
+
+const CATALOG = {
+  skins: [
+    { id: "sk_heart", name: "Heartbreaker Rifle", rarity: "LEGENDARY", price: 1299, slot: "rifle render" },
+    { id: "sk_knife", name: "Princess Knife", rarity: "EPIC", price: 899, slot: "knife render" },
+    { id: "sk_pop", name: "Sugarpop Pistol", rarity: "RARE", price: 349, slot: "pistol render" },
+    { id: "sk_cotton", name: "Cotton Shotgun", rarity: "COMMON", price: 149, slot: "shotgun render" },
+  ],
+  charms: [
+    { id: "ch_bow", name: "Bow Charm", rarity: "RARE", price: 199, slot: "bow charm render" },
+    { id: "ch_sticker", name: "Sweetheart Sticker Pack", rarity: "COMMON", price: 99, slot: "sticker render" },
+    { id: "ch_crown", name: "Crown Charm", rarity: "EPIC", price: 499, slot: "crown charm render" },
+    { id: "ch_fountain", name: "Fountain Charm", rarity: "LEGENDARY", price: 1099, slot: "fountain charm render" },
+  ],
+};
+
+const NEWS = {
+  title: "NEW SUMMER UPDATE! 🌴",
+  bullets: ["2 New Maps!", "New Weapon Skins!", "Limited Time Event!"],
+};
+
+const ROSTER = [
+  { name: "cutiegracie", kills: 7, deaths: 3, self: true },
+  { name: "bubblybri", kills: 11, deaths: 6, self: false },
+  { name: "luvlylani", kills: 9, deaths: 5, self: false },
+  { name: "itzprincess", kills: 5, deaths: 8, self: false },
+  { name: "pinkangel", kills: 4, deaths: 7, self: false },
+  { name: "xoxosky", kills: 2, deaths: 9, self: false },
+];
+
+class Component extends DCLogic {
+  state = {
+    device: "desktop", scene: "lobby", zone: null, newsOpen: true,
+    popped: {}, modal: null, scoreboard: false,
+    shopTab: "skins", focusWeapon: false,
+    coins: 12450, level: 27, xp: 2450, xpMax: 5000,
+    owned: { sk_heart: true }, equippedSkin: "sk_heart", equippedCharm: null,
+    feed: [], hits: [], msg: "", msgErr: false, gain: null,
+    sens: 0.55, vol: 0.7, weapon: "Rifle",
+    hp: 82, ammo: 24, ammoMax: 30, kills: 7, timer: 222,
+    scale: 1, nextId: 1,
+  };
+
+  componentDidMount() {
+    const p = this.props || {};
+    const patch = {};
+    if (p.device === "phone") patch.device = "phone";
+    if (p.startScreen === "combat") patch.scene = "combat";
+    if (p.startScreen === "shop") { patch.zone = "bowtique"; patch.modal = "shop"; }
+    if (Object.keys(patch).length) this.setState(patch);
+
+    this._resize = () => this.fit();
+    window.addEventListener("resize", this._resize);
+    this.fit();
+
+    this._down = (e) => {
+      const k = (e.key || "").toLowerCase();
+      if (k === "b") { e.preventDefault(); this.setState((s) => ({ modal: s.modal === "shop" ? null : "shop", msg: "" })); }
+      else if (k === "tab") { e.preventDefault(); this.setState({ scoreboard: true }); }
+      else if (k === "escape") { this.setState({ modal: null, zone: null }); }
+    };
+    this._up = (e) => { if ((e.key || "").toLowerCase() === "tab") this.setState({ scoreboard: false }); };
+    window.addEventListener("keydown", this._down);
+    window.addEventListener("keyup", this._up);
+
+    this._tick = setInterval(() => this.setState((s) => ({ timer: s.timer > 0 ? s.timer - 1 : 300 })), 1000);
+
+    this.setState({
+      feed: [
+        { id: -1, killer: "bubblybri", victim: "xoxosky", wep: "RIF", self: false },
+        { id: -2, killer: "cutiegracie", victim: "itzprincess", wep: "PST", self: true },
+      ],
+    });
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("resize", this._resize);
+    window.removeEventListener("keydown", this._down);
+    window.removeEventListener("keyup", this._up);
+    clearInterval(this._tick);
+  }
+
+  fit() {
+    const d = this.state.device;
+    const w = d === "phone" ? 896 : d === "assets" ? 1600 : 1920;
+    const h = d === "phone" ? 414 : d === "assets" ? 1560 : 1080;
+    const vw = window.innerWidth, vh = window.innerHeight - 52;
+    this.setState({ scale: Math.min((vw - 40) / w, (vh - 32) / h, 1.4) });
+  }
+
+  setDevice(d) { this.setState({ device: d, modal: null, zone: null }, () => this.fit()); }
+
+  enterZone(z) {
+    this.setState({ zone: z, modal: z === "bowtique" ? "shop" : z === "armory" ? "settings" : null, msg: "", focusWeapon: z === "armory" });
+  }
+
+  pop(id, e) {
+    if (this.state.popped[id]) return;
+    const sc = this.state.scale || 1;
+    const b = e.currentTarget.getBoundingClientRect();
+    const stage = e.currentTarget.closest("[data-stage]");
+    const sb = stage ? stage.getBoundingClientRect() : { left: 0, top: 0 };
+    const x = Math.round((b.left + b.width / 2 - sb.left) / sc);
+    const y = Math.round((b.top + b.height / 2 - sb.top) / sc);
+    const hid = this.state.nextId;
+    this.setState((s) => ({
+      popped: Object.assign({}, s.popped, { [id]: true }),
+      nextId: s.nextId + 1,
+      coins: s.coins + 5,
+      gain: "+5 coins",
+      hits: s.hits.concat([{ id: hid, x, y, dmg: "POP!", size: 34, color: C.hot }]),
+    }));
+    setTimeout(() => this.setState((s) => ({ hits: s.hits.filter((h) => h.id !== hid) })), 900);
+    setTimeout(() => this.setState({ gain: null }), 1200);
+    if (Object.keys(this.state.popped).length >= 2) setTimeout(() => this.setState({ popped: {} }), 1400);
+  }
+
+  fire = (e) => {
+    if (this.state.scene !== "combat" || this.state.modal || this.state.scoreboard) return;
+    const box = e.currentTarget.getBoundingClientRect();
+    const sc = this.state.scale || 1;
+    const world = box.width / sc > 300;
+    const x = world ? Math.round((e.clientX - box.left) / sc) : (this.state.device === "phone" ? 448 : 960);
+    const y = world ? Math.round((e.clientY - box.top) / sc) : (this.state.device === "phone" ? 207 : 540);
+    const id = this.state.nextId;
+    const crit = Math.random() < 0.28;
+    const dmg = crit ? 84 : 20 + Math.floor(Math.random() * 22);
+    const killed = Math.random() < 0.3;
+
+    this.setState((s) => ({
+      nextId: s.nextId + 1,
+      hits: s.hits.concat([{ id, x, y, dmg: crit ? dmg + " ✦" : String(dmg), size: crit ? 44 : 32, color: crit ? C.gold : C.hot }]),
+      ammo: s.ammo > 0 ? s.ammo - 1 : s.ammoMax,
+    }));
+    setTimeout(() => this.setState((s) => ({ hits: s.hits.filter((h) => h.id !== id) })), 900);
+
+    if (killed) {
+      const victim = ROSTER[1 + Math.floor(Math.random() * (ROSTER.length - 1))].name;
+      const fid = "k" + id;
+      this.setState((s) => ({
+        feed: s.feed.concat([{ id: fid, killer: "cutiegracie", victim, wep: "RIF", self: true }]),
+        kills: s.kills + 1, coins: s.coins + 25, xp: Math.min(s.xpMax, s.xp + 40), gain: "+25 coins  ·  +40 XP",
+      }));
+      setTimeout(() => this.setState((s) => ({ feed: s.feed.filter((f) => f.id !== fid) })), 5000);
+      setTimeout(() => this.setState({ gain: null }), 1200);
+    }
+  };
+
+  buy(item) {
+    if (this.state.coins < item.price) {
+      this.setState({ msg: "Not enough coins — you need " + (item.price - this.state.coins).toLocaleString() + " more 💗", msgErr: true });
+      return;
+    }
+    this.setState((s) => ({
+      coins: s.coins - item.price,
+      owned: Object.assign({}, s.owned, { [item.id]: true }),
+      msg: item.name + " purchased! Tap Equip 🎀", msgErr: false,
+    }));
+  }
+
+  equip(item) {
+    const key = this.state.shopTab === "skins" ? "equippedSkin" : "equippedCharm";
+    this.setState({ [key]: item.id, msg: item.name + " equipped ✓", msgErr: false });
+  }
+
+  slide = (e, key) => {
+    const box = e.currentTarget.getBoundingClientRect();
+    const v = Math.max(0, Math.min(1, (e.clientX - box.left) / box.width));
+    this.setState({ [key]: v });
+  };
+
+  renderVals() {
+    const s = this.state;
+    const list = CATALOG[s.shopTab] || CATALOG.skins;
+    const equippedId = s.shopTab === "skins" ? s.equippedSkin : s.equippedCharm;
+    const rc = { COMMON: C.common, RARE: C.rare, EPIC: C.epic, LEGENDARY: C.legendary };
+    const mm = Math.floor(s.timer / 60), ss = s.timer % 60;
+    const hpPct = Math.round((s.hp / 100) * 100);
+
+    const stageW = s.device === "phone" ? 896 : s.device === "assets" ? 1600 : 1920;
+    const stageH = s.device === "phone" ? 414 : s.device === "assets" ? 1560 : 1080;
+    const WRARITY = { Pistol: "COMMON", Rifle: "RARE", Shotgun: "EPIC", Knife: "COMMON" };
+    const RC = { COMMON: C.common, RARE: C.rare, EPIC: C.epic, LEGENDARY: C.legendary };
+    const wpk = (w) => {
+      const on = s.weapon === w;
+      return {
+        frame: on ? C.hot : RC[WRARITY[w]],
+        glow: (on ? C.hot : RC[WRARITY[w]]) + "33",
+        color: on ? C.deep : C.plum,
+        tag: on ? "EQUIPPED ✓" : WRARITY[w],
+        tagColor: on ? C.hot : RC[WRARITY[w]],
+        onClick: () => this.setState({ weapon: w }),
+      };
+    };
+
+    return {
+      scale: s.scale,
+      wrapW: Math.round(stageW * s.scale),
+      wrapH: Math.round(stageH * s.scale),
+      isDesktop: s.device === "desktop",
+      isPhone: s.device === "phone",
+      isAssets: s.device === "assets",
+      inLobby: s.scene === "lobby",
+      inCombat: s.scene === "combat",
+      zoneActive: !!s.zone,
+      zoneName: s.zone === "bowtique" ? "🎀 The Bow-tique 🎀" : s.zone === "armory" ? "🍭 Candy Armory 🍭" : "💘 Heartbreaker Range 💘",
+      zoneColor: s.zone === "armory" ? "#FF9A3C" : s.zone === "range" ? "#BE55CC" : C.hot,
+      zoneLight: s.zone === "armory" ? "#FFB765" : s.zone === "range" ? "#D97CE0" : C.bubble,
+      zoneDark: s.zone === "armory" ? "#C4741F" : s.zone === "range" ? "#8C32A0" : "#B03A78",
+      enterBowtique: () => this.enterZone("bowtique"),
+      enterArmory: () => this.enterZone("armory"),
+      enterRange: () => this.enterZone("range"),
+      leaveZone: () => this.setState({ zone: null, modal: null }),
+      balloons: [
+        { id: "b1", color: "#FF5CA8" },
+        { id: "b2", color: "#FFC458" },
+        { id: "b3", color: "#AA5ADC" },
+      ].map((b) => ({
+        color: s.popped[b.id] ? "rgba(214,66,143,.16)" : b.color,
+        opacity: s.popped[b.id] ? "0.35" : "1",
+        anim: s.popped[b.id] ? "none" : "ppBob 2.4s ease-in-out infinite",
+        onClick: (e) => this.pop(b.id, e),
+      })),
+      newsOpen: s.newsOpen,
+      newsClosed: !s.newsOpen,
+      closeNews: () => this.setState({ newsOpen: false }),
+      openNews: () => this.setState({ newsOpen: true }),
+      shopOpen: s.modal === "shop",
+      settingsOpen: s.modal === "settings",
+      scoreboard: s.scoreboard,
+
+      coinsText: s.coins.toLocaleString(),
+      level: s.level,
+      xpText: s.xp.toLocaleString() + " / " + s.xpMax.toLocaleString() + " XP",
+      xpPct: Math.round((s.xp / s.xpMax) * 100) + "%",
+      gain: s.gain,
+      clock: mm + ":" + String(ss).padStart(2, "0"),
+      kills: s.kills,
+      hp: s.hp, hpPct: hpPct + "%",
+      hpColor: s.hp <= 30 ? C.err : C.deep,
+      hpFill: s.hp <= 30 ? C.err : "linear-gradient(90deg,#FF82BE,#FF5CA8)",
+      ammo: s.ammo, ammoMax: s.ammoMax, weapon: s.weapon,
+      hits: s.hits,
+      fire: this.fire,
+
+      feed: s.feed.map((f) => ({ id: f.id, killer: f.killer, victim: f.victim, wep: f.wep, killerColor: f.self ? C.deep : C.plum })),
+
+      players: ROSTER.map((p) => ({
+        name: p.name, kills: p.kills, initial: p.name.slice(0, 2).toUpperCase(),
+        bg: p.self ? "rgba(255,92,168,.20)" : C.white,
+        stroke: p.self ? "rgba(255,92,168,.75)" : "rgba(255,92,168,.18)",
+        nameColor: p.self ? C.deep : C.plum,
+      })),
+
+      board: ROSTER.slice().sort((a, b) => b.kills - a.kills).map((p, i) => ({
+        rank: i + 1, name: p.name, kills: p.kills, deaths: p.deaths,
+        score: p.kills * 100 - p.deaths * 20,
+        initial: p.name.slice(0, 2).toUpperCase(),
+        bg: p.self ? "rgba(255,92,168,.20)" : C.white,
+        stroke: p.self ? "rgba(255,92,168,.75)" : "rgba(255,92,168,.18)",
+        nameColor: p.self ? C.deep : C.plum,
+        rankColor: i === 0 ? C.gold : "rgba(96,56,78,.55)",
+      })),
+
+      news: NEWS,
+
+      tabsLive: ["skins", "charms"].map((t) => ({
+        label: t.toUpperCase(),
+        bg: s.shopTab === t ? "linear-gradient(180deg,#FF7FBC,#FF5CA8)" : C.white,
+        stroke: s.shopTab === t ? "rgba(255,255,255,.8)" : "rgba(255,92,168,.35)",
+        color: s.shopTab === t ? "#fff" : C.deep,
+        shadow: s.shopTab === t ? "0 4px 0 rgba(198,52,124,.5)" : "none",
+        onClick: () => this.setState({ shopTab: t, msg: "" }),
+      })),
+      tabsSoon: [{ label: "FEATURED" }, { label: "BUNDLES" }, { label: "DAILY" }, { label: "LIMITED" }],
+
+      cards: list.map((it) => {
+        const owned = !!s.owned[it.id];
+        const on = equippedId === it.id;
+        return {
+          name: it.name, rarity: it.rarity, slot: it.slot,
+          rarityColor: rc[it.rarity],
+          glow: rc[it.rarity] + "33",
+          action: on ? "Equipped ✓" : owned ? "Equip 🎀" : "💗 " + it.price.toLocaleString(),
+          actionBg: on ? "rgba(111,207,127,.22)" : owned ? "linear-gradient(180deg,#FF7FBC,#FF5CA8)" : "linear-gradient(180deg,#FFD98A,#FFC458)",
+          actionStroke: on ? "rgba(111,207,127,.7)" : owned ? "rgba(255,255,255,.8)" : "rgba(255,255,255,.85)",
+          actionShadow: on ? "none" : owned ? "0 4px 0 rgba(198,52,124,.45)" : "0 4px 0 rgba(200,140,40,.5)",
+          actionColor: on ? "#3E8A50" : owned ? "#fff" : "#7A4A12",
+          cursor: on ? "default" : "pointer",
+          onClick: on ? () => {} : owned ? () => this.equip(it) : () => this.buy(it),
+        };
+      }),
+      msg: s.msg, msgColor: s.msgErr ? C.err : C.deep,
+
+      sensPct: Math.round(s.sens * 100) + "%", sensText: s.sens.toFixed(2),
+      volPct: Math.round(s.vol * 100) + "%", volText: Math.round(s.vol * 100) + "%",
+      setSens: (e) => this.slide(e, "sens"),
+      setVol: (e) => this.slide(e, "vol"),
+      loadoutRing: s.focusWeapon ? "3px solid " + C.hot : "2px solid rgba(255,92,168,.35)",
+      weapons: ["Pistol", "Rifle", "Shotgun", "Knife"].map((w) => ({
+        name: w, code: w.slice(0, 3).toUpperCase(),
+        bg: s.weapon === w ? "rgba(255,92,168,.20)" : "rgba(255,227,240,.5)",
+        stroke: s.weapon === w ? "rgba(255,92,168,.8)" : "rgba(255,92,168,.2)",
+        color: s.weapon === w ? C.deep : "rgba(96,56,78,.7)",
+        onClick: () => this.setState({ weapon: w }),
+      })),
+
+      playersShort: ROSTER.slice(0, 4).map((p) => ({
+        name: p.name, kills: p.kills, initial: p.name.slice(0, 2).toUpperCase(),
+        bg: p.self ? "rgba(255,92,168,.20)" : C.white,
+        stroke: p.self ? "rgba(255,92,168,.75)" : "rgba(255,92,168,.18)",
+        nameColor: p.self ? C.deep : C.plum,
+      })),
+      reload: () => this.setState((s) => ({ ammo: s.ammoMax })),
+
+      wPistol: wpk("Pistol"), wRifle: wpk("Rifle"), wShotgun: wpk("Shotgun"), wKnife: wpk("Knife"),
+
+      openSettings: () => this.setState({ modal: "settings", focusWeapon: false }),
+      closeModal: () => this.setState({ modal: null, zone: null }),
+
+      setLobby: () => this.setState({ scene: "lobby", modal: null, zone: null }),
+      setCombat: () => this.setState({ scene: "combat", modal: null, zone: null }),
+      lBg: s.scene === "lobby" ? "rgba(255,92,168,.9)" : "rgba(255,255,255,.06)",
+      lColor: s.scene === "lobby" ? "#fff" : "rgba(255,255,255,.55)",
+      cBg: s.scene === "combat" ? "rgba(255,92,168,.9)" : "rgba(255,255,255,.06)",
+      cColor: s.scene === "combat" ? "#fff" : "rgba(255,255,255,.55)",
+
+      setDesktop: () => this.setDevice("desktop"),
+      setPhone: () => this.setDevice("phone"),
+      setAssets: () => this.setDevice("assets"),
+      aBg: s.device === "assets" ? "rgba(255,92,168,.9)" : "rgba(255,255,255,.06)",
+      aColor: s.device === "assets" ? "#fff" : "rgba(255,255,255,.55)",
+      dBg: s.device === "desktop" ? "rgba(255,92,168,.9)" : "rgba(255,255,255,.06)",
+      dColor: s.device === "desktop" ? "#fff" : "rgba(255,255,255,.55)",
+      pBg: s.device === "phone" ? "rgba(255,92,168,.9)" : "rgba(255,255,255,.06)",
+      pColor: s.device === "phone" ? "#fff" : "rgba(255,255,255,.55)",
+      flags: "inLobby=" + (s.scene === "lobby") + " · shopOpen=" + (s.modal === "shop") + " · settingsOpen=" + (s.modal === "settings") + " · cursor " + (s.scene === "lobby" || s.modal ? "free" : "locked"),
+    };
+  }
+}
+</script>
+</body>
+</html>
