@@ -67,36 +67,50 @@ tabs like the shop's Featured/Weapons/…), and a cheap `sparkle` accent
 | `ShopController.luau` | Shop modal | Rebuild per Phase C shop spec below |
 | `SettingsController.luau` | Settings modal | Match mockup panel styling |
 
+## IMPORTANT — the lobby changed the UI world
+
+The game now has a **walkable plaza lobby** (Animal Crossing-style camera,
+free cursor) where the buildings ARE the menu: walking into The Bow-tique 🎀
+auto-opens the shop, Candy Armory 🍭 auto-opens settings, and leaving closes
+them — driven by `LobbyController.luau` calling `ShopController.setOpen()` /
+`SettingsController.setOpen()`. Consequences you must respect:
+
+- `ShopController.setOpen(open)` and `SettingsController.setOpen(open)` are
+  **public API** — keep the names, signatures, and their internal
+  `ClientData` flag + `updateMouseUnlock()` calls intact.
+- There is NO separate main-menu overlay — the plaza replaced it. Do not
+  build one.
+- `ClientData.inLobby()` / `ClientData.roundStateChanged` gate what shows
+  where: combat HUD + crosshair are combat-only; the cursor is free in the
+  lobby. Preserve every `inLobby` check you find.
+- New stylable surface: the **zone name banner** in `LobbyController.luau`
+  (the "🎀 The Bow-tique 🎀" text when entering a building) — restyle it into
+  a proper ribbon/banner moment.
+
 ## Phase C — new screens from the mockup
 
-1. **Main menu overlay** (`MenuController.luau`, new): opens with **M** or a
-   🎀 button; PINK PANIC wordmark (styled TextLabels — bubbly, layered
-   stroke), left menu stack: **PLAY** (closes menu) · **SHOP** (opens shop) ·
-   **LOADOUT** (opens settings' weapon section or settings) · **SETTINGS** ·
-   then INVENTORY / BATTLE PASS / DAILY / RANKED as "Coming soon 💗"
-   (visibly muted). Sets a menu-open flag + `updateMouseUnlock()`.
-2. **Play menu panel** (inside the main menu, like the mockup): mode list —
-   **Free For All (active)**, Team Deathmatch / Infection / CTF as coming
-   soon; right side shows mode blurb + "PINK MALL" map card (static text
-   card; no carousel until more maps exist) + big PLAY button.
-3. **Shop rebuild** (`ShopController.luau`): header + ✕; **tabs**: `Skins` ·
+1. **Shop rebuild** (`ShopController.luau`): header + ✕; **tabs**: `Skins` ·
    `Charms` · (Featured/Bundles/Daily/Limited rendered as disabled coming-
    soon tabs); cards like the mockup: preview swatch, name, **rarity label
    in its rarity color**, price pill (💗 + amount, gold pill) / "Equip 🎀" /
-   "Equipped ✓"; insufficient-funds message line stays.
-4. **News panel** (part of main menu, right side): reads a static
-   `src/shared/Config/NewsConfig.luau` table (title, bullets) you create —
-   content editable without touching UI. "View update" button can close to
-   a detail panel or be omitted if empty.
+   "Equipped ✓"; insufficient-funds message line stays. Panel should sit to
+   one side so the player's character at the storefront stays visible.
+2. **Settings/Armory panel** (`SettingsController.luau`): same treatment;
+   the starting-weapon picker gets weapon-card styling (it's the "gun store"
+   of the Candy Armory).
+3. **Zone banner** (`LobbyController.luau`): mockup-style ribbon with
+   sparkle accents; slides/fades in on zone entry.
+4. **News panel**: a small dismissible panel shown in the lobby (right side,
+   like the mockup) reading a static `src/shared/Config/NewsConfig.luau`
+   table (title, bullets) you create — content editable without touching UI.
 5. **Overhead nameplates** (`NameplateController.luau`, new): BillboardGui
-   over each character — name + "💗 Level n" (level comes through
-   `ScoreUpdated`/`RoundStateChanged` rows? If level isn't in the payload,
-   show name only — do NOT touch server code to add it).
+   over each character — name styled like the mockup ("cutiegracie 💗").
+   Client-only, built from `Players` events; do NOT touch server code.
 
-**DO NOT BUILD** (not designed for this pass, no shells): Battle Pass
-screens, inventory grid, daily-rewards claim flow, spin wheel, emotes wheel,
-codes redemption, ranked, gems purchasing. Their menu entries appear only as
-muted coming-soon buttons.
+**DO NOT BUILD** (not designed for this pass, no shells): a main-menu
+overlay, Battle Pass screens, inventory grid, daily-rewards claim flow, spin
+wheel, emotes wheel, codes redemption, ranked, gems purchasing, mode-select
+menus (modes live in the future Panic Portal UI, not this pass).
 
 ## Phase D — verify (2-player test in Studio)
 
