@@ -16,6 +16,7 @@ local WeaponModels = require(ReplicatedStorage.Shared.Assets.WeaponModels)
 local WeaponCosmetics = require(ReplicatedStorage.Shared.Assets.WeaponCosmetics)
 local CombatService = require(script.Parent.CombatService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local RoundService = require(script.Parent.RoundService)
 
 -- Allow slightly faster than nominal fire rate so honest clients with jitter
 -- aren't rejected, without letting macros double the rate.
@@ -136,6 +137,11 @@ end
 type HitTotal = { damage: number, position: Vector3 }
 
 local function onFireWeapon(player: Player, origin: any, direction: any)
+	-- Real combat only happens in live rounds; lobby shooting is the separate
+	-- cosmetic LobbyShot path.
+	if RoundService.getState() ~= "Active" then
+		return
+	end
 	if not Guard.checkRate(player, "FireWeapon", 25, 1) then
 		return
 	end

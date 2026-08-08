@@ -10,6 +10,7 @@ local TweenService = game:GetService("TweenService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
+local ClientData = require(script.Parent.Parent.ClientData)
 
 local HOT_PINK = Color3.fromRGB(255, 92, 168)
 local DEEP_PINK = Color3.fromRGB(214, 66, 143)
@@ -19,6 +20,7 @@ local HEALTH_LOW = Color3.fromRGB(235, 90, 90)
 
 local HudController = {}
 
+local combatPanel: Frame
 local healthFill: Frame
 local healthText: TextLabel
 local weaponLabel: TextLabel
@@ -57,12 +59,13 @@ local function buildGui()
 	screen.Name = "CombatHUD"
 	screen.ResetOnSpawn = false
 
-	-- Bottom-center: health + ammo
+	-- Bottom-center: health + ammo (combat only; hidden in the lobby)
 	local panel = Instance.new("Frame")
 	panel.AnchorPoint = Vector2.new(0.5, 1)
 	panel.Position = UDim2.new(0.5, 0, 1, -14)
 	panel.Size = UDim2.fromOffset(380, 58)
 	stylePanel(panel, 16)
+	combatPanel = panel
 
 	local healthBar = Instance.new("Frame")
 	healthBar.Position = UDim2.new(0, 14, 0, 12)
@@ -185,6 +188,10 @@ function HudController.init()
 	buildGui()
 
 	RunService.Heartbeat:Connect(updateHealth)
+	combatPanel.Visible = not ClientData.inLobby()
+	ClientData.roundStateChanged:Connect(function()
+		combatPanel.Visible = not ClientData.inLobby()
+	end)
 	Remotes.event("AmmoChanged").OnClientEvent:Connect(applyAmmo)
 	Remotes.event("Killfeed").OnClientEvent:Connect(function(entry)
 		if type(entry) == "table" and type(entry.victim) == "string" then

@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local CombatService = require(script.Parent.CombatService)
+local LobbyService = require(script.Parent.LobbyService)
 
 type Score = { kills: number, deaths: number }
 
@@ -24,6 +25,19 @@ local scores: { [Player]: Score } = {}
 
 local function now(): number
 	return workspace:GetServerTimeNow()
+end
+
+-- Combat gating (WeaponService): real shots only land during a live round.
+function RoundService.getState(): string
+	return state
+end
+
+local function respawnAll()
+	for _, player in Players:GetPlayers() do
+		task.spawn(function()
+			player:LoadCharacter()
+		end)
+	end
 end
 
 local function serializeScores(): { any }
@@ -113,11 +127,8 @@ local function runLoop()
 		state = "Active"
 		endsAt = now() + GameConfig.roundSeconds
 		broadcast()
-		for _, player in Players:GetPlayers() do
-			task.spawn(function()
-				player:LoadCharacter()
-			end)
-		end
+		LobbyService.setArenaActive(true)
+		respawnAll()
 		while now() < endsAt do
 			local top = topEntry()
 			if top and top.kills >= GameConfig.scoreTarget then
@@ -136,6 +147,9 @@ local function runLoop()
 			task.spawn(onRoundEnd, serializeScores(), winnerName)
 		end
 		broadcast({ winner = winnerName })
+		-- Everyone back to the plaza for the results + intermission.
+		LobbyService.setArenaActive(false)
+		respawnAll()
 		task.wait(GameConfig.roundEndSeconds)
 	end
 end

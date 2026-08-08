@@ -53,7 +53,10 @@ local function round(instance: GuiObject, radius: number)
 	corner.Parent = instance
 end
 
-local function setOpen(open: boolean)
+function ShopController.setOpen(open: boolean)
+	if panel.Visible == open then
+		return
+	end
 	ClientData.shopOpen = open
 	panel.Visible = open
 	modalUnlock.Visible = open
@@ -242,7 +245,7 @@ local function buildGui()
 	openButton.Text = "🛍️ Shop  [B]"
 	round(openButton, 21)
 	openButton.MouseButton1Click:Connect(function()
-		setOpen(not panel.Visible)
+		ShopController.setOpen(not panel.Visible)
 	end)
 	openButton.Parent = screen
 
@@ -275,7 +278,7 @@ local function buildGui()
 	close.Text = "✕"
 	round(close, 16)
 	close.MouseButton1Click:Connect(function()
-		setOpen(false)
+		ShopController.setOpen(false)
 	end)
 	close.Parent = panel
 
@@ -316,7 +319,7 @@ function ShopController.init()
 
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if not gameProcessed and input.KeyCode == Enum.KeyCode.B then
-			setOpen(not panel.Visible)
+			ShopController.setOpen(not panel.Visible)
 		end
 	end)
 

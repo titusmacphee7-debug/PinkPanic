@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 
 local changedEvent = Instance.new("BindableEvent")
+local stateEvent = Instance.new("BindableEvent")
 local UNLOCK_BIND = "PinkPanicMouseUnlock"
 local unlockBound = false
 
@@ -19,6 +20,24 @@ ClientData.snapshot = nil :: any
 ClientData.changed = changedEvent.Event
 ClientData.shopOpen = false
 ClientData.settingsOpen = false
+
+-- Round state mirror (fed by RoundController). Lobby life happens in every
+-- state except Active.
+ClientData.roundState = "Waiting"
+ClientData.roundStateChanged = stateEvent.Event
+
+function ClientData.inLobby(): boolean
+	return ClientData.roundState ~= "Active"
+end
+
+function ClientData.setRoundState(state: string)
+	if ClientData.roundState == state then
+		return
+	end
+	ClientData.roundState = state
+	ClientData.updateMouseUnlock()
+	stateEvent:Fire(state)
+end
 
 -- True while any modal menu should block gameplay input.
 function ClientData.menuOpen(): boolean
@@ -30,7 +49,7 @@ end
 -- them (RenderPriority.Last) and force the cursor free each frame — the only
 -- approach that reliably wins that fight.
 function ClientData.updateMouseUnlock()
-	local shouldUnlock = ClientData.menuOpen()
+	local shouldUnlock = ClientData.menuOpen() or ClientData.inLobby()
 	if shouldUnlock and not unlockBound then
 		unlockBound = true
 		RunService:BindToRenderStep(UNLOCK_BIND, Enum.RenderPriority.Last.Value, function()
@@ -70,6 +89,8 @@ function ClientData.init()
 			changedEvent:Fire(data)
 		end
 	end)
+	-- The game opens in the lobby; free the cursor from the start.
+	ClientData.updateMouseUnlock()
 end
 
 return ClientData

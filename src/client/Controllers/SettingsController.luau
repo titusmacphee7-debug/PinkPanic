@@ -152,7 +152,10 @@ local function highlightWeapon(selected: string)
 	end
 end
 
-local function setOpen(open: boolean)
+function SettingsController.setOpen(open: boolean)
+	if panel.Visible == open then
+		return
+	end
 	ClientData.settingsOpen = open
 	panel.Visible = open
 	modalUnlock.Visible = open
@@ -209,7 +212,7 @@ local function buildGui()
 	openButton.Text = "⚙️"
 	round(openButton, 21)
 	openButton.MouseButton1Click:Connect(function()
-		setOpen(not panel.Visible)
+		SettingsController.setOpen(not panel.Visible)
 	end)
 	openButton.Parent = screen
 
@@ -241,7 +244,7 @@ local function buildGui()
 	close.Text = "✕"
 	round(close, 15)
 	close.MouseButton1Click:Connect(function()
-		setOpen(false)
+		SettingsController.setOpen(false)
 	end)
 	close.Parent = panel
 

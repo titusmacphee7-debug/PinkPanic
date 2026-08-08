@@ -9,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local EffectsController = require(script.Parent.EffectsController)
+local ClientData = require(script.Parent.Parent.ClientData)
 
 local PINK = Color3.fromRGB(255, 105, 180)
 local KILL_RED = Color3.fromRGB(255, 64, 96)
@@ -16,6 +17,7 @@ local KILL_RED = Color3.fromRGB(255, 64, 96)
 local HitFeedbackController = {}
 
 local hitmarker: TextLabel? = nil
+local crosshair: Frame? = nil
 
 local function buildGui()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
@@ -25,17 +27,20 @@ local function buildGui()
 	screen.ResetOnSpawn = false
 	screen.IgnoreGuiInset = true
 
-	local crosshair = Instance.new("Frame")
-	crosshair.Name = "Crosshair"
-	crosshair.AnchorPoint = Vector2.new(0.5, 0.5)
-	crosshair.Position = UDim2.fromScale(0.5, 0.5)
-	crosshair.Size = UDim2.fromOffset(4, 4)
-	crosshair.BackgroundColor3 = PINK
-	crosshair.BorderSizePixel = 0
+	local crosshairDot = Instance.new("Frame")
+	crosshairDot.Name = "Crosshair"
+	crosshairDot.AnchorPoint = Vector2.new(0.5, 0.5)
+	crosshairDot.Position = UDim2.fromScale(0.5, 0.5)
+	crosshairDot.Size = UDim2.fromOffset(4, 4)
+	crosshairDot.BackgroundColor3 = PINK
+	crosshairDot.BorderSizePixel = 0
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(1, 0)
-	corner.Parent = crosshair
-	crosshair.Parent = screen
+	corner.Parent = crosshairDot
+	-- Combat only: in the lobby the real cursor is the pointer.
+	crosshairDot.Visible = not ClientData.inLobby()
+	crosshairDot.Parent = screen
+	crosshair = crosshairDot
 
 	local marker = Instance.new("TextLabel")
 	marker.Name = "Hitmarker"
@@ -97,6 +102,13 @@ end
 
 function HitFeedbackController.init()
 	buildGui()
+
+	ClientData.roundStateChanged:Connect(function()
+		local dot = crosshair
+		if dot then
+			dot.Visible = not ClientData.inLobby()
+		end
+	end)
 
 	Remotes.event("DamageDealt").OnClientEvent:Connect(function(amount, worldPosition, killed)
 		flashHitmarker(killed == true)

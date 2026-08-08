@@ -25,6 +25,10 @@ local Definitions: { [string]: RemoteKind } = {
 	RoundStateChanged = "Event", -- server -> clients: state machine transitions
 	ScoreUpdated = "Event", -- server -> clients: live standings
 
+	-- Lobby (M6)
+	LobbyShot = "Event", -- client -> server: cosmetic lobby shot (target pops)
+	TargetPopped = "Event", -- server -> clients: a lobby target burst
+
 	-- Economy (M4)
 	PurchaseItem = "Function", -- client -> server: buy from catalog, returns result
 	EquipItem = "Function", -- client -> server: equip owned cosmetic, returns result

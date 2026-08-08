@@ -39,7 +39,7 @@ local function selectWeapon(weaponId: string)
 end
 
 local function shoot()
-	if ClientData.menuOpen() then
+	if ClientData.menuOpen() or ClientData.inLobby() then
 		return
 	end
 	local config = WeaponConfig[currentWeapon]

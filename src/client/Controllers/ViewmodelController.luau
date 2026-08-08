@@ -62,7 +62,7 @@ local function hideModel()
 end
 
 local function update(dt: number)
-	if not localCharacterAlive() then
+	if ClientData.inLobby() or not localCharacterAlive() then
 		hideModel()
 		return
 	end

@@ -10,6 +10,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local ClientData = require(script.Parent.Parent.ClientData)
 
 local HOT_PINK = Color3.fromRGB(255, 92, 168)
 local DEEP_PINK = Color3.fromRGB(214, 66, 143)
@@ -213,6 +214,7 @@ local function applyPayload(data: any)
 		return
 	end
 	state = data.state or state
+	ClientData.setRoundState(state)
 	endsAt = data.endsAt or 0
 	scoreTarget = data.scoreTarget or scoreTarget
 	if type(data.scores) == "table" then
