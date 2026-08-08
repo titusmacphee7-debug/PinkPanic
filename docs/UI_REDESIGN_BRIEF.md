@@ -1,89 +1,114 @@
-# Pink Panic — UI Redesign Brief (NOD-36 Core UI Kit)
+# Pink Panic — Full UI Design Brief (NOD-36 + mockup build-out)
 
-You are redesigning the entire in-game UI of Pink Panic, a cute pink Roblox
-FFA shooter. The logic works; the visuals are programmer-art. Your job is to
-make every screen look like the approved concept art without breaking any
+You are building the complete UI of Pink Panic, a cute pink Roblox FFA
+shooter, to match the approved concept mockup (attached image). The game
+logic works; your job is visuals and screen structure — without breaking any
 behavior.
 
 ## References (read first)
 
-1. `docs/ART_DIRECTION.md` — the locked palette (exact hex values), font,
-   corner radii, rarity colors, iconography rules. This is law.
-2. The lobby/UI concept mockup (ask Titus for the image): soft pink panels,
-   white rounded cards, hearts/bows, glow accents, gold for currency —
-   specifically its PLAYERS list, shop cards with rarity + price footers, and
-   chunky rounded menu buttons.
+1. **The attached mockup image** — the target look. It shows: a lobby
+   overview with a left menu stack, currency/level bar, PLAYERS and NEWS
+   panels, a bottom dock; a main menu; a play menu with mode select + map
+   carousel; and a shop with tabs and rarity-labeled item cards.
+2. `docs/ART_DIRECTION.md` — locked palette hex values, font, radii, rarity
+   colors, iconography rules. This is law.
+3. The current code under `src/client/` — every existing surface is built in
+   code (Instance.new) inside Controllers.
 
-## Hard constraints
+## Ground rules
 
-- **Do not change any logic.** Every remote call, event subscription,
-  `init()` signature, and data flow stays exactly as-is. You are restyling
-  and restructuring visuals only.
-- All UI is **built in code** (Instance.new) inside the controller files
-  listed below. Keep it that way — no StarterGui assets, no external images
-  (uploaded ImageLabels are fine ONLY if Titus uploads them and gives you
-  asset ids; otherwise use UICorner/UIStroke/UIGradient shapes).
-- Font: `Enum.Font.FredokaOne` everywhere.
-- Must stay readable on small screens: prefer Scale + AnchorPoint layouts
-  over fixed offsets where practical; test at 1280×720.
-- The mouse-unlock system (`ClientData.updateMouseUnlock`) and the
-  `ClientData.shopOpen` / `settingsOpen` flags must keep working — call them
-  exactly where the current code does.
-- Keep every existing keybind hookup (B shop, Tab scoreboard, ⚙️ settings).
+- **Never change game logic.** Remote calls, event subscriptions, `init()`
+  signatures, keybinds (B shop, Tab scoreboard), and the
+  `ClientData.shopOpen` / `settingsOpen` / `updateMouseUnlock()` calls stay
+  exactly where they are. Any new full-screen menu must set one of those
+  flags + call `updateMouseUnlock()` so the cursor frees correctly.
+- All UI is code-built. No uploaded images/assets unless Titus hands you
+  asset ids. Allowed instead: emoji icons, UICorner/UIStroke/UIGradient
+  shapes, and **player avatars via `Players:GetUserThumbnailAsync`** (use
+  for the PLAYERS panel rows like the mockup).
+- Font `Enum.Font.FredokaOne` everywhere. Readable at 1280×720.
+- **Feature honesty:** the mockup shows features that don't exist yet. Build
+  what's wired, show "Coming soon 💗" states for what's designed-but-unwired
+  (the mockup itself does this for Infection/CTF), and skip what's listed as
+  DO NOT BUILD. Never ship a button that looks functional but does nothing.
 
-## Step 1 — Build the UI kit (new file)
+## What exists today (wire to these)
 
-Create `src/client/UIKit.luau`: one module every controller imports. It owns
-the palette constants (single source of truth — delete the per-file copies)
-and returns styled component builders:
+FFA rounds w/ state machine + timer · four weapons + starting-weapon choice ·
+coins + XP/levels (`DataChanged` snapshots via `ClientData`) · shop
+(skins/charms, coins only, `PurchaseItem`/`EquipItem`) · settings
+(`UpdateSettings`: sensitivity/volume/startingWeapon) · players/scores
+(`RoundStateChanged`/`ScoreUpdated`) · killfeed · health/ammo. Post-MVP
+(Linear: gems, battle pass, daily rewards, inventory, ranked, emotes, TDM)
+is NOT wired yet.
 
-- `UIKit.panel(props)` — blush panel, 14–18px corners, hot-pink stroke,
-  optional drop-shadow effect and open/close tween (scale + fade, ~0.15s).
-- `UIKit.button(props)` — chunky rounded button, hot-pink fill, white
-  Fredoka text, hover brighten + press shrink tweens.
-- `UIKit.card(props)` — white rounded card for grids (shop items, rows) with
-  optional rarity-colored stroke/glow.
-- `UIKit.label(props)` — Fredoka text with size/color presets
-  (title / heading / body / caption).
-- `UIKit.bar(props)` — rounded progress bar (XP, health) with tweened fill.
-- `UIKit.slider(props)` — the draggable slider (lift the working logic from
-  `SettingsController.mkSlider`, restyle it).
-- `UIKit.closeButton(parent, onClose)` — the ✕.
-- Nice-to-have: `UIKit.sparkle(parent)` — subtle floating ✨/💗 particles for
-  panel corners; keep it cheap (few TextLabels + tweens, no per-frame loops).
+## Phase A — UIKit foundation
 
-## Step 2 — Restyle every surface using the kit
+Create `src/client/UIKit.luau`, the single source of truth for palette +
+components; delete the per-file color constants. Components: `panel` (blush,
+14–18px corners, pink stroke, open/close scale+fade tween), `button` (chunky
+rounded, hover brighten + press shrink), `iconButton` (square, like the
+mockup's bottom dock), `menuButton` (left-stack style: icon + label, like
+PLAY/SHOP/INVENTORY), `card` (white rounded, optional rarity stroke+glow),
+`label` (title/heading/body/caption presets), `bar` (tweened progress),
+`slider` (lift logic from SettingsController), `closeButton`, `tab` (pill
+tabs like the shop's Featured/Weapons/…), and a cheap `sparkle` accent
+(tweened 💗/✨ labels, no per-frame loops).
 
-| File (src/client/Controllers/) | Surfaces to redo |
-| --- | --- |
-| `EconomyController.luau` | Top-left coins + level + XP bar panel; "+n 🪙" gain pop |
-| `RoundController.luau` | Top-center status pill; top-right PLAYERS panel (crown/rank/name/💗kills, self-row highlight); hold-Tab K/D board; round-end results overlay |
-| `HudController.luau` | Bottom-center health bar + ammo/weapon panel; right-side killfeed rows |
-| `HitFeedbackController.luau` | Crosshair, hitmarker ✕, floating damage numbers |
-| `ShopController.luau` | 🛍️ Shop button; shop modal: header, scrolling card grid (preview swatch, name, rarity, price/Equip/Equipped ✓ footer), message line |
-| `SettingsController.luau` | ⚙️ button; settings modal: sliders, starting-weapon picker, controls hint |
+## Phase B — restyle every existing surface (kit only)
 
-Specific upgrades wanted while you're in there:
-- Shop cards: rarity-colored stroke + soft glow per `ART_DIRECTION.md` rarity
-  colors; "Equipped ✓" state styled like the mockup's owned items; price row
-  uses 💗 + gold text like the mockup.
-- Panels animate open/closed instead of popping.
-- Results overlay: bigger moment — winner name large, confetti-ish sparkles,
-  your stats beneath.
-- Health bar: hearts motif; smooth tween on damage; keep the low-health red.
-- Killfeed rows: slide in from the right, fade out.
-- Buttons: consistent hover/press feedback everywhere.
+| File (src/client/Controllers/) | Surface | Mockup cues |
+| --- | --- | --- |
+| `EconomyController.luau` | Coins/level/XP → **top-right currency bar** | Gold coin pill + level bar w/ "2,450 / 5,000 XP" text and flower badge. Leave a hidden slot where gems will go. Keep "+n" gain pop |
+| `RoundController.luau` | Status pill; PLAYERS panel; Tab K/D board; results overlay | PLAYERS panel exactly like mockup: header + ✕, white rows w/ avatar thumbnail, name, right-aligned detail (use 💗kills in-round where mockup shows Level), self-row highlighted |
+| `HudController.luau` | Health/ammo panel; killfeed | Killfeed rows slide in / fade out |
+| `HitFeedbackController.luau` | Crosshair, hitmarker, damage numbers | Keep pink; juice the kill flash |
+| `ShopController.luau` | Shop modal | Rebuild per Phase C shop spec below |
+| `SettingsController.luau` | Settings modal | Match mockup panel styling |
 
-## Step 3 — Verify (2-player test in Studio)
+## Phase C — new screens from the mockup
 
-Rojo-sync, run a Clients-and-Servers 2-player test, and confirm: shop buy +
-equip flows work with readable insufficient-funds errors; settings sliders
-persist; Tab board and PLAYERS panel update on kills; mouse unlocks in shop
-and settings and relocks after; nothing overlaps at 1280×720; no errors in
-the client console.
+1. **Main menu overlay** (`MenuController.luau`, new): opens with **M** or a
+   🎀 button; PINK PANIC wordmark (styled TextLabels — bubbly, layered
+   stroke), left menu stack: **PLAY** (closes menu) · **SHOP** (opens shop) ·
+   **LOADOUT** (opens settings' weapon section or settings) · **SETTINGS** ·
+   then INVENTORY / BATTLE PASS / DAILY / RANKED as "Coming soon 💗"
+   (visibly muted). Sets a menu-open flag + `updateMouseUnlock()`.
+2. **Play menu panel** (inside the main menu, like the mockup): mode list —
+   **Free For All (active)**, Team Deathmatch / Infection / CTF as coming
+   soon; right side shows mode blurb + "PINK MALL" map card (static text
+   card; no carousel until more maps exist) + big PLAY button.
+3. **Shop rebuild** (`ShopController.luau`): header + ✕; **tabs**: `Skins` ·
+   `Charms` · (Featured/Bundles/Daily/Limited rendered as disabled coming-
+   soon tabs); cards like the mockup: preview swatch, name, **rarity label
+   in its rarity color**, price pill (💗 + amount, gold pill) / "Equip 🎀" /
+   "Equipped ✓"; insufficient-funds message line stays.
+4. **News panel** (part of main menu, right side): reads a static
+   `src/shared/Config/NewsConfig.luau` table (title, bullets) you create —
+   content editable without touching UI. "View update" button can close to
+   a detail panel or be omitted if empty.
+5. **Overhead nameplates** (`NameplateController.luau`, new): BillboardGui
+   over each character — name + "💗 Level n" (level comes through
+   `ScoreUpdated`/`RoundStateChanged` rows? If level isn't in the payload,
+   show name only — do NOT touch server code to add it).
 
-## Definition of done (NOD-36 acceptance)
+**DO NOT BUILD** (not designed for this pass, no shells): Battle Pass
+screens, inventory grid, daily-rewards claim flow, spin wheel, emotes wheel,
+codes redemption, ranked, gems purchasing. Their menu entries appear only as
+muted coming-soon buttons.
 
-- [ ] Reusable buttons, panels, modals, rounded corners in one kit module
-- [ ] Cute font + icon accents (hearts, bows) consistently applied
-- [ ] Every listed surface uses the kit; zero behavior changes
+## Phase D — verify (2-player test in Studio)
+
+Rojo-sync, Clients-and-Servers 2-player test: menu opens/closes with cursor
+freed/relocked · PLAY drops you back in game · shop buy/equip works with
+readable errors · tabs switch · settings persist · PLAYERS panel shows
+avatars + live kills · nothing overlaps at 1280×720 · zero client errors.
+
+## Definition of done
+
+- [ ] UIKit module is the only place colors/components are defined
+- [ ] Every Phase B surface rebuilt on the kit; zero behavior changes
+- [ ] Main menu, play menu, shop tabs, news, nameplates live per Phase C
+- [ ] Coming-soon states clearly muted; no dead-looking-but-functional buttons
+- [ ] Phase D checklist passes clean
