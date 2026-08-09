@@ -33,6 +33,13 @@ local Definitions: { [string]: RemoteKind } = {
 	PurchaseItem = "Function", -- client -> server: buy from catalog, returns result
 	EquipItem = "Function", -- client -> server: equip owned cosmetic, returns result
 	UpdateSettings = "Function", -- client -> server: persist sensitivity/volume/starting weapon
+
+	-- Gun roster economy (docs/GUNS_HANDOFF.md §4.3)
+	BuyGun = "Function", -- client -> server: buy a roster gun
+	BuyGunSkin = "Function", -- client -> server: buy a color skin for an owned gun
+	BuyCamo = "Function", -- client -> server: buy a universal camo
+	EquipLoadout = "Function", -- client -> server: set primary/secondary (lobby only)
+	EquipGunCosmetics = "Function", -- client -> server: set a gun's skin/camo
 	DataChanged = "Event", -- server -> client: profile replication (coins, xp, owned)
 }
 

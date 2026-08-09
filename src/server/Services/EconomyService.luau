@@ -30,6 +30,11 @@ function EconomyService.push(player: Player)
 		ownedCharms = data.ownedCharms,
 		equipped = data.equipped,
 		settings = data.settings,
+		ownedGuns = data.ownedGuns,
+		ownedGunSkins = data.ownedGunSkins,
+		ownedCamos = data.ownedCamos,
+		loadout = data.loadout,
+		gunCosmetics = data.gunCosmetics,
 	})
 end
 

@@ -1,19 +1,29 @@
 --!strict
--- ViewmodelController — the in-hand first-person gun (NOD-16 first pass):
--- camera-attached pistol with sway, walk bob, and recoil kick. Skins/charms
--- render onto this same model in M5.
+-- ViewmodelController — the in-hand first-person gun (NOD-16/NOD-109):
+-- builds whatever the current slot holds via GunModelLoader (real meshes
+-- with part-built fallback), applies the player's cosmetics, and runs sway,
+-- walk bob, recoil kick, sprint held-up pose, and slide cant. Longer weapon
+-- classes sit further out via per-class offsets.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local WeaponModels = require(ReplicatedStorage.Shared.Assets.WeaponModels)
-local WeaponCosmetics = require(ReplicatedStorage.Shared.Assets.WeaponCosmetics)
+local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
+local GunModelLoader = require(ReplicatedStorage.Shared.Assets.GunModelLoader)
 local ClientData = require(script.Parent.Parent.ClientData)
 local MovementController = require(script.Parent.MovementController)
 
 local BASE_OFFSET = CFrame.new(1.05, -0.85, -1.55)
+local CLASS_OFFSET: { [string]: CFrame } = {
+	SMG = CFrame.new(0, 0, -0.1),
+	Rifle = CFrame.new(0.05, 0, -0.25),
+	Carbine = CFrame.new(0.05, 0, -0.2),
+	Bullpup = CFrame.new(0.05, 0, -0.15),
+	Shotgun = CFrame.new(0.05, 0, -0.25),
+	Sniper = CFrame.new(0.1, -0.05, -0.4),
+}
 local SWAY_LIMIT = 0.06
 local KICK_PER_SHOT = 0.09
 local KICK_MAX = 0.22
@@ -21,12 +31,12 @@ local KICK_MAX = 0.22
 local ViewmodelController = {}
 
 local model: Model? = nil
-local currentWeapon = "Pistol"
+local currentWeapon = "Pistol_1"
 local recoil = 0
 local swayX = 0
 local swayY = 0
-local loweredAlpha = 0 -- sprint: gun drops out of the way
-local cantAlpha = 0 -- slide: gun cants sideways
+local loweredAlpha = 0
+local cantAlpha = 0
 
 local function localCharacterAlive(): boolean
 	local character = Players.LocalPlayer.Character
@@ -34,9 +44,16 @@ local function localCharacterAlive(): boolean
 	return humanoid ~= nil and humanoid.Health > 0
 end
 
-local function applyCosmetics(gun: Model)
-	WeaponCosmetics.applySkin(gun, ClientData.equippedSkin())
-	WeaponCosmetics.applyCharm(gun, ClientData.equippedCharm())
+local function myCosmetics(): GunModelLoader.Cosmetics?
+	local snapshot = ClientData.snapshot
+	local all = snapshot and snapshot.gunCosmetics
+	local entry = if type(all) == "table" then all[currentWeapon] else nil
+	return if type(entry) == "table" then { skinId = entry.skinId, camoId = entry.camoId } else nil
+end
+
+local function classOffset(): CFrame
+	local def = GunCatalog.get(currentWeapon)
+	return if def then (CLASS_OFFSET[def.class] or CFrame.identity) else CFrame.identity
 end
 
 local function ensureModel(): Model
@@ -44,14 +61,13 @@ local function ensureModel(): Model
 	if current and current.Parent then
 		return current
 	end
-	local built = WeaponModels.build(currentWeapon)
+	local built = GunModelLoader.build(currentWeapon, myCosmetics())
 	built.Name = "Viewmodel"
 	for _, part in built:GetDescendants() do
 		if part:IsA("BasePart") then
 			part.Anchored = true
 		end
 	end
-	applyCosmetics(built)
 	built.Parent = workspace.CurrentCamera
 	model = built
 	return built
@@ -75,7 +91,6 @@ local function update(dt: number)
 	end
 	local gun = ensureModel()
 
-	-- Sway lags the camera slightly; bob kicks in while moving.
 	local delta = UserInputService:GetMouseDelta()
 	local blend = math.min(dt * 12, 1)
 	swayX += (math.clamp(-delta.X * 0.0025, -SWAY_LIMIT, SWAY_LIMIT) - swayX) * blend
@@ -90,23 +105,22 @@ local function update(dt: number)
 
 	recoil = math.max(0, recoil - recoil * math.min(dt * 10, 1))
 
-	-- Movement poses: sprint pulls the gun up across the chest (COD-style
-	-- held-high jog); slides cant it sideways.
-	local blend = math.min(dt * 9, 1)
-	loweredAlpha += ((if MovementController.isSprinting() then 1 else 0) - loweredAlpha) * blend
-	cantAlpha += ((if MovementController.isSliding() then 1 else 0) - cantAlpha) * blend
+	local poseBlend = math.min(dt * 9, 1)
+	loweredAlpha += ((if MovementController.isSprinting() then 1 else 0) - loweredAlpha) * poseBlend
+	cantAlpha += ((if MovementController.isSliding() then 1 else 0) - cantAlpha) * poseBlend
 
 	local sprintPose = CFrame.new(-0.45 * loweredAlpha, -0.12 * loweredAlpha, 0.18 * loweredAlpha)
 		* CFrame.Angles(0.28 * loweredAlpha, 0.7 * loweredAlpha, 0.12 * loweredAlpha)
 	local cframe = camera.CFrame
 		* BASE_OFFSET
+		* classOffset()
 		* CFrame.new(swayX, swayY + bob, recoil * 0.4)
 		* sprintPose
 		* CFrame.Angles(recoil, swayX * 0.5, cantAlpha * 0.35)
 	gun:PivotTo(cframe)
 end
 
--- Called by WeaponController on weapon switch; rebuilds next frame.
+-- Called on slot switches and server slot pushes; rebuilds next frame.
 function ViewmodelController.setWeapon(weaponId: string)
 	if weaponId == currentWeapon then
 		return
@@ -115,7 +129,14 @@ function ViewmodelController.setWeapon(weaponId: string)
 	hideModel()
 end
 
--- Called by WeaponController on each shot.
+-- Cosmetic changes re-dress the in-hand gun.
+function ViewmodelController.refreshCosmetics()
+	local gun = model
+	if gun then
+		GunModelLoader.applyCosmetics(gun, currentWeapon, myCosmetics())
+	end
+end
+
 function ViewmodelController.kick()
 	recoil = math.min(recoil + KICK_PER_SHOT, KICK_MAX)
 end
@@ -123,8 +144,8 @@ end
 -- Where tracers start: the viewmodel's muzzle, or a camera-relative fallback.
 function ViewmodelController.getMuzzlePosition(): Vector3?
 	local gun = model
-	local slide = gun and gun.PrimaryPart
-	local muzzle = slide and slide:FindFirstChild("Muzzle")
+	local primary = gun and gun.PrimaryPart
+	local muzzle = primary and primary:FindFirstChild("Muzzle")
 	if muzzle and muzzle:IsA("Attachment") then
 		return muzzle.WorldPosition
 	end
@@ -133,13 +154,6 @@ end
 
 function ViewmodelController.init()
 	RunService:BindToRenderStep("PinkPanicViewmodel", Enum.RenderPriority.Camera.Value + 1, update)
-
-	-- Equip changes re-dress the in-hand gun live.
-	ClientData.changed:Connect(function()
-		if model then
-			applyCosmetics(model)
-		end
-	end)
 end
 
 return ViewmodelController

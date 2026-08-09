@@ -51,10 +51,13 @@ local function column(name: string, diameter: number, height: number, position: 
 	return part
 end
 
-local function sign(text: string, position: Vector3)
+local function sign(text: string, position: Vector3, parent: Instance?)
 	local anchor = mkPart("SignAnchor", Vector3.new(0.5, 0.5, 0.5), CFrame.new(position), PINK_WHITE)
 	anchor.Transparency = 1
 	anchor.CanCollide = false
+	if parent then
+		anchor.Parent = parent
+	end
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.fromOffset(340, 56)
 	billboard.AlwaysOnTop = false
@@ -194,9 +197,9 @@ function LobbyService.setArenaActive(active: boolean)
 			end
 		end
 	end
-	local lobby = folder
+	local lobby: Instance? = workspace:FindFirstChild("Lobby") or folder
 	if lobby then
-		for _, child in lobby:GetChildren() do
+		for _, child in lobby:GetDescendants() do
 			if child:IsA("SpawnLocation") then
 				child.Enabled = not active
 			end
@@ -249,7 +252,27 @@ local function onLobbyShot(player: Player, hitPosition: any, hitInstance: any)
 	end
 end
 
+-- Titus's hand-built lobby: dress attribute-tagged pads with floating
+-- name signs, make sure spawn pads exist, and skip placeholder generation.
+local function setupCustomLobby(lobby: Instance)
+	for _, pad in lobby:GetDescendants() do
+		if pad:IsA("BasePart") and pad:GetAttribute("PadAction") then
+			local name = pad:GetAttribute("PadName")
+			if type(name) == "string" and not pad:FindFirstChild("SignAnchor", true) then
+				sign(name, pad.Position + Vector3.new(0, 7, 0), pad)
+			end
+		end
+	end
+	LobbyService.setArenaActive(false)
+	Remotes.event("LobbyShot").OnServerEvent:Connect(onLobbyShot)
+end
+
 function LobbyService.init()
+	local custom = workspace:FindFirstChild("Lobby")
+	if custom then
+		setupCustomLobby(custom)
+		return
+	end
 	if workspace:FindFirstChild(LOBBY_NAME) then
 		return
 	end

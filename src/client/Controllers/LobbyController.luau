@@ -33,6 +33,24 @@ local function lobbyFolder(): Folder?
 	return workspace:FindFirstChild("PinkPanicLobby") :: Folder?
 end
 
+-- Titus's hand-built lobby: pads are attribute-tagged parts (PadAction /
+-- PadName / optional PadRadius) anywhere under workspace.Lobby.
+local cachedPads: { BasePart }? = nil
+local function customPads(custom: Instance): { BasePart }
+	local cached = cachedPads
+	if cached then
+		return cached
+	end
+	local list: { BasePart } = {}
+	for _, descendant in custom:GetDescendants() do
+		if descendant:IsA("BasePart") and descendant:GetAttribute("PadAction") then
+			table.insert(list, descendant)
+		end
+	end
+	cachedPads = list
+	return list
+end
+
 local function buildBanner()
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 	local screen = Instance.new("ScreenGui")
@@ -87,9 +105,12 @@ local function applyZone(zone: BasePart?)
 	if zone == currentZone then
 		return
 	end
-	local previousAction = currentZone and currentZone:GetAttribute("ZoneAction")
+	local previous = currentZone
+	local previousAction = previous
+		and (previous:GetAttribute("ZoneAction") or previous:GetAttribute("PadAction"))
 	currentZone = zone
-	CameraController.setZone(zone)
+	-- Hand-built lobby uses the fixed-pivot camera; no per-zone framing.
+	CameraController.setZone(if workspace:FindFirstChild("Lobby") then nil else zone)
 
 	-- Leaving a building closes its UI.
 	if previousAction == "shop" then
@@ -99,11 +120,11 @@ local function applyZone(zone: BasePart?)
 	end
 
 	if zone then
-		local name = zone:GetAttribute("ZoneName")
+		local name = zone:GetAttribute("ZoneName") or zone:GetAttribute("PadName")
 		if type(name) == "string" then
 			showBanner(name)
 		end
-		local action = zone:GetAttribute("ZoneAction")
+		local action = zone:GetAttribute("ZoneAction") or zone:GetAttribute("PadAction")
 		if action == "shop" then
 			ShopController.setOpen(true)
 		elseif action == "loadout" then
@@ -119,12 +140,30 @@ local function updateZones()
 	end
 	local character = Players.LocalPlayer.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	local lobby = lobbyFolder()
-	if not root or not root:IsA("BasePart") or not lobby then
+	if not root or not root:IsA("BasePart") then
 		applyZone(nil)
 		return
 	end
 
+	-- Hand-built lobby: proximity to tagged pads.
+	local custom = workspace:FindFirstChild("Lobby")
+	if custom then
+		for _, pad in customPads(custom) do
+			local radius = (pad:GetAttribute("PadRadius") :: number?) or 8
+			if (pad.Position - root.Position).Magnitude <= radius then
+				applyZone(pad)
+				return
+			end
+		end
+		applyZone(nil)
+		return
+	end
+
+	local lobby = lobbyFolder()
+	if not lobby then
+		applyZone(nil)
+		return
+	end
 	for _, child in lobby:GetChildren() do
 		if child:IsA("BasePart") and child:GetAttribute("ZoneAction") and insideZone(child, root.Position) then
 			applyZone(child)

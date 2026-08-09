@@ -35,6 +35,16 @@ local function lobbyFolder(): Folder?
 	return workspace:FindFirstChild("PinkPanicLobby") :: Folder?
 end
 
+-- Titus's hand-built lobby (workspace.Lobby) supplies a CameraAnchor part:
+-- its position is the camera eye, its facing is the base view, and the
+-- camera PIVOTS in place to follow you — clamped (MaxYawDeg / MaxPitchDeg
+-- attributes) so it can never swing far enough to reveal unbuilt areas.
+local function cameraAnchor(): BasePart?
+	local lobby = workspace:FindFirstChild("Lobby")
+	local anchor = lobby and lobby:FindFirstChild("CameraAnchor")
+	return if anchor and anchor:IsA("BasePart") then anchor else nil
+end
+
 local function plazaCenter(): Vector3
 	local lobby = lobbyFolder()
 	local center = lobby and lobby:GetAttribute("PlazaCenter")
@@ -59,6 +69,28 @@ local function desiredLobbyCFrame(deltaTime: number): CFrame?
 	local override = shotOverride
 	if override then
 		return override
+	end
+
+	-- Fixed-pivot mode: hand-built lobby with an authored camera position.
+	local anchor = cameraAnchor()
+	if anchor then
+		local eye = anchor.Position
+		local target = root.Position + Vector3.new(0, 2, 0)
+		local toTarget = (target - eye)
+		if toTarget.Magnitude < 0.5 then
+			return anchor.CFrame
+		end
+		-- Express the desired look direction in the anchor's space, clamp
+		-- yaw/pitch offsets, rebuild.
+		local localDir = anchor.CFrame:VectorToObjectSpace(toTarget.Unit)
+		local yaw = math.atan2(-localDir.X, -localDir.Z)
+		local pitch = math.asin(math.clamp(localDir.Y, -1, 1))
+		local maxYaw = math.rad((anchor:GetAttribute("MaxYawDeg") :: number?) or 20)
+		local maxPitch = math.rad((anchor:GetAttribute("MaxPitchDeg") :: number?) or 10)
+		yaw = math.clamp(yaw, -maxYaw, maxYaw)
+		pitch = math.clamp(pitch, -maxPitch, maxPitch)
+		local look = (anchor.CFrame * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)).LookVector
+		return CFrame.lookAlong(eye, look)
 	end
 
 	local zone = zonePart

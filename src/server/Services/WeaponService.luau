@@ -1,37 +1,32 @@
 --!strict
--- WeaponService — server-side arsenal: per-weapon ammo, firing validation,
--- pellets, melee, reload, and switching (NOD-12, NOD-14, NOD-25..27, NOD-29).
--- The client only *reports* a shot (origin + direction); the server
--- re-raycasts the world itself, so spoofed hits, wall-bangs and impossible
--- fire rates are rejected here.
+-- WeaponService — server-side combat for the gun-roster era (NOD-109):
+-- loadout slots (Primary / Secondary / Knife), stats resolved through
+-- CombatStats, real mesh models via GunModelLoader (part-built fallback),
+-- per-slot ammo, validated firing with pellets and melee, reloads, and
+-- switching. The client only *reports* a shot; the server re-raycasts the
+-- world itself.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Guard = require(ReplicatedStorage.Shared.Net.Guard)
-local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
-local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
-local WeaponModels = require(ReplicatedStorage.Shared.Assets.WeaponModels)
-local WeaponCosmetics = require(ReplicatedStorage.Shared.Assets.WeaponCosmetics)
+local CombatStats = require(ReplicatedStorage.Shared.Config.CombatStats)
+local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
+local GunModelLoader = require(ReplicatedStorage.Shared.Assets.GunModelLoader)
 local CombatService = require(script.Parent.CombatService)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local RoundService = require(script.Parent.RoundService)
 
--- Allow slightly faster than nominal fire rate so honest clients with jitter
--- aren't rejected, without letting macros double the rate.
 local FIRE_RATE_TOLERANCE = 0.9
--- Client fires from the camera; the camera sits near the head, so a reported
--- origin far from the head means teleported/spoofed shots.
 local MAX_ORIGIN_DRIFT = 8
 
--- Everyone carries the full MVP arsenal; the loadout choice picks which one
--- you spawn holding.
-local LOADOUT = GameConfig.loadout
+local SLOTS = { "Primary", "Secondary", "Knife" }
 
 type WeaponState = {
-	current: string,
-	ammo: { [string]: number },
+	slot: string,
+	guns: { [string]: string? }, -- slot -> gunId ("Knife" for the knife)
+	ammo: { [string]: number }, -- by slot
 	lastShotAt: number,
 	reloadingUntil: number,
 	reloadToken: number,
@@ -43,21 +38,49 @@ local WeaponService = {}
 local states: { [Player]: WeaponState } = {}
 local rng = Random.new()
 
-local function resetState(player: Player)
-	local ammo: { [string]: number } = {}
-	for _, weaponId in LOADOUT do
-		ammo[weaponId] = WeaponConfig[weaponId].magSize
-	end
+local function currentGunId(state: WeaponState): string
+	return state.guns[state.slot] or "Pistol_1"
+end
 
-	-- Spawn holding the persisted loadout choice (NOD-28).
+local function currentStats(state: WeaponState): CombatStats.Resolved
+	return CombatStats.resolve(currentGunId(state))
+end
+
+-- Resolves the player's persisted loadout, validating ownership so a stale
+-- profile can never spawn a gun it doesn't own.
+local function resolveLoadout(player: Player): { [string]: string? }
 	local data = PlayerDataService.get(player)
-	local starting = data and data.equipped.weapon
-	if not starting or not table.find(LOADOUT, starting) then
-		starting = "Pistol"
+	local primary: string? = nil
+	local secondary = "Pistol_1"
+	if data then
+		local wanted = data.loadout.primary
+		if wanted and table.find(data.ownedGuns, wanted) then
+			local def = GunCatalog.get(wanted)
+			if def and def.slot == "Primary" then
+				primary = wanted
+			end
+		end
+		local wantedSecondary = data.loadout.secondary
+		if wantedSecondary and table.find(data.ownedGuns, wantedSecondary) then
+			local def = GunCatalog.get(wantedSecondary)
+			if def and def.slot == "Secondary" then
+				secondary = wantedSecondary
+			end
+		end
 	end
+	return { Primary = primary, Secondary = secondary, Knife = "Knife" }
+end
 
+local function resetState(player: Player)
+	local guns = resolveLoadout(player)
+	local ammo: { [string]: number } = {}
+	for _, slot in SLOTS do
+		local gunId = guns[slot]
+		ammo[slot] = if gunId then CombatStats.resolve(gunId).magSize else 0
+	end
 	states[player] = {
-		current = starting,
+		slot = if guns.Primary then "Primary" else "Secondary",
+		guns = guns,
 		ammo = ammo,
 		lastShotAt = 0,
 		reloadingUntil = 0,
@@ -71,21 +94,28 @@ local function pushAmmo(player: Player)
 	if not state then
 		return
 	end
-	local config = WeaponConfig[state.current]
+	local stats = currentStats(state)
 	Remotes.event("AmmoChanged"):FireClient(player, {
-		weaponId = state.current,
-		ammo = state.ammo[state.current],
-		magSize = config.magSize,
+		slot = state.slot,
+		gunId = currentGunId(state),
+		name = stats.name,
+		ammo = state.ammo[state.slot],
+		magSize = stats.magSize,
 		reloading = os.clock() < state.reloadingUntil,
 	})
 end
 
+local function cosmeticsFor(player: Player, gunId: string): GunModelLoader.Cosmetics?
+	local data = PlayerDataService.get(player)
+	local entry = data and data.gunCosmetics[gunId]
+	return if entry then { skinId = entry.skinId, camoId = entry.camoId } else nil
+end
+
 -- Welds the current weapon to the character's hand so other players see it.
--- The owner sees their own viewmodel instead (first-person hides the body).
 local function attachWorldGun(player: Player, character: Model)
 	task.spawn(function()
 		local state = states[player]
-		local weaponId = if state then state.current else "Pistol"
+		local gunId = if state then currentGunId(state) else "Pistol_1"
 
 		local existing = character:FindFirstChild("WorldGun")
 		if existing then
@@ -98,19 +128,17 @@ local function attachWorldGun(player: Player, character: Model)
 			return
 		end
 
-		local gun = WeaponModels.build(weaponId)
+		local gun = GunModelLoader.build(gunId, cosmeticsFor(player, gunId))
 		gun.Name = "WorldGun"
-		local data = PlayerDataService.get(player)
-		if data then
-			WeaponCosmetics.applySkin(gun, data.equipped.skins.Pistol)
-			WeaponCosmetics.applyCharm(gun, data.equipped.charms.Pistol)
-		end
 		local grip = CFrame.lookAlong(hand.Position, root.CFrame.LookVector) * CFrame.new(0, -0.1, -0.45)
 		gun:PivotTo(grip)
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = gun.PrimaryPart
-		weld.Part1 = hand
-		weld.Parent = gun.PrimaryPart
+		local primary = gun.PrimaryPart
+		if primary then
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = primary
+			weld.Part1 = hand
+			weld.Parent = primary
+		end
 		gun.Parent = character
 	end)
 end
@@ -127,20 +155,18 @@ local function aliveCharacter(player: Player): (Model?, BasePart?)
 	return character, character:FindFirstChild("Head") :: BasePart?
 end
 
-local function damageAtDistance(config: WeaponConfig.WeaponStats, distance: number): number
-	if distance <= config.falloffStart then
-		return config.damage
+local function damageAtDistance(stats: CombatStats.Resolved, distance: number): number
+	if distance <= stats.falloffStart then
+		return stats.totalDamage
 	end
-	local span = math.max(config.range - config.falloffStart, 1)
-	local alpha = math.clamp((distance - config.falloffStart) / span, 0, 1)
-	return config.damage + (config.falloffEndDamage - config.damage) * alpha
+	local span = math.max(stats.range - stats.falloffStart, 1)
+	local alpha = math.clamp((distance - stats.falloffStart) / span, 0, 1)
+	return stats.totalDamage + (stats.falloffEndDamage - stats.totalDamage) * alpha
 end
 
 type HitTotal = { damage: number, position: Vector3 }
 
 local function onFireWeapon(player: Player, origin: any, direction: any)
-	-- Real combat only happens in live rounds; lobby shooting is the separate
-	-- cosmetic LobbyShot path.
 	if RoundService.getState() ~= "Active" then
 		return
 	end
@@ -162,24 +188,23 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 		return
 	end
 
-	local config = WeaponConfig[state.current]
-	local isMelee = config.kind == "Melee"
+	local stats = currentStats(state)
+	local isMelee = stats.kind == "Melee"
 	local now = os.clock()
-	-- Pull-out time: a fresh switch can't fire instantly (equip stat).
-	if now - state.switchedAt < config.equipTime * 0.85 then
+	if now - state.switchedAt < stats.equipTime * 0.85 then
 		return
 	end
-	if now - state.lastShotAt < (1 / config.fireRate) * FIRE_RATE_TOLERANCE then
+	if now - state.lastShotAt < (1 / stats.fireRate) * FIRE_RATE_TOLERANCE then
 		return
 	end
 	if not isMelee then
-		if now < state.reloadingUntil or state.ammo[state.current] <= 0 then
+		if now < state.reloadingUntil or state.ammo[state.slot] <= 0 then
 			return
 		end
 	end
 	state.lastShotAt = now
 	if not isMelee then
-		state.ammo[state.current] -= 1
+		state.ammo[state.slot] -= 1
 		pushAmmo(player)
 	end
 
@@ -187,12 +212,10 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { character }
 
-	-- Pellet 1 flies exactly where the client aimed; extra pellets get
-	-- server-rolled spread so clients can't choose their own pattern.
 	local totals: { [Player]: HitTotal } = {}
 	local firstEndpoint: Vector3? = nil
-	local spreadRad = math.rad(config.spread)
-	for pellet = 1, config.pellets do
+	local spreadRad = math.rad(stats.spreadDeg)
+	for pellet = 1, stats.pellets do
 		local dir: Vector3 = direction
 		if pellet > 1 then
 			dir = (CFrame.lookAlong(Vector3.zero, direction) * CFrame.Angles(
@@ -202,8 +225,8 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 			)).LookVector
 		end
 
-		local result = workspace:Raycast(origin, dir * config.range, params)
-		local endpoint = if result then result.Position else origin + dir * config.range
+		local result = workspace:Raycast(origin, dir * stats.range, params)
+		local endpoint = if result then result.Position else origin + dir * stats.range
 		if not firstEndpoint then
 			firstEndpoint = endpoint
 		end
@@ -218,9 +241,9 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 		end
 
 		local distance = (result.Position - origin).Magnitude
-		local pelletDamage = damageAtDistance(config, distance) / config.pellets
+		local pelletDamage = damageAtDistance(stats, distance) / stats.pellets
 		if result.Instance.Name == "Head" then
-			pelletDamage *= config.headshotMultiplier
+			pelletDamage *= stats.headshotMult
 		end
 		local total = totals[victim]
 		if total then
@@ -231,14 +254,14 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 		end
 	end
 
-	Remotes.event("ShotFired"):FireAllClients(player, origin, firstEndpoint or origin + direction * config.range)
+	Remotes.event("ShotFired"):FireAllClients(player, origin, firstEndpoint or origin + direction * stats.range)
 
 	for victim, total in totals do
 		local damage = math.floor(total.damage + 0.5)
 		if damage <= 0 then
 			continue
 		end
-		local applied, killed = CombatService.applyDamage(player, victim, damage, state.current)
+		local applied, killed = CombatService.applyDamage(player, victim, damage, stats.name)
 		if applied then
 			Remotes.event("DamageDealt"):FireClient(player, damage, total.position, killed)
 		end
@@ -253,46 +276,44 @@ local function onReloadWeapon(player: Player)
 	if not state then
 		return
 	end
-	local weaponId = state.current
-	local config = WeaponConfig[weaponId]
-	if config.kind == "Melee" or config.magSize <= 0 then
+	local slot = state.slot
+	local stats = currentStats(state)
+	if stats.kind == "Melee" or stats.magSize <= 0 then
 		return
 	end
 	local now = os.clock()
-	if state.ammo[weaponId] >= config.magSize or now < state.reloadingUntil then
+	if state.ammo[slot] >= stats.magSize or now < state.reloadingUntil then
 		return
 	end
 
 	state.reloadToken += 1
 	local token = state.reloadToken
-	state.reloadingUntil = now + config.reloadTime
+	state.reloadingUntil = now + stats.reloadSeconds
 	pushAmmo(player)
-	task.delay(config.reloadTime, function()
-		-- A respawn (fresh state table) or a weapon switch (bumped token)
-		-- cancels the pending refill.
+	task.delay(stats.reloadSeconds, function()
 		if states[player] == state and state.reloadToken == token then
-			state.ammo[weaponId] = config.magSize
+			state.ammo[slot] = stats.magSize
 			state.reloadingUntil = 0
 			pushAmmo(player)
 		end
 	end)
 end
 
-local function onSelectWeapon(player: Player, weaponId: any)
+local function onSelectWeapon(player: Player, slotName: any)
 	if not Guard.checkRate(player, "SelectWeapon", 10, 1) then
 		return
 	end
-	if not Guard.isString(weaponId, 30) or not table.find(LOADOUT, weaponId) then
+	if not Guard.isString(slotName, 20) or not table.find(SLOTS, slotName) then
 		return
 	end
 	local state = states[player]
-	if not state or state.current == weaponId then
+	if not state or state.slot == slotName or not state.guns[slotName] then
 		return
 	end
 
-	state.current = weaponId
+	state.slot = slotName :: string
 	state.switchedAt = os.clock()
-	state.reloadToken += 1 -- cancels any in-flight reload
+	state.reloadToken += 1
 	state.reloadingUntil = 0
 	pushAmmo(player)
 
@@ -302,7 +323,26 @@ local function onSelectWeapon(player: Player, weaponId: any)
 	end
 end
 
+-- GunShopService hooks: apply loadout/cosmetic changes live (lobby).
+function WeaponService.refreshLoadout(player: Player)
+	local character = player.Character
+	resetState(player)
+	if character then
+		attachWorldGun(player, character)
+	end
+	pushAmmo(player)
+end
+
+function WeaponService.refreshCosmetics(player: Player)
+	local character = player.Character
+	if character then
+		attachWorldGun(player, character)
+	end
+end
+
 function WeaponService.init()
+	GunModelLoader.normalizeAll()
+
 	local function hookPlayer(player: Player)
 		resetState(player)
 		player.CharacterAdded:Connect(function(character)

@@ -174,7 +174,10 @@ local function applyAmmo(data: any)
 		return
 	end
 	local config = WeaponConfig[data.weaponId]
-	weaponLabel.Text = if config then config.displayName else tostring(data.weaponId)
+	weaponLabel.Text = if type(data.name) == "string"
+		then data.name
+		elseif config then config.displayName
+		else tostring(data.gunId or data.weaponId)
 	if type(data.magSize) == "number" and data.magSize <= 0 then
 		ammoLabel.Text = "∞"
 	elseif data.reloading then
