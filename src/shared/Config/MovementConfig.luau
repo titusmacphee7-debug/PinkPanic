@@ -22,12 +22,12 @@ return {
 	chainWalkSpeed = 34,
 	chainWindow = 1.0,
 
-	staminaMax = 100,
-	sprintDrainPerSecond = 10,
-	slideCost = 25,
-	regenPerSecond = 18,
-	regenDelay = 0.4, -- pause after spending before regen kicks in
-	minSprintStamina = 5,
+	staminaMax = 150,
+	sprintDrainPerSecond = 3,
+	slideCost = 12,
+	regenPerSecond = 40,
+	regenDelay = 0.2, -- pause after spending before regen kicks in
+	minSprintStamina = 2,
 
 	-- Combat-only FOV feel (the lobby camera owns its own framing).
 	fovBase = 70,
