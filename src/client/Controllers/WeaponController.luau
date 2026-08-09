@@ -43,8 +43,8 @@ local ADS_ZOOM: { [string]: number } = {
 -- climbs the CAMERA instead, and the crosshair always tells the truth.
 local recoilPitch = 0 -- radians of climb currently applied
 local recoilYaw = 0
-local RECOIL_PITCH_MAX = math.rad(6.5)
-local RECOIL_YAW_MAX = math.rad(2.5)
+local RECOIL_PITCH_MAX = math.rad(3.2)
+local RECOIL_YAW_MAX = math.rad(1.2)
 
 -- Aim-error feel knobs (per-gun numbers live in GunCatalog).
 local MOVE_SPREAD_DEG = 0.3 -- tiny penalty at full stride; barely noticeable
@@ -220,7 +220,7 @@ function WeaponController.init()
 		ViewmodelController.setAdsAlpha(adsAlpha)
 		MovementController.setAds(adsAlpha, ADS_ZOOM[stats.class] or 10)
 
-		local settle = math.exp(-dt * stats.recoilRecovery / 2.2)
+		local settle = math.exp(-dt * stats.recoilRecovery / 1.6)
 		recoilPitch *= settle
 		recoilYaw *= settle
 		if inCombat and (recoilPitch > 1e-4 or math.abs(recoilYaw) > 1e-4) then

@@ -7,9 +7,11 @@ return {
 	sprintWalkSpeed = 30, -- +50%
 	fireRaiseDelay = 0.25, -- fallback sprint-to-fire; weapons override per-config
 
-	-- Jump: higher and floatier than stock Roblox, and it carries your speed.
-	jumpHeight = 9.5, -- stock is ~6.4 studs
-	jumpGravityScale = 0.76, -- character gravity while airborne (lower = floatier)
+	-- Jump: low takeoff, LOTS of hang. Apparent apex ≈ jumpHeight divided by
+	-- jumpGravityScale (≈7.8 studs here) — raise gravity scale to cut float,
+	-- raise jumpHeight to jump higher.
+	jumpHeight = 4.5, -- stock is ~6.4 studs; low on purpose, the float carries it
+	jumpGravityScale = 0.58, -- character gravity while airborne (lower = floatier)
 
 	-- Friction: releasing the keys skids you to a stop instead of the
 	-- engine's instant brake.

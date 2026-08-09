@@ -8,6 +8,11 @@
 
 local MAP_NAME = "PinkPanicMap"
 
+-- The arena generates FAR from the world origin so it can never overlap or
+-- interfere with hand-built content (the lobby town lives near origin).
+-- Players only ever reach it via round spawns, so distance is free.
+local ARENA_ORIGIN = Vector3.new(0, 0, 1400)
+
 local HOT_PINK = Color3.fromRGB(255, 92, 168)
 local BUBBLEGUM = Color3.fromRGB(255, 130, 190)
 local BLUSH = Color3.fromRGB(255, 227, 240)
@@ -43,7 +48,7 @@ local function mk(props: PartProps): BasePart
 	end
 	part.Name = props.name
 	part.Size = props.size
-	part.CFrame = props.cframe
+	part.CFrame = CFrame.new(ARENA_ORIGIN) * props.cframe
 	part.Color = props.color
 	part.Material = props.material or Enum.Material.SmoothPlastic
 	part.Transparency = props.transparency or 0
@@ -248,7 +253,7 @@ local function buildSpawns()
 		local spawnLocation = Instance.new("SpawnLocation")
 		spawnLocation.Name = `Spawn{index}`
 		spawnLocation.Size = Vector3.new(6, 0.6, 6)
-		spawnLocation.CFrame = CFrame.new(position)
+		spawnLocation.CFrame = CFrame.new(position + ARENA_ORIGIN)
 		spawnLocation.Color = HOT_PINK
 		spawnLocation.Material = Enum.Material.Neon
 		spawnLocation.Transparency = 0.4
@@ -277,9 +282,15 @@ function MapService.init()
 
 	newFolder.Parent = workspace
 
-	-- All spawning happens on our pads; retire any Baseplate spawn.
+	-- Retire stray spawns (e.g. the Baseplate's) — but NEVER touch the
+	-- hand-built lobby's spawn pads; LobbyService owns those.
+	local lobby = workspace:FindFirstChild("Lobby")
 	for _, descendant in workspace:GetDescendants() do
-		if descendant:IsA("SpawnLocation") and not descendant:IsDescendantOf(newFolder) then
+		if
+			descendant:IsA("SpawnLocation")
+			and not descendant:IsDescendantOf(newFolder)
+			and not (lobby and descendant:IsDescendantOf(lobby))
+		then
 			descendant.Enabled = false
 		end
 	end
