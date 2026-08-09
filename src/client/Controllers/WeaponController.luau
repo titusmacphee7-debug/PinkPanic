@@ -95,6 +95,12 @@ local function shoot()
 	end
 	EffectsController.playShotSound(0.6)
 
+	-- One shell per shot pops from the in-hand gun and stays on the floor.
+	EffectsController.ejectShell(
+		ViewmodelController.getEjectCFrame()
+			or camera.CFrame * CFrame.new(0.95, -0.65, -1.3)
+	)
+
 	local muzzle = ViewmodelController.getMuzzlePosition()
 		or origin + camera.CFrame.RightVector * 0.6 - camera.CFrame.UpVector * 0.4
 	local tracerCount = math.min(stats.pellets, 3)

@@ -1,11 +1,15 @@
 --!strict
--- EffectsController — shot tracers and sounds. Local shots draw effects
+-- EffectsController — shot visuals and sounds. Local shots draw effects
 -- immediately at fire time; everyone else's validated shots arrive via the
--- ShotFired remote. Placeholder audio uses engine-bundled sounds until the
--- real SFX pass (NOD-40).
+-- ShotFired remote. Bullets fly as real projectiles (mesh + trail when a
+-- Bullet template exists, neon streak fallback), and every shot ejects a
+-- shell that tumbles with real physics then freezes where it lands, so
+-- spent brass litters the floor all round at near-zero cost. Placeholder
+-- audio uses engine-bundled sounds until the real SFX pass (NOD-40).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
@@ -15,8 +19,16 @@ local ClientData = require(script.Parent.Parent.ClientData)
 local SHOT_SOUND = "rbxasset://sounds/snap.mp3"
 local HIT_SOUND = "rbxasset://sounds/electronicpingshort.wav"
 local TRACER_PINK = Color3.fromRGB(255, 150, 200)
+local SHELL_BRASS = Color3.fromRGB(255, 208, 130)
+
+local MAX_SHELLS = 180 -- oldest brass despawns past this
+local SHELL_SIZE = 0.35 -- longest axis after import normalization, studs
+local BULLET_SIZE = 0.45
+local SHELL_EJECT_RANGE = 140 -- no shells for shooters further away than this
 
 local EffectsController = {}
+
+local rng = Random.new()
 
 -- Player-set volume from settings scales every effect sound.
 local function volumeMultiplier(): number
@@ -44,6 +56,172 @@ end
 
 function EffectsController.playHitSound()
 	playSound(HIT_SOUND, 0.5, 1.4)
+end
+
+-- ============ Effect mesh templates ============
+-- Drop MeshParts named "Bullet" and "Shell" into a ReplicatedStorage folder
+-- called "EffectModels" (Studio-side, exactly like GunModels) and they're
+-- picked up automatically — any import size works, they get normalized.
+-- Until then a neon streak / brass cylinder stand in.
+
+local preppedBullet: BasePart? = nil
+local preppedShell: BasePart? = nil
+
+local function findEffectPart(name: string): BasePart?
+	local roots: { Instance } = {}
+	local direct = ReplicatedStorage:FindFirstChild("EffectModels")
+	if direct then
+		table.insert(roots, direct)
+	end
+	local shared = ReplicatedStorage:FindFirstChild("Shared")
+	local assets = shared and shared:FindFirstChild("Assets")
+	local nested = assets and assets:FindFirstChild("EffectModels")
+	if nested then
+		table.insert(roots, nested)
+	end
+	for _, root in roots do
+		local found = root:FindFirstChild(name)
+		if found and found:IsA("BasePart") then
+			return found
+		end
+	end
+	return nil
+end
+
+local function prepEffectPart(source: BasePart, targetSize: number): BasePart
+	local part = source:Clone()
+	local size = part.Size
+	local longest = math.max(size.X, size.Y, size.Z)
+	if longest > 0 then
+		part.Size = size * (targetSize / longest)
+	end
+	part.Anchored = false
+	part.CanCollide = false
+	part.CanQuery = false -- brass must NEVER catch bullets or armory clicks
+	part.CanTouch = false
+	part.CastShadow = false
+	part.Massless = false
+	return part
+end
+
+local function bulletTemplate(): BasePart?
+	if preppedBullet then
+		return preppedBullet
+	end
+	local source = findEffectPart("Bullet")
+	if not source then
+		return nil
+	end
+	local part = prepEffectPart(source, BULLET_SIZE)
+	part.Anchored = true
+	-- Pink tracer ribbon streams off the tail so fast rounds stay readable.
+	local rear = part.Size.Z / 2
+	local above = Instance.new("Attachment")
+	above.Position = Vector3.new(0, 0.03, rear)
+	above.Parent = part
+	local below = Instance.new("Attachment")
+	below.Position = Vector3.new(0, -0.03, rear)
+	below.Parent = part
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = above
+	trail.Attachment1 = below
+	trail.Color = ColorSequence.new(TRACER_PINK)
+	trail.Transparency = NumberSequence.new(0.25, 1)
+	trail.Lifetime = 0.07
+	trail.LightEmission = 1
+	trail.FaceCamera = true
+	trail.Parent = part
+	preppedBullet = part
+	return part
+end
+
+local function shellTemplate(): BasePart
+	if preppedShell then
+		return preppedShell
+	end
+	local source = findEffectPart("Shell")
+	local part: BasePart
+	if source then
+		part = prepEffectPart(source, SHELL_SIZE)
+	else
+		local placeholder = Instance.new("Part")
+		placeholder.Shape = Enum.PartType.Cylinder
+		placeholder.Size = Vector3.new(SHELL_SIZE, 0.13, 0.13)
+		placeholder.Color = SHELL_BRASS
+		placeholder.Material = Enum.Material.Metal
+		part = prepEffectPart(placeholder, SHELL_SIZE)
+	end
+	part.CanCollide = true -- shells bounce off the world (but stay unclickable)
+	part.CustomPhysicalProperties = PhysicalProperties.new(2, 0.5, 0.35, 1, 1)
+	preppedShell = part
+	return part
+end
+
+-- ============ Shell casings ============
+local shellBin: Folder? = nil
+local shells: { BasePart } = {}
+
+local function ensureShellBin(): Folder
+	local bin = shellBin
+	if bin and bin.Parent then
+		return bin
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "ShellBin"
+	folder.Parent = workspace
+	shellBin = folder
+	return folder
+end
+
+-- Freeze brass once it settles: anchored parts have zero physics cost, so
+-- the floor can stay littered for the whole round.
+local function settleShell(shell: BasePart, attempt: number)
+	task.delay(1.4, function()
+		if not shell.Parent then
+			return
+		end
+		if shell.Position.Y < -150 then
+			shell:Destroy() -- rolled off the map
+			return
+		end
+		if shell.AssemblyLinearVelocity.Magnitude < 2.5 or attempt >= 2 then
+			shell.Anchored = true
+		else
+			settleShell(shell, attempt + 1)
+		end
+	end)
+end
+
+-- Pops a shell out of the ejection port: right + up with tumble, exactly
+-- like the guns it grew up watching.
+function EffectsController.ejectShell(port: CFrame)
+	local shell = shellTemplate():Clone()
+	shell.CFrame = port * CFrame.Angles(rng:NextNumber(-0.4, 0.4), rng:NextNumber(-0.4, 0.4), 0)
+	shell.AssemblyLinearVelocity = port.RightVector * rng:NextNumber(7, 11)
+		+ port.UpVector * rng:NextNumber(5, 8)
+		+ port.LookVector * rng:NextNumber(-1.5, 1.5)
+	shell.AssemblyAngularVelocity = Vector3.new(
+		rng:NextNumber(-25, 25),
+		rng:NextNumber(-25, 25),
+		rng:NextNumber(-25, 25)
+	)
+	shell.Parent = ensureShellBin()
+	table.insert(shells, shell)
+	if #shells > MAX_SHELLS then
+		local oldest = table.remove(shells, 1)
+		if oldest then
+			oldest:Destroy()
+		end
+	end
+	settleShell(shell, 1)
+end
+
+function EffectsController.clearShells()
+	table.clear(shells)
+	local bin = shellBin
+	if bin then
+		bin:ClearAllChildren()
+	end
 end
 
 function EffectsController.drawTracer(origin: Vector3, endpoint: Vector3)
@@ -86,17 +264,23 @@ function EffectsController.launchProjectileVisual(
 	if velocity <= 0 then
 		return
 	end
-	local length = math.clamp(velocity * 0.02, 1.5, 8)
-	local part = Instance.new("Part")
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
-	part.Material = Enum.Material.Neon
-	part.Color = TRACER_PINK
-	part.Transparency = 0.1
-	part.Size = Vector3.new(0.06, 0.06, length)
+	local template = bulletTemplate()
+	local part: BasePart
+	if template then
+		part = template:Clone()
+	else
+		local streakPart = Instance.new("Part")
+		streakPart.Anchored = true
+		streakPart.CanCollide = false
+		streakPart.CanQuery = false
+		streakPart.CanTouch = false
+		streakPart.CastShadow = false
+		streakPart.Material = Enum.Material.Neon
+		streakPart.Color = TRACER_PINK
+		streakPart.Transparency = 0.1
+		streakPart.Size = Vector3.new(0.06, 0.06, math.clamp(velocity * 0.02, 1.5, 8))
+		part = streakPart
+	end
 	part.CFrame = CFrame.lookAlong(origin, direction)
 	part.Parent = workspace
 	table.insert(streaks, {
@@ -124,8 +308,26 @@ local function stepStreaks(deltaTime: number)
 	end
 end
 
+-- Other players' shells pop from the gun welded to their hand.
+local function worldGunPort(shooter: Player): CFrame?
+	local character = shooter.Character
+	local gun = character and character:FindFirstChild("WorldGun")
+	local primary = if gun and gun:IsA("Model") then gun.PrimaryPart else nil
+	if primary then
+		return primary.CFrame * CFrame.new(primary.Size.X / 2 + 0.05, primary.Size.Y * 0.2, 0)
+	end
+	return nil
+end
+
 function EffectsController.init()
-	game:GetService("RunService").Heartbeat:Connect(stepStreaks)
+	RunService.Heartbeat:Connect(stepStreaks)
+
+	-- Fresh round, fresh floor.
+	Remotes.event("RoundStateChanged").OnClientEvent:Connect(function(data)
+		if type(data) == "table" and data.state == "Active" then
+			EffectsController.clearShells()
+		end
+	end)
 
 	Remotes.event("ShotFired").OnClientEvent:Connect(function(shooter, origin, direction, velocity, drop, travelMax, pellets)
 		-- The local player already drew their own effects at fire time.
@@ -146,6 +348,19 @@ function EffectsController.init()
 				)
 			end
 			EffectsController.playShotSound(0.35)
+
+			-- One shell per shot, skipped for far-away shooters nobody can see.
+			local camera = workspace.CurrentCamera
+			if
+				camera
+				and (origin - camera.CFrame.Position).Magnitude <= SHELL_EJECT_RANGE
+				and typeof(shooter) == "Instance"
+				and shooter:IsA("Player")
+			then
+				local port = worldGunPort(shooter)
+					or CFrame.lookAlong(origin, direction) * CFrame.new(0.35, -0.15, 0.5)
+				EffectsController.ejectShell(port)
+			end
 		elseif typeof(direction) == "Vector3" then
 			-- Melee / legacy: instant short tracer.
 			EffectsController.drawTracer(origin, origin + direction * 8)

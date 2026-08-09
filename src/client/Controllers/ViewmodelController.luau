@@ -191,6 +191,16 @@ function ViewmodelController.kick()
 	recoil = math.min(recoil + KICK_PER_SHOT, KICK_MAX)
 end
 
+-- Where shells pop out: the right side of the in-hand gun's receiver.
+function ViewmodelController.getEjectCFrame(): CFrame?
+	local gun = model
+	local primary = gun and gun.PrimaryPart
+	if primary then
+		return primary.CFrame * CFrame.new(primary.Size.X / 2 + 0.04, primary.Size.Y * 0.25, primary.Size.Z * 0.1)
+	end
+	return nil
+end
+
 -- Where tracers start: the viewmodel's muzzle, or a camera-relative fallback.
 function ViewmodelController.getMuzzlePosition(): Vector3?
 	local gun = model
