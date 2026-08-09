@@ -45,4 +45,7 @@ SettingsController.init()
 CameraController.init()
 LobbyController.init()
 
+local ArmoryController = require(script.Controllers.ArmoryController)
+ArmoryController.init()
+
 print("[PinkPanic] Client booted 🎀")

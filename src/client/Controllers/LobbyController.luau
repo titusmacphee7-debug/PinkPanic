@@ -174,6 +174,9 @@ local function updateZones()
 end
 
 local function lobbyShoot()
+	if ClientData.armoryBusy then
+		return
+	end
 	local now = os.clock()
 	if now - lastShotAt < SHOT_COOLDOWN then
 		return

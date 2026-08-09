@@ -20,6 +20,8 @@ ClientData.snapshot = nil :: any
 ClientData.changed = changedEvent.Event
 ClientData.shopOpen = false
 ClientData.settingsOpen = false
+-- True while the Armory dialog/inspection owns the mouse (blocks lobby shooting).
+ClientData.armoryBusy = false
 
 -- Round state mirror (fed by RoundController). Lobby life happens in every
 -- state except Active.
@@ -74,6 +76,46 @@ function ClientData.equippedCharm(): string?
 	local snap = ClientData.snapshot
 	local charms = snap and snap.equipped and snap.equipped.charms
 	return if type(charms) == "table" then charms.Pistol else nil
+end
+
+-- Gun-roster helpers (schema v2 snapshot fields).
+local function inList(list: any, itemId: string): boolean
+	return type(list) == "table" and table.find(list, itemId) ~= nil
+end
+
+function ClientData.ownsGun(gunId: string): boolean
+	local snap = ClientData.snapshot
+	return inList(snap and snap.ownedGuns, gunId)
+end
+
+function ClientData.ownsGunSkin(skinId: string): boolean
+	local snap = ClientData.snapshot
+	return inList(snap and snap.ownedGunSkins, skinId)
+end
+
+function ClientData.ownsCamo(camoId: string): boolean
+	local snap = ClientData.snapshot
+	return inList(snap and snap.ownedCamos, camoId)
+end
+
+function ClientData.loadout(): (string?, string)
+	local snap = ClientData.snapshot
+	local loadout = snap and snap.loadout
+	local primary = if type(loadout) == "table" then loadout.primary else nil
+	local secondary = if type(loadout) == "table" and type(loadout.secondary) == "string"
+		then loadout.secondary
+		else "Pistol_1"
+	return primary, secondary
+end
+
+function ClientData.gunCosmeticsFor(gunId: string): (string?, string?)
+	local snap = ClientData.snapshot
+	local all = snap and snap.gunCosmetics
+	local entry = if type(all) == "table" then all[gunId] else nil
+	if type(entry) == "table" then
+		return entry.skinId, entry.camoId
+	end
+	return nil, nil
 end
 
 function ClientData.owns(kind: string, itemId: string): boolean
