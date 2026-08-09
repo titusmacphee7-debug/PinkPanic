@@ -41,7 +41,8 @@ end
 -- attributes) so it can never swing far enough to reveal unbuilt areas.
 local function cameraAnchor(): BasePart?
 	local lobby = workspace:FindFirstChild("Lobby")
-	local anchor = lobby and lobby:FindFirstChild("CameraAnchor")
+	-- Recursive: the anchor works nested anywhere inside the lobby build.
+	local anchor = lobby and lobby:FindFirstChild("CameraAnchor", true)
 	return if anchor and anchor:IsA("BasePart") then anchor else nil
 end
 

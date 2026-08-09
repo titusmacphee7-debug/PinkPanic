@@ -15,7 +15,8 @@ pink so you can see and drag each piece into place:
 
 ```lua
 local origin = workspace.CurrentCamera.Focus.Position
-local lobby = Instance.new("Folder") lobby.Name = "Lobby" lobby.Parent = workspace
+local lobby = workspace:FindFirstChild("Lobby") or Instance.new("Folder")
+lobby.Name = "Lobby" lobby.Parent = workspace
 local anchor = Instance.new("Part") anchor.Name = "CameraAnchor"
 anchor.Size = Vector3.new(2,2,2) anchor.Anchored = true anchor.CanCollide = false
 anchor.Transparency = 0.5 anchor.Color = Color3.fromRGB(120,200,255)
