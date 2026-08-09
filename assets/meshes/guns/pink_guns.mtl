@@ -1,0 +1,25 @@
+newmtl PinkWhite
+Kd 1.0000 0.9608 0.9804
+Ka 0 0 0
+Ks 0 0 0
+
+newmtl Blush
+Kd 1.0000 0.8902 0.9412
+Ka 0 0 0
+Ks 0 0 0
+
+newmtl Bubblegum
+Kd 1.0000 0.5098 0.7451
+Ka 0 0 0
+Ks 0 0 0
+
+newmtl PlumDark
+Kd 0.3608 0.2824 0.3451
+Ka 0 0 0
+Ks 0 0 0
+
+newmtl HotPink
+Kd 1.0000 0.3608 0.6588
+Ka 0 0 0
+Ks 0 0 0
+
