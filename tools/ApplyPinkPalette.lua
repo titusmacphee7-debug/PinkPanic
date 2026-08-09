@@ -16,10 +16,12 @@ local HOT = Color3.fromRGB(255, 92, 168)
 local DEEP = Color3.fromRGB(214, 66, 143)
 local PLUM = Color3.fromRGB(92, 72, 88)
 local GOLD = Color3.fromRGB(255, 196, 88)
+local MINT = Color3.fromRGB(152, 216, 184)
 
 local GENERIC = {
 	-- 32-gun roster parts
 	Body = WHITE, Panel = BLUSH, Grip = PINK, Hardware = PLUM, Accent = HOT, Mag = PINK,
+	Curb = WHITE, Grass = MINT,
 	-- marshmallow pistol parts
 	Slide = WHITE, Frame = BLUSH, Guard = PLUM, Barrel = PLUM, Tip = HOT, Charm = HOT,
 	-- façade defaults (overridden per model below)
