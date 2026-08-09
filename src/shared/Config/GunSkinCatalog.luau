@@ -1120,6 +1120,17 @@ GunSkinCatalog.universal = {
 
 local ROLE_PARTS = { "Body", "Panel", "Grip", "Hardware", "Accent" }
 
+-- Animation-split guns (docs/GUNS_SPLIT_HANDOFF.md) add moving parts on top
+-- of the five skin regions; each borrows a region's color so every skin
+-- keeps working with zero new data.
+local MOVING_PART_REGION: { [string]: string } = {
+	Slide = "Panel",
+	Bolt = "Hardware",
+	Pump = "Grip",
+	Cylinder = "Hardware",
+	Mag = "Hardware",
+}
+
 -- Recolors a gun model's role parts to a color skin. Missing parts are
 -- skipped so simpler guns (no Panel/Accent) still work.
 function GunSkinCatalog.applyColorSkin(gun: Model, def: GunSkinDef)
@@ -1134,6 +1145,12 @@ function GunSkinCatalog.applyColorSkin(gun: Model, def: GunSkinDef)
 		local part = gun:FindFirstChild(partName)
 		if part and part:IsA("BasePart") then
 			part.Color = colors[partName]
+		end
+	end
+	for partName, region in MOVING_PART_REGION do
+		local part = gun:FindFirstChild(partName)
+		if part and part:IsA("BasePart") then
+			part.Color = colors[region]
 		end
 	end
 end

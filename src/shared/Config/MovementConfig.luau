@@ -17,6 +17,16 @@ return {
 	skidMinSpeed = 12, -- skids only start above this speed
 	skidStopSpeed = 6, -- control snaps back below this
 
+	-- Crouch: hold C/Ctrl while not sprinting (a slide melts into a crouch
+	-- if you keep the key held). Tighter spread and calmer recoil while down.
+	crouchSpeedMult = 0.55,
+	crouchHipDrop = 0.55,
+	crouchCameraDrop = 0.9,
+
+	-- ADS: aiming slows the walk and gently zooms (per-class zoom lives in
+	-- WeaponController).
+	adsWalkMult = 0.62,
+
 	slideInitialSpeed = 44,
 	slideEndSpeed = 27,
 	slideDuration = 1.25,

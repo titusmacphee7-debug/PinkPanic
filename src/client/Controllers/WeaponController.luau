@@ -31,6 +31,26 @@ local triggerHeld = false
 local lastShotAt = 0
 local equipReadyAt = 0
 
+-- ADS: hold right mouse. The blend eases over the gun's adsTime.
+local adsHeld = false
+local adsAlpha = 0
+local ADS_ZOOM: { [string]: number } = {
+	Pistol = 8, Revolver = 9, SMG = 8, Shotgun = 6,
+	Rifle = 10, Carbine = 10, Bullpup = 10, Sniper = 26,
+}
+
+-- Recoil: fixed spread never grows (no bloom, ever) — sustained fire
+-- climbs the CAMERA instead, and the crosshair always tells the truth.
+local recoilPitch = 0 -- radians of climb currently applied
+local recoilYaw = 0
+local RECOIL_PITCH_MAX = math.rad(6.5)
+local RECOIL_YAW_MAX = math.rad(2.5)
+
+-- Aim-error feel knobs (per-gun numbers live in GunCatalog).
+local MOVE_SPREAD_DEG = 0.3 -- tiny penalty at full stride; barely noticeable
+local CROUCH_SPREAD_MULT = 0.8
+local CROUCH_RECOIL_MULT = 0.9
+
 local function slotGunId(slot: string): string?
 	if slot == "Knife" then
 		return "Knife"
@@ -82,17 +102,40 @@ local function shoot()
 		return
 	end
 
-	local spread = math.rad(stats.spreadDeg)
+	-- Aim error: hip vs ADS (fixed — never grows), a whisper of movement
+	-- penalty, and a crouch discount. Shotgun pellet cones stay separate.
+	local crouched = MovementController.isCrouching()
+	local aimSpreadDeg = stats.spreadDeg + (stats.adsSpreadDeg - stats.spreadDeg) * adsAlpha
+	local strideFactor = math.clamp(MovementController.getHorizontalSpeed() / 24, 0, 1)
+	aimSpreadDeg += MOVE_SPREAD_DEG * strideFactor * (1 - 0.5 * adsAlpha)
+	if crouched then
+		aimSpreadDeg *= CROUCH_SPREAD_MULT
+	end
+	local spread = math.rad(aimSpreadDeg)
 	local aim = camera.CFrame
 		* CFrame.Angles(rng:NextNumber(-spread, spread), rng:NextNumber(-spread, spread), 0)
 	local origin = camera.CFrame.Position
 	Remotes.event("FireWeapon"):FireServer(origin, aim.LookVector)
 
-	ViewmodelController.kick()
+	ViewmodelController.kick(stats.recoilVert)
 	if stats.kind == "Melee" then
 		EffectsController.playShotSound(0.45)
 		return
 	end
+
+	-- Camera recoil for the NEXT shot: vertical climb with light sideways
+	-- jitter, calmer while aimed or crouched.
+	local calm = (1 - 0.25 * adsAlpha) * (if crouched then CROUCH_RECOIL_MULT else 1)
+	recoilPitch = math.min(
+		recoilPitch + math.rad(stats.recoilVert) * rng:NextNumber(0.9, 1.1) * calm,
+		RECOIL_PITCH_MAX
+	)
+	recoilYaw = math.clamp(
+		recoilYaw + math.rad(stats.recoilHoriz) * rng:NextNumber(-1, 1) * calm,
+		-RECOIL_YAW_MAX,
+		RECOIL_YAW_MAX
+	)
+
 	EffectsController.playShotSound(0.6)
 
 	-- One shell per shot pops from the in-hand gun and stays on the floor.
@@ -103,11 +146,18 @@ local function shoot()
 
 	local muzzle = ViewmodelController.getMuzzlePosition()
 		or origin + camera.CFrame.RightVector * 0.6 - camera.CFrame.UpVector * 0.4
+	-- Extra pellets scatter in the gun's fixed pellet cone (the server rolls
+	-- its own; these are just the local visuals).
+	local pelletSpread = math.rad(stats.spreadDeg)
 	local tracerCount = math.min(stats.pellets, 3)
 	for pellet = 1, tracerCount do
 		local dir = aim.LookVector
 		if pellet > 1 then
-			dir = (aim * CFrame.Angles(rng:NextNumber(-spread, spread), rng:NextNumber(-spread, spread), 0)).LookVector
+			dir = (aim * CFrame.Angles(
+				rng:NextNumber(-pelletSpread, pelletSpread),
+				rng:NextNumber(-pelletSpread, pelletSpread),
+				0
+			)).LookVector
 		end
 		EffectsController.launchProjectileVisual(muzzle, dir, stats.velocity, stats.drop, stats.travelMax)
 	end
@@ -126,6 +176,8 @@ function WeaponController.init()
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			triggerHeld = true
 			shoot()
+		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+			adsHeld = true
 		elseif input.KeyCode == Enum.KeyCode.R then
 			Remotes.event("ReloadWeapon"):FireServer()
 		else
@@ -140,12 +192,42 @@ function WeaponController.init()
 	UserInputService.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			triggerHeld = false
+		elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+			adsHeld = false
 		end
 	end)
 
 	RunService.Heartbeat:Connect(function()
 		if triggerHeld and currentStats().auto then
 			shoot()
+		end
+	end)
+
+	-- Per-frame aim step, after the engine camera (+1) and before the slide
+	-- roll (+3): blend ADS over the gun's adsTime, settle recoil, and apply
+	-- the climb to the camera so the crosshair points where bullets go.
+	RunService:BindToRenderStep("PinkPanicAim", Enum.RenderPriority.Camera.Value + 2, function(dt)
+		local stats = currentStats()
+		local inCombat = not ClientData.inLobby() and not ClientData.menuOpen()
+
+		local target = if adsHeld and inCombat and stats.kind ~= "Melee" then 1 else 0
+		local step = dt / math.max(stats.adsTime, 0.06)
+		adsAlpha = math.clamp(
+			adsAlpha + (if target > adsAlpha then step else -step * 1.5),
+			0,
+			1
+		)
+		ViewmodelController.setAdsAlpha(adsAlpha)
+		MovementController.setAds(adsAlpha, ADS_ZOOM[stats.class] or 10)
+
+		local settle = math.exp(-dt * stats.recoilRecovery / 2.2)
+		recoilPitch *= settle
+		recoilYaw *= settle
+		if inCombat and (recoilPitch > 1e-4 or math.abs(recoilYaw) > 1e-4) then
+			local camera = workspace.CurrentCamera
+			if camera then
+				camera.CFrame = camera.CFrame * CFrame.Angles(recoilPitch, recoilYaw, 0)
+			end
 		end
 	end)
 

@@ -25,7 +25,11 @@ export type Resolved = {
 	headshotMult: number,
 	fireRate: number, -- shots per second
 	auto: boolean,
-	spreadDeg: number,
+	spreadDeg: number, -- hipfire (and shotgun pellet cone)
+	adsSpreadDeg: number,
+	recoilVert: number,
+	recoilHoriz: number,
+	recoilRecovery: number,
 	magSize: number,
 	reloadSeconds: number,
 	velocity: number,
@@ -41,7 +45,8 @@ local CombatStats = {}
 
 local MODIFIABLE = {
 	damageNear = true, damageFar = true, rangeNear = true, rangeFar = true,
-	headshotMult = true, fireRate = true, spreadDeg = true, magSize = true,
+	headshotMult = true, fireRate = true, spreadDeg = true, adsSpreadDeg = true,
+	recoilVert = true, recoilHoriz = true, recoilRecovery = true, magSize = true,
 	reloadSeconds = true, velocity = true, drop = true, moveSpeedMult = true,
 	equipTime = true, sprintToFire = true, adsTime = true,
 }
@@ -99,6 +104,10 @@ function CombatStats.forGun(gunId: string, attachmentIds: { string }?): Resolved
 		fireRate = s.rpm / 60,
 		auto = s.auto,
 		spreadDeg = s.spreadDeg,
+		adsSpreadDeg = s.adsSpreadDeg,
+		recoilVert = s.recoilVert,
+		recoilHoriz = s.recoilHoriz,
+		recoilRecovery = s.recoilRecovery,
 		magSize = s.magSize,
 		reloadSeconds = s.reloadSeconds,
 		velocity = s.velocity,
@@ -130,6 +139,10 @@ function CombatStats.knife(): Resolved
 		fireRate = config.fireRate,
 		auto = false,
 		spreadDeg = 0,
+		adsSpreadDeg = 0,
+		recoilVert = 0, -- knives don't kick
+		recoilHoriz = 0,
+		recoilRecovery = 20,
 		magSize = 0,
 		reloadSeconds = 0,
 		velocity = 0,

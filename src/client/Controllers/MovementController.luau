@@ -31,6 +31,14 @@ local stamina = MovementConfig.staminaMax
 local regenPausedUntil = 0
 local originalHipHeight: number? = nil
 local slideCameraAlpha = 0
+-- Crouch: C/Ctrl held while not sprinting; a slide melts into a crouch.
+local crouchHeld = false
+local crouching = false
+local crouchCameraAlpha = 0
+-- ADS state pushed by WeaponController: blocks sprint, slows the walk,
+-- zooms the FOV.
+local adsAlpha = 0
+local adsZoom = 0
 -- Momentum: extra speed above the normal ladder, carried across states.
 local momentumSpeed = 0
 local lastLandedAt = 0
@@ -82,6 +90,22 @@ function MovementController.isSliding(): boolean
 	return sliding
 end
 
+function MovementController.isCrouching(): boolean
+	return crouching
+end
+
+function MovementController.getHorizontalSpeed(): number
+	local _, _, root = character()
+	return if root then horizontalSpeed(root) else 0
+end
+
+-- WeaponController pushes the ADS blend every frame (0 = hip, 1 = aimed).
+function MovementController.setAds(alpha: number, zoomDeg: number)
+	adsAlpha = math.clamp(alpha, 0, 1)
+	adsZoom = zoomDeg
+end
+
+-- Sliding is a firing stance; only sprint keeps the gun down.
 function MovementController.canFire(): boolean
 	return not sprinting and os.clock() >= raiseBlockedUntil
 end
@@ -106,9 +130,7 @@ local function endSlide(humanoid: Humanoid?)
 	sliding = false
 	-- The speed you built carries into momentum (glide-out, air, bhops).
 	momentumSpeed = math.max(momentumSpeed, slideSpeed)
-	if humanoid and originalHipHeight then
-		humanoid.HipHeight = originalHipHeight
-	end
+	-- HipHeight is owned by the per-frame profile logic (slide/crouch/stand).
 end
 
 local function trySlide()
@@ -130,6 +152,9 @@ local function trySlide()
 	regenPausedUntil = now + MovementConfig.regenDelay
 	lastSlideAt = now
 	sliding = true
+	-- A slide is a firing stance: leave sprint NOW so the trigger works
+	-- from the first frame of the slide.
+	sprinting = false
 	slideEndsAt = now + MovementConfig.slideDuration
 	-- Momentum-fed entry: a bhop chain slides in FASTER than a fresh slide.
 	slideSpeed = math.max(MovementConfig.slideInitialSpeed * weaponSpeedMult, horizontalSpeed(root), momentumSpeed)
@@ -139,11 +164,6 @@ local function trySlide()
 	slideDirection = if flat.Magnitude > 2
 		then flat.Unit
 		else Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z).Unit
-
-	if not originalHipHeight then
-		originalHipHeight = humanoid.HipHeight
-	end
-	humanoid.HipHeight = (originalHipHeight :: number) - MovementConfig.slideHipDrop
 end
 
 local function onJumping()
@@ -226,6 +246,7 @@ local function update(deltaTime: number)
 		sprinting = false
 		sliding = false
 		skidding = false
+		crouching = false
 		momentumSpeed = 0
 		return
 	end
@@ -318,10 +339,40 @@ local function update(deltaTime: number)
 		momentumSpeed = math.min(momentumSpeed, MovementConfig.momentumHardCap)
 	end
 
-	-- Low-to-the-ground camera while sliding.
+	-- Sprint state: held + moving + stamina, never while sliding or aimed in.
+	if sprinting then
+		sprinting = sprintHeld and moving and stamina > 1 and not sliding and adsAlpha < 0.2
+	else
+		sprinting = sprintHeld
+			and moving
+			and not sliding
+			and stamina > MovementConfig.minSprintStamina
+			and adsAlpha < 0.2
+	end
+
+	-- Crouch: key held, grounded, and nothing faster going on. A slide with
+	-- the key still down melts into a crouch when it ends.
+	crouching = crouchHeld and not sprinting and not sliding and not airborne
+
+	-- Profile: slide, crouch, or standing — one place owns hip and camera.
+	if not originalHipHeight then
+		originalHipHeight = humanoid.HipHeight
+	end
+	local hipDrop = if sliding
+		then MovementConfig.slideHipDrop
+		elseif crouching then MovementConfig.crouchHipDrop
+		else 0
+	humanoid.HipHeight = (originalHipHeight :: number) - hipDrop
+
 	local slideTarget = if sliding then 1 else 0
 	slideCameraAlpha += (slideTarget - slideCameraAlpha) * math.min(deltaTime * 10, 1)
-	humanoid.CameraOffset = Vector3.new(0, -MovementConfig.slideCameraDrop * slideCameraAlpha, 0)
+	local crouchTarget = if crouching then 1 else 0
+	crouchCameraAlpha += (crouchTarget - crouchCameraAlpha) * math.min(deltaTime * 10, 1)
+	humanoid.CameraOffset = Vector3.new(
+		0,
+		-(MovementConfig.slideCameraDrop * slideCameraAlpha + MovementConfig.crouchCameraDrop * crouchCameraAlpha),
+		0
+	)
 
 	-- Friction: no input at speed = skid along the last direction, bleeding
 	-- speed gradually instead of the engine's instant brake.
@@ -346,13 +397,6 @@ local function update(deltaTime: number)
 		lastMovingSpeed = 0
 	end
 
-	-- Sprint state: held + moving + stamina, never while sliding.
-	if sprinting then
-		sprinting = sprintHeld and moving and stamina > 1 and not sliding
-	else
-		sprinting = sprintHeld and moving and not sliding and stamina > MovementConfig.minSprintStamina
-	end
-
 	-- Stamina drain/regen.
 	if sprinting then
 		stamina = math.max(0, stamina - MovementConfig.sprintDrainPerSecond * deltaTime)
@@ -366,6 +410,11 @@ local function update(deltaTime: number)
 	-- at your carried speed.
 	local ladder = (if sprinting then MovementConfig.sprintWalkSpeed else MovementConfig.baseWalkSpeed)
 		* weaponSpeedMult
+	if crouching then
+		ladder *= MovementConfig.crouchSpeedMult
+	end
+	-- Aiming in slows the walk toward adsWalkMult.
+	ladder *= 1 - (1 - MovementConfig.adsWalkMult) * adsAlpha
 	if sliding then
 		humanoid.WalkSpeed = MovementConfig.slideEndSpeed
 	elseif skidding then
@@ -383,6 +432,7 @@ local function update(deltaTime: number)
 			else MovementConfig.fovBase
 		local momentumStretch = math.clamp((momentumSpeed - MovementConfig.sprintWalkSpeed) / 30, 0, 1) * 6
 		target += momentumStretch
+		target -= adsZoom * adsAlpha -- aiming in zooms
 		camera.FieldOfView += (target - camera.FieldOfView) * math.min(deltaTime * 8, 1)
 	end
 
@@ -415,12 +465,17 @@ function MovementController.init()
 		if input.KeyCode == Enum.KeyCode.LeftShift then
 			sprintHeld = true
 		elseif input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.LeftControl then
+			-- Sprinting: this starts a slide. Otherwise: hold to crouch.
+			-- Keeping it held through a slide melts the slide into a crouch.
+			crouchHeld = true
 			trySlide()
 		end
 	end)
 	UserInputService.InputEnded:Connect(function(input)
 		if input.KeyCode == Enum.KeyCode.LeftShift then
 			sprintHeld = false
+		elseif input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.LeftControl then
+			crouchHeld = false
 		end
 	end)
 
@@ -450,6 +505,7 @@ function MovementController.init()
 		sliding = false
 		sprinting = false
 		skidding = false
+		crouching = false
 		momentumSpeed = 0
 		stamina = MovementConfig.staminaMax
 		task.spawn(hookCharacter, model)

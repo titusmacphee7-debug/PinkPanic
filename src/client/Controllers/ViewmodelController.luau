@@ -17,6 +17,8 @@ local ClientData = require(script.Parent.Parent.ClientData)
 local MovementController = require(script.Parent.MovementController)
 
 local BASE_OFFSET = CFrame.new(1.05, -0.85, -1.55)
+-- Aimed-in: the gun rides centered under the crosshair.
+local ADS_OFFSET = CFrame.new(0, -0.6, -1.15)
 local CLASS_OFFSET: { [string]: CFrame } = {
 	SMG = CFrame.new(0, 0, -0.1),
 	Rifle = CFrame.new(0.05, 0, -0.25),
@@ -26,8 +28,8 @@ local CLASS_OFFSET: { [string]: CFrame } = {
 	Sniper = CFrame.new(0.1, -0.05, -0.4),
 }
 local SWAY_LIMIT = 0.06
-local KICK_PER_SHOT = 0.09
-local KICK_MAX = 0.22
+local KICK_PER_SHOT = 0.075 -- multiplied by the gun's recoilVert
+local KICK_MAX = 0.3
 
 local ViewmodelController = {}
 
@@ -44,6 +46,8 @@ local equipDuration = 0.3
 local reloadEndsAt = 0
 local reloadDuration = 1
 local landKick = 0
+-- ADS blend pushed by WeaponController (0 = hip, 1 = aimed).
+local adsAlpha = 0
 
 local function localCharacterAlive(): boolean
 	local character = Players.LocalPlayer.Character
@@ -100,14 +104,16 @@ local function update(dt: number)
 
 	local delta = UserInputService:GetMouseDelta()
 	local blend = math.min(dt * 12, 1)
-	swayX += (math.clamp(-delta.X * 0.0025, -SWAY_LIMIT, SWAY_LIMIT) - swayX) * blend
-	swayY += (math.clamp(delta.Y * 0.002, -SWAY_LIMIT, SWAY_LIMIT) - swayY) * blend
+	-- Aiming in steadies the hands: sway and bob fade with the ADS blend.
+	local steady = 1 - 0.65 * adsAlpha
+	swayX += (math.clamp(-delta.X * 0.0025, -SWAY_LIMIT, SWAY_LIMIT) * steady - swayX) * blend
+	swayY += (math.clamp(delta.Y * 0.002, -SWAY_LIMIT, SWAY_LIMIT) * steady - swayY) * blend
 
 	local bob = 0
 	local character = Players.LocalPlayer.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if root and root:IsA("BasePart") and root.AssemblyLinearVelocity.Magnitude > 2 then
-		bob = math.sin(os.clock() * 10) * 0.025
+		bob = math.sin(os.clock() * 10) * 0.025 * steady
 	end
 
 	recoil = math.max(0, recoil - recoil * math.min(dt * 10, 1))
@@ -143,9 +149,12 @@ local function update(dt: number)
 	landKick = math.max(0, landKick - dt * 4)
 	local landPose = CFrame.new(0, -0.35 * landKick, 0) * CFrame.Angles(-0.2 * landKick, 0, 0)
 
+	-- ADS pulls the gun to center; class push-out fades with it so every
+	-- gun lands in the same aimed pose.
+	local mount = BASE_OFFSET:Lerp(ADS_OFFSET, adsAlpha)
+		* CFrame.identity:Lerp(classOffset(), 1 - adsAlpha)
 	local cframe = camera.CFrame
-		* BASE_OFFSET
-		* classOffset()
+		* mount
 		* CFrame.new(swayX, swayY + bob, recoil * 0.4)
 		* sprintPose
 		* equipPose
@@ -187,8 +196,15 @@ function ViewmodelController.refreshCosmetics()
 	end
 end
 
-function ViewmodelController.kick()
-	recoil = math.min(recoil + KICK_PER_SHOT, KICK_MAX)
+-- Visual kick scaled by the gun's real recoil stat (degrees of climb per
+-- shot), so the viewmodel and the camera agree about how mean the gun is.
+function ViewmodelController.kick(recoilVert: number?)
+	local strength = math.max(recoilVert or 1, 0.4)
+	recoil = math.min(recoil + KICK_PER_SHOT * strength, KICK_MAX)
+end
+
+function ViewmodelController.setAdsAlpha(alpha: number)
+	adsAlpha = math.clamp(alpha, 0, 1)
 end
 
 -- Where shells pop out: the right side of the in-hand gun's receiver.

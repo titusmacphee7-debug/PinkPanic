@@ -287,6 +287,12 @@ local function populateInspect(gunId: string)
 	local function spd(base: number): number
 		return math.floor(base * stats.moveSpeedMult + 0.5)
 	end
+	-- Recoil in plain words; the number is degrees of climb per shot.
+	local recoilWord = if stats.recoilVert < 0.8
+		then "Low"
+		elseif stats.recoilVert < 1.5 then "Medium"
+		elseif stats.recoilVert < 2.8 then "High"
+		else "Heavy"
 	local rows = {
 		{ "Damage", damageText },
 		{ "Falloff", `{stats.rangeNear}–{stats.rangeFar} studs` },
@@ -294,6 +300,8 @@ local function populateInspect(gunId: string)
 		{ "Mag", `{stats.magSize}` },
 		{ "Reload", `{stats.reloadSeconds}s` },
 		{ "Velocity", `{stats.velocity} studs/s` },
+		{ "Recoil", `{recoilWord} ({stats.recoilVert}°/shot)` },
+		{ "Spread", `{stats.spreadDeg}° hip · {stats.adsSpreadDeg}° ADS` },
 		{ "Headshot", `x{stats.headshotMult}` },
 		{
 			"Speed",
@@ -302,9 +310,9 @@ local function populateInspect(gunId: string)
 		{ "Pull-out / ADS", `{stats.equipTime}s / {stats.adsTime}s` },
 	}
 	for index, row in rows do
-		local label = mkText(inspectStatsList, 15, TEXT_DARK)
+		local label = mkText(inspectStatsList, 14, TEXT_DARK)
 		label.LayoutOrder = index
-		label.Size = UDim2.new(1, 0, 0, 20)
+		label.Size = UDim2.new(1, 0, 0, 18)
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		label.Text = `{row[1]}:  {row[2]}`
 	end
@@ -553,7 +561,7 @@ local function buildUi()
 	inspectPanel = Instance.new("Frame")
 	inspectPanel.AnchorPoint = Vector2.new(1, 0.5)
 	inspectPanel.Position = UDim2.new(1, -24, 0.5, 0)
-	inspectPanel.Size = UDim2.fromOffset(300, 470)
+	inspectPanel.Size = UDim2.fromOffset(300, 500)
 	stylePanel(inspectPanel, 16)
 	inspectPanel.Visible = false
 	inspectName = mkText(inspectPanel, 24, DEEP_PINK)
@@ -566,7 +574,7 @@ local function buildUi()
 	inspectRarity.TextXAlignment = Enum.TextXAlignment.Left
 	inspectStatsList = Instance.new("Frame")
 	inspectStatsList.Position = UDim2.new(0, 16, 0, 66)
-	inspectStatsList.Size = UDim2.new(1, -32, 0, 170)
+	inspectStatsList.Size = UDim2.new(1, -32, 0, 198)
 	inspectStatsList.BackgroundTransparency = 1
 	local statsLayout = Instance.new("UIListLayout")
 	statsLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -578,7 +586,7 @@ local function buildUi()
 	skinsLabel.TextXAlignment = Enum.TextXAlignment.Left
 	skinsLabel.Text = "Skins"
 	inspectSkinRow = Instance.new("Frame")
-	inspectSkinRow.Position = UDim2.new(0, 16, 0, 262)
+	inspectSkinRow.Position = UDim2.new(0, 16, 0, 274)
 	inspectSkinRow.Size = UDim2.new(1, -32, 0, 88)
 	inspectSkinRow.BackgroundTransparency = 1
 	local skinLayout = Instance.new("UIGridLayout")
