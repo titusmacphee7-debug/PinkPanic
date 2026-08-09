@@ -21,6 +21,7 @@ local sprintHeld = false
 local sprinting = false
 local sliding = false
 local slideDirection = Vector3.zAxis
+local slideStartedAt = 0
 local slideEndsAt = 0
 local lastSlideAt = 0
 local chainUntil = 0
@@ -28,6 +29,7 @@ local raiseBlockedUntil = 0
 local stamina = MovementConfig.staminaMax
 local regenPausedUntil = 0
 local originalHipHeight: number? = nil
+local slideCameraAlpha = 0 -- smoothed 0..1 for the low camera + roll
 
 local staminaBar: Frame? = nil
 local staminaFill: Frame? = nil
@@ -59,12 +61,13 @@ function MovementController.canFire(): boolean
 	return not sprinting and os.clock() >= raiseBlockedUntil
 end
 
--- A blocked fire attempt breaks sprint and starts the raise delay, so
--- holding the trigger fires shortly after you come off the sprint.
-function MovementController.noteFireAttempt()
+-- A blocked fire attempt breaks sprint and starts the raise delay (the
+-- weapon's sprint-to-fire stat), so holding the trigger fires shortly after
+-- you come off the sprint.
+function MovementController.noteFireAttempt(sprintToFire: number?)
 	if sprinting then
 		sprinting = false
-		raiseBlockedUntil = os.clock() + MovementConfig.fireRaiseDelay
+		raiseBlockedUntil = os.clock() + (sprintToFire or MovementConfig.fireRaiseDelay)
 	end
 end
 
@@ -77,6 +80,8 @@ local function endSlide(humanoid: Humanoid?)
 		return
 	end
 	sliding = false
+	-- Momentum blends out (glide window) instead of snapping to a walk.
+	chainUntil = math.max(chainUntil, os.clock() + MovementConfig.postSlideGlideWindow)
 	if humanoid and originalHipHeight then
 		humanoid.HipHeight = originalHipHeight
 	end
@@ -101,6 +106,7 @@ local function trySlide()
 	regenPausedUntil = now + MovementConfig.regenDelay
 	lastSlideAt = now
 	sliding = true
+	slideStartedAt = now
 	slideEndsAt = now + MovementConfig.slideDuration
 
 	local flat = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
@@ -171,18 +177,25 @@ local function update(deltaTime: number)
 		return
 	end
 
-	-- Slide physics: drive horizontal velocity along the locked direction.
+	-- Slide physics: an ice glide — exponential decay along the locked
+	-- direction, so it's fast out of the gate and slips the rest of the way.
 	if sliding then
 		if now >= slideEndsAt then
 			endSlide(humanoid)
 		else
-			local progress = 1 - (slideEndsAt - now) / MovementConfig.slideDuration
-			local speed = MovementConfig.slideInitialSpeed
-				+ (MovementConfig.slideEndSpeed - MovementConfig.slideInitialSpeed) * progress
+			local progress = (now - slideStartedAt) / MovementConfig.slideDuration
+			local speed = MovementConfig.slideEndSpeed
+				+ (MovementConfig.slideInitialSpeed - MovementConfig.slideEndSpeed)
+					* math.exp(-MovementConfig.slideDecayRate * progress)
 			local vertical = root.AssemblyLinearVelocity.Y
 			root.AssemblyLinearVelocity = slideDirection * speed + Vector3.new(0, vertical, 0)
 		end
 	end
+
+	-- Low-to-the-ground camera while sliding (first person sinks with you).
+	local slideTarget = if sliding then 1 else 0
+	slideCameraAlpha += (slideTarget - slideCameraAlpha) * math.min(deltaTime * 10, 1)
+	humanoid.CameraOffset = Vector3.new(0, -MovementConfig.slideCameraDrop * slideCameraAlpha, 0)
 
 	-- Sprint state: held + moving + stamina, never while sliding.
 	local moving = humanoid.MoveDirection.Magnitude > 0.1
@@ -274,6 +287,18 @@ function MovementController.init()
 	end)
 
 	RunService.Heartbeat:Connect(update)
+
+	-- Camera cant while sliding: applied after the engine camera each frame,
+	-- combat only (the lobby camera composes its own shot).
+	RunService:BindToRenderStep("PinkPanicSlideRoll", Enum.RenderPriority.Camera.Value + 3, function()
+		if ClientData.inLobby() or slideCameraAlpha < 0.01 then
+			return
+		end
+		local camera = workspace.CurrentCamera
+		if camera then
+			camera.CFrame = camera.CFrame * CFrame.Angles(0, 0, -MovementConfig.slideCameraRoll * slideCameraAlpha)
+		end
+	end)
 end
 
 return MovementController

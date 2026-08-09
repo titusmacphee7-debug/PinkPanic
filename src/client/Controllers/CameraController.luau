@@ -16,7 +16,7 @@ local ClientData = require(script.Parent.Parent.ClientData)
 -- Tuning knobs (all feel-related feedback lands here):
 local FOLLOW_OFFSET = Vector3.new(0, 11, 34) -- low + pulled back: ~15° down-angle
 local LOOK_HEIGHT = 2.5 -- aim point above the character's root
-local CHASE_SPEED = 9 -- camera position responsiveness (higher = snappier)
+local CHASE_SPEED = 6 -- camera position responsiveness (higher = snappier)
 local LEAD_SECONDS = 0.25 -- how far ahead of your velocity the camera drifts
 local LEAD_MAX = 5 -- studs of maximum lead
 local LEAD_SMOOTHING = 4 -- how quickly the lead itself eases in/out

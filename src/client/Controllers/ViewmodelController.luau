@@ -90,15 +90,19 @@ local function update(dt: number)
 
 	recoil = math.max(0, recoil - recoil * math.min(dt * 10, 1))
 
-	-- Movement poses: sprint lowers the gun, slides cant it sideways.
+	-- Movement poses: sprint pulls the gun up across the chest (COD-style
+	-- held-high jog); slides cant it sideways.
 	local blend = math.min(dt * 9, 1)
 	loweredAlpha += ((if MovementController.isSprinting() then 1 else 0) - loweredAlpha) * blend
 	cantAlpha += ((if MovementController.isSliding() then 1 else 0) - cantAlpha) * blend
 
+	local sprintPose = CFrame.new(-0.45 * loweredAlpha, -0.12 * loweredAlpha, 0.18 * loweredAlpha)
+		* CFrame.Angles(0.28 * loweredAlpha, 0.7 * loweredAlpha, 0.12 * loweredAlpha)
 	local cframe = camera.CFrame
 		* BASE_OFFSET
-		* CFrame.new(swayX, swayY + bob - loweredAlpha * 0.45, recoil * 0.4 + loweredAlpha * 0.25)
-		* CFrame.Angles(recoil - loweredAlpha * 0.5, swayX * 0.5 + loweredAlpha * 0.35, cantAlpha * 0.35)
+		* CFrame.new(swayX, swayY + bob, recoil * 0.4)
+		* sprintPose
+		* CFrame.Angles(recoil, swayX * 0.5, cantAlpha * 0.35)
 	gun:PivotTo(cframe)
 end
 

@@ -29,12 +29,14 @@ local rng = Random.new()
 local currentWeapon = "Pistol"
 local triggerHeld = false
 local lastShotAt = 0
+local equipReadyAt = 0 -- pull-out time: no firing until the weapon is up
 
 local function selectWeapon(weaponId: string)
 	if weaponId == currentWeapon then
 		return
 	end
 	currentWeapon = weaponId
+	equipReadyAt = os.clock() + WeaponConfig[weaponId].equipTime
 	ViewmodelController.setWeapon(weaponId)
 	Remotes.event("SelectWeapon"):FireServer(weaponId)
 end
@@ -43,14 +45,18 @@ local function shoot()
 	if ClientData.menuOpen() or ClientData.inLobby() then
 		return
 	end
-	-- Sprinting blocks fire; the attempt breaks sprint and starts the raise
-	-- delay, so a held trigger fires as soon as the gun comes back up.
+	local config = WeaponConfig[currentWeapon]
+	-- Sprinting blocks fire; the attempt breaks sprint and starts the
+	-- weapon's sprint-to-fire delay, so a held trigger fires as soon as the
+	-- gun comes back up.
 	if not MovementController.canFire() then
-		MovementController.noteFireAttempt()
+		MovementController.noteFireAttempt(config.sprintToFire)
 		return
 	end
-	local config = WeaponConfig[currentWeapon]
 	local now = os.clock()
+	if now < equipReadyAt then
+		return
+	end
 	if now - lastShotAt < 1 / config.fireRate then
 		return
 	end

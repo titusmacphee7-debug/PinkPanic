@@ -18,6 +18,10 @@ export type WeaponStats = {
 	falloffStart: number, -- distance where damage starts dropping
 	falloffEndDamage: number, -- total damage at max range
 	pellets: number,
+	-- Handling (COD-style stats, shown in the Armory):
+	equipTime: number, -- pull-out: seconds after switching before you can fire
+	sprintToFire: number, -- seconds from sprint-break to first shot
+	adsTime: number, -- aim-down-sights time (mechanic lands with the ADS issue)
 }
 
 local WeaponConfig: { [string]: WeaponStats } = {
@@ -35,6 +39,9 @@ local WeaponConfig: { [string]: WeaponStats } = {
 		falloffStart = 60,
 		falloffEndDamage = 20,
 		pellets = 1,
+		equipTime = 0.25,
+		sprintToFire = 0.15,
+		adsTime = 0.18,
 	},
 	Rifle = {
 		displayName = "Rifle",
@@ -50,6 +57,9 @@ local WeaponConfig: { [string]: WeaponStats } = {
 		falloffStart = 80,
 		falloffEndDamage = 10,
 		pellets = 1,
+		equipTime = 0.45,
+		sprintToFire = 0.25,
+		adsTime = 0.3,
 	},
 	Shotgun = {
 		displayName = "Shotgun",
@@ -65,6 +75,9 @@ local WeaponConfig: { [string]: WeaponStats } = {
 		falloffStart = 15,
 		falloffEndDamage = 12,
 		pellets = 6,
+		equipTime = 0.5,
+		sprintToFire = 0.3,
+		adsTime = 0.32,
 	},
 	Knife = {
 		displayName = "Knife",
@@ -80,6 +93,9 @@ local WeaponConfig: { [string]: WeaponStats } = {
 		falloffStart = 9,
 		falloffEndDamage = 45,
 		pellets = 1,
+		equipTime = 0.2,
+		sprintToFire = 0.1,
+		adsTime = 0.1,
 	},
 }
 

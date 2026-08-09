@@ -35,6 +35,7 @@ type WeaponState = {
 	lastShotAt: number,
 	reloadingUntil: number,
 	reloadToken: number,
+	switchedAt: number,
 }
 
 local WeaponService = {}
@@ -61,6 +62,7 @@ local function resetState(player: Player)
 		lastShotAt = 0,
 		reloadingUntil = 0,
 		reloadToken = 0,
+		switchedAt = 0,
 	}
 end
 
@@ -163,6 +165,10 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 	local config = WeaponConfig[state.current]
 	local isMelee = config.kind == "Melee"
 	local now = os.clock()
+	-- Pull-out time: a fresh switch can't fire instantly (equip stat).
+	if now - state.switchedAt < config.equipTime * 0.85 then
+		return
+	end
 	if now - state.lastShotAt < (1 / config.fireRate) * FIRE_RATE_TOLERANCE then
 		return
 	end
@@ -285,6 +291,7 @@ local function onSelectWeapon(player: Player, weaponId: any)
 	end
 
 	state.current = weaponId
+	state.switchedAt = os.clock()
 	state.reloadToken += 1 -- cancels any in-flight reload
 	state.reloadingUntil = 0
 	pushAmmo(player)
