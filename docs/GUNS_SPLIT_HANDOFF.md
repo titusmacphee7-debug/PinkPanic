@@ -30,10 +30,13 @@ scale, and style as the shipped set.
   stay on the floor. A `Bullet` and `Shell` mesh convention already exists
   (`ReplicatedStorage/EffectModels`) — this split gives shells a REAL port
   to pop from.
-- Attachments framework is coded and waiting (Barrel/Grip/Mag/Stock/Sight
-  slots; recoil is its centerpiece stat). Mount points are computed at
-  runtime from part bounding boxes — you don't model mounts, but cleaner
-  part separation = better mounts later.
+- Attachments are a PLANNED feature, not a live one: nothing is
+  purchasable or equippable yet. The stat framework is coded and inert
+  (Barrel/Grip/Mag/Stock/Sight slots; recoil is its centerpiece stat), and
+  when the feature ships, mount points will be computed at runtime from
+  part bounding boxes — so you don't model mounts, but cleaner part
+  separation = better mounts later. Don't model any attachment geometry
+  onto the guns themselves.
 
 ## 3. The split spec
 
