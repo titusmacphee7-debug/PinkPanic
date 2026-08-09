@@ -27,8 +27,13 @@ local SettingsController = require(script.Controllers.SettingsController)
 local CameraController = require(script.Controllers.CameraController)
 local LobbyController = require(script.Controllers.LobbyController)
 
+local MovementController = require(script.Controllers.MovementController)
+local MovementAnimator = require(script.Controllers.MovementAnimator)
+
 ClientData.init()
 EffectsController.init()
+MovementController.init()
+MovementAnimator.init()
 ViewmodelController.init()
 WeaponController.init()
 HitFeedbackController.init()

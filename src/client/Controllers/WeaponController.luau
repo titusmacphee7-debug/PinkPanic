@@ -13,6 +13,7 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
 local EffectsController = require(script.Parent.EffectsController)
 local ViewmodelController = require(script.Parent.ViewmodelController)
+local MovementController = require(script.Parent.MovementController)
 local ClientData = require(script.Parent.Parent.ClientData)
 
 local KEY_TO_WEAPON: { [Enum.KeyCode]: string } = {
@@ -40,6 +41,12 @@ end
 
 local function shoot()
 	if ClientData.menuOpen() or ClientData.inLobby() then
+		return
+	end
+	-- Sprinting blocks fire; the attempt breaks sprint and starts the raise
+	-- delay, so a held trigger fires as soon as the gun comes back up.
+	if not MovementController.canFire() then
+		MovementController.noteFireAttempt()
 		return
 	end
 	local config = WeaponConfig[currentWeapon]

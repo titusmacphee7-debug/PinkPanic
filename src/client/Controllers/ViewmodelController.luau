@@ -11,6 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local WeaponModels = require(ReplicatedStorage.Shared.Assets.WeaponModels)
 local WeaponCosmetics = require(ReplicatedStorage.Shared.Assets.WeaponCosmetics)
 local ClientData = require(script.Parent.Parent.ClientData)
+local MovementController = require(script.Parent.MovementController)
 
 local BASE_OFFSET = CFrame.new(1.05, -0.85, -1.55)
 local SWAY_LIMIT = 0.06
@@ -24,6 +25,8 @@ local currentWeapon = "Pistol"
 local recoil = 0
 local swayX = 0
 local swayY = 0
+local loweredAlpha = 0 -- sprint: gun drops out of the way
+local cantAlpha = 0 -- slide: gun cants sideways
 
 local function localCharacterAlive(): boolean
 	local character = Players.LocalPlayer.Character
@@ -87,10 +90,15 @@ local function update(dt: number)
 
 	recoil = math.max(0, recoil - recoil * math.min(dt * 10, 1))
 
+	-- Movement poses: sprint lowers the gun, slides cant it sideways.
+	local blend = math.min(dt * 9, 1)
+	loweredAlpha += ((if MovementController.isSprinting() then 1 else 0) - loweredAlpha) * blend
+	cantAlpha += ((if MovementController.isSliding() then 1 else 0) - cantAlpha) * blend
+
 	local cframe = camera.CFrame
 		* BASE_OFFSET
-		* CFrame.new(swayX, swayY + bob, recoil * 0.4)
-		* CFrame.Angles(recoil, swayX * 0.5, 0)
+		* CFrame.new(swayX, swayY + bob - loweredAlpha * 0.45, recoil * 0.4 + loweredAlpha * 0.25)
+		* CFrame.Angles(recoil - loweredAlpha * 0.5, swayX * 0.5 + loweredAlpha * 0.35, cantAlpha * 0.35)
 	gun:PivotTo(cframe)
 end
 
