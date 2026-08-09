@@ -1,137 +1,1152 @@
 --!strict
--- GunSkinCatalog — per-gun color skins (3 schemes x 32 roster guns = 96) and
--- the 10 universal camo textures (docs/GUNS_HANDOFF.md §5). Skins recolor
--- the imported mesh parts (Body/Panel/Grip/Hardware/Accent); camos set
--- MeshPart.TextureID and OVERRIDE the color skin (pending §8.1 confirmation).
--- Camos with a blank textureId are not yet purchasable (Studio upload pending).
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
+-- GunSkinCatalog — per-gun color skins + universal pattern camos for the
+-- 40-gun mesh set (assets/meshes/pink_guns_uv.zip). Generated with Claude;
+-- colors follow docs/ART_DIRECTION.md. Meshes are split into parts named
+-- Body / Panel / Grip / Hardware / Accent, which is what these recolor.
+-- Universal camos need textureId filled in after uploading each PNG in
+-- assets/textures/ via Studio's Asset Manager (rbxassetid://...).
 
 export type Rarity = "Common" | "Rare" | "Epic" | "Legendary"
 
-export type ColorSkinDef = {
-	gunId: string,
+export type GunSkinDef = {
 	name: string,
-	rarity: Rarity,
 	price: number,
-	colors: { [string]: Color3 }, -- by part name
+	rarity: Rarity,
+	body: Color3,
+	panel: Color3,
+	grip: Color3,
+	hardware: Color3,
+	accent: Color3,
 }
 
-export type CamoDef = {
+export type UniversalCamoDef = {
 	name: string,
-	rarity: Rarity,
 	price: number,
-	textureId: string, -- "" until Studio upload (§2 step 4)
+	rarity: Rarity,
+	textureId: string,
 }
 
 local GunSkinCatalog = {}
 
--- The three shared schemes; each gun gets all three as `<GunId>__<key>`.
-local SCHEMES = {
-	{
-		key = "Rosewater",
-		name = "Rosewater",
-		rarity = "Common" :: Rarity,
-		price = 100,
-		colors = {
-			Body = Color3.fromRGB(255, 245, 250),
-			Panel = Color3.fromRGB(255, 214, 235),
-			Grip = Color3.fromRGB(255, 160, 205),
-			Hardware = Color3.fromRGB(150, 130, 145),
-			Accent = Color3.fromRGB(255, 92, 168),
+GunSkinCatalog.perGun = {
+	AssaultRifle2_1 = {
+		SkinAssaultRifle21TaffyTwist = {
+			name = "Taffy Twist",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 179, 217),
+			panel = Color3.fromRGB(255, 227, 240),
+			grip = Color3.fromRGB(255, 92, 168),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinAssaultRifle21PeachFizz = {
+			name = "Peach Fizz",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 227, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(255, 170, 120),
+			hardware = Color3.fromRGB(138, 108, 92),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinAssaultRifle21WatermelonSugar = {
+			name = "Watermelon Sugar",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 140, 180),
+			panel = Color3.fromRGB(214, 240, 220),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(214, 66, 143),
 		},
 	},
-	{
-		key = "MidnightCrush",
-		name = "Midnight Crush",
-		rarity = "Rare" :: Rarity,
-		price = 150,
-		colors = {
-			Body = Color3.fromRGB(70, 55, 80),
-			Panel = Color3.fromRGB(92, 72, 88),
-			Grip = Color3.fromRGB(255, 92, 168),
-			Hardware = Color3.fromRGB(45, 35, 52),
-			Accent = Color3.fromRGB(255, 130, 190),
+	AssaultRifle2_3 = {
+		SkinAssaultRifle23PeachFizz = {
+			name = "Peach Fizz",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 227, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(255, 170, 120),
+			hardware = Color3.fromRGB(138, 108, 92),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinAssaultRifle23MatchaBloom = {
+			name = "Matcha Bloom",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(214, 240, 220),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(78, 102, 83),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinAssaultRifle23BubbleBath = {
+			name = "Bubble Bath",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(255, 130, 190),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(168, 216, 255),
 		},
 	},
-	{
-		key = "PrincessGold",
-		name = "Princess Gold",
-		rarity = "Epic" :: Rarity,
-		price = 300,
-		colors = {
-			Body = Color3.fromRGB(255, 214, 120),
-			Panel = Color3.fromRGB(255, 245, 250),
-			Grip = Color3.fromRGB(255, 130, 190),
-			Hardware = Color3.fromRGB(122, 74, 18),
-			Accent = Color3.fromRGB(255, 196, 88),
+	AssaultRifle2_4 = {
+		SkinAssaultRifle24MilkTea = {
+			name = "Milk Tea",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(232, 214, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(180, 148, 120),
+			hardware = Color3.fromRGB(110, 90, 70),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinAssaultRifle24GrapeCrush = {
+			name = "Grape Crush",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(180, 140, 220),
+			panel = Color3.fromRGB(232, 220, 255),
+			grip = Color3.fromRGB(120, 80, 160),
+			hardware = Color3.fromRGB(70, 50, 90),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinAssaultRifle24SakuraStorm = {
+			name = "Sakura Storm",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 227, 240),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(214, 66, 143),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 92, 168),
 		},
 	},
-}
-
--- Generated: only roster guns (dropped lookalikes pruned by construction).
-GunSkinCatalog.perGun = {} :: { [string]: ColorSkinDef }
-for gunId in GunCatalog.guns do
-	for _, scheme in SCHEMES do
-		GunSkinCatalog.perGun[`{gunId}__{scheme.key}`] = {
-			gunId = gunId,
-			name = scheme.name,
-			rarity = scheme.rarity,
-			price = scheme.price,
-			colors = scheme.colors,
-		}
-	end
-end
+	AssaultRifle_1 = {
+		SkinAssaultRifle1BubbleBath = {
+			name = "Bubble Bath",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(255, 130, 190),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(168, 216, 255),
+		},
+		SkinAssaultRifle1WatermelonSugar = {
+			name = "Watermelon Sugar",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 140, 180),
+			panel = Color3.fromRGB(214, 240, 220),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(214, 66, 143),
+		},
+		SkinAssaultRifle1CottonCandy = {
+			name = "Cotton Candy",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(168, 216, 255),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 255, 255),
+		},
+	},
+	AssaultRifle_2 = {
+		SkinAssaultRifle2MatchaBloom = {
+			name = "Matcha Bloom",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(214, 240, 220),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(78, 102, 83),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinAssaultRifle2BubbleBath = {
+			name = "Bubble Bath",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(255, 130, 190),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(168, 216, 255),
+		},
+		SkinAssaultRifle2Frostbite = {
+			name = "Frostbite",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(232, 245, 255),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(168, 216, 255),
+			hardware = Color3.fromRGB(110, 140, 160),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	AssaultRifle_3 = {
+		SkinAssaultRifle3GrapeCrush = {
+			name = "Grape Crush",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(180, 140, 220),
+			panel = Color3.fromRGB(232, 220, 255),
+			grip = Color3.fromRGB(120, 80, 160),
+			hardware = Color3.fromRGB(70, 50, 90),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinAssaultRifle3BlueberryMilk = {
+			name = "Blueberry Milk",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(220, 232, 255),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(127, 163, 232),
+			hardware = Color3.fromRGB(74, 88, 120),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinAssaultRifle3Princess = {
+			name = "Princess",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 220, 120),
+			panel = Color3.fromRGB(255, 240, 200),
+			grip = Color3.fromRGB(255, 245, 250),
+			hardware = Color3.fromRGB(138, 116, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+	},
+	AssaultRifle_4 = {
+		SkinAssaultRifle4PeachFizz = {
+			name = "Peach Fizz",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 227, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(255, 170, 120),
+			hardware = Color3.fromRGB(138, 108, 92),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinAssaultRifle4MidnightRush = {
+			name = "Midnight Rush",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(70, 55, 78),
+			panel = Color3.fromRGB(92, 72, 88),
+			grip = Color3.fromRGB(255, 92, 168),
+			hardware = Color3.fromRGB(50, 38, 54),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinAssaultRifle4MatchaBloom = {
+			name = "Matcha Bloom",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(214, 240, 220),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(78, 102, 83),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	Bullpup_1 = {
+		SkinBullpup1Princess = {
+			name = "Princess",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 220, 120),
+			panel = Color3.fromRGB(255, 240, 200),
+			grip = Color3.fromRGB(255, 245, 250),
+			hardware = Color3.fromRGB(138, 116, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinBullpup1MidnightRush = {
+			name = "Midnight Rush",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(70, 55, 78),
+			panel = Color3.fromRGB(92, 72, 88),
+			grip = Color3.fromRGB(255, 92, 168),
+			hardware = Color3.fromRGB(50, 38, 54),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinBullpup1SakuraStorm = {
+			name = "Sakura Storm",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 227, 240),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(214, 66, 143),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	Bullpup_2 = {
+		SkinBullpup2SakuraStorm = {
+			name = "Sakura Storm",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 227, 240),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(214, 66, 143),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinBullpup2WatermelonSugar = {
+			name = "Watermelon Sugar",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 140, 180),
+			panel = Color3.fromRGB(214, 240, 220),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(214, 66, 143),
+		},
+		SkinBullpup2Frostbite = {
+			name = "Frostbite",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(232, 245, 255),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(168, 216, 255),
+			hardware = Color3.fromRGB(110, 140, 160),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	Pistol_1 = {
+		SkinPistol1MidnightRush = {
+			name = "Midnight Rush",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(70, 55, 78),
+			panel = Color3.fromRGB(92, 72, 88),
+			grip = Color3.fromRGB(255, 92, 168),
+			hardware = Color3.fromRGB(50, 38, 54),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinPistol1TaffyTwist = {
+			name = "Taffy Twist",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 179, 217),
+			panel = Color3.fromRGB(255, 227, 240),
+			grip = Color3.fromRGB(255, 92, 168),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinPistol1BubbleBath = {
+			name = "Bubble Bath",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(255, 130, 190),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(168, 216, 255),
+		},
+	},
+	Pistol_3 = {
+		SkinPistol3BlueberryMilk = {
+			name = "Blueberry Milk",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(220, 232, 255),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(127, 163, 232),
+			hardware = Color3.fromRGB(74, 88, 120),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinPistol3PeachFizz = {
+			name = "Peach Fizz",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 227, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(255, 170, 120),
+			hardware = Color3.fromRGB(138, 108, 92),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinPistol3SakuraStorm = {
+			name = "Sakura Storm",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 227, 240),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(214, 66, 143),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	Pistol_4 = {
+		SkinPistol4BubbleBath = {
+			name = "Bubble Bath",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(255, 130, 190),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(168, 216, 255),
+		},
+		SkinPistol4BlueberryMilk = {
+			name = "Blueberry Milk",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(220, 232, 255),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(127, 163, 232),
+			hardware = Color3.fromRGB(74, 88, 120),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinPistol4PeachFizz = {
+			name = "Peach Fizz",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 227, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(255, 170, 120),
+			hardware = Color3.fromRGB(138, 108, 92),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	Pistol_5 = {
+		SkinPistol5Princess = {
+			name = "Princess",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 220, 120),
+			panel = Color3.fromRGB(255, 240, 200),
+			grip = Color3.fromRGB(255, 245, 250),
+			hardware = Color3.fromRGB(138, 116, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinPistol5PeachFizz = {
+			name = "Peach Fizz",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 227, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(255, 170, 120),
+			hardware = Color3.fromRGB(138, 108, 92),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinPistol5CherrySoda = {
+			name = "Cherry Soda",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 140, 168),
+			panel = Color3.fromRGB(255, 214, 220),
+			grip = Color3.fromRGB(220, 60, 80),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 245, 250),
+		},
+	},
+	Pistol_6 = {
+		SkinPistol6LavenderHaze = {
+			name = "Lavender Haze",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(232, 220, 255),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(170, 140, 220),
+			hardware = Color3.fromRGB(92, 72, 120),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinPistol6RoseGold = {
+			name = "Rose Gold",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(240, 200, 180),
+			panel = Color3.fromRGB(255, 232, 220),
+			grip = Color3.fromRGB(220, 160, 140),
+			hardware = Color3.fromRGB(138, 100, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinPistol6CherrySoda = {
+			name = "Cherry Soda",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 140, 168),
+			panel = Color3.fromRGB(255, 214, 220),
+			grip = Color3.fromRGB(220, 60, 80),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 245, 250),
+		},
+	},
+	Revolver_1 = {
+		SkinRevolver1MilkTea = {
+			name = "Milk Tea",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(232, 214, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(180, 148, 120),
+			hardware = Color3.fromRGB(110, 90, 70),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinRevolver1RoseGold = {
+			name = "Rose Gold",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(240, 200, 180),
+			panel = Color3.fromRGB(255, 232, 220),
+			grip = Color3.fromRGB(220, 160, 140),
+			hardware = Color3.fromRGB(138, 100, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinRevolver1GrapeCrush = {
+			name = "Grape Crush",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(180, 140, 220),
+			panel = Color3.fromRGB(232, 220, 255),
+			grip = Color3.fromRGB(120, 80, 160),
+			hardware = Color3.fromRGB(70, 50, 90),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	Revolver_3 = {
+		SkinRevolver3RoseGold = {
+			name = "Rose Gold",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(240, 200, 180),
+			panel = Color3.fromRGB(255, 232, 220),
+			grip = Color3.fromRGB(220, 160, 140),
+			hardware = Color3.fromRGB(138, 100, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinRevolver3CherrySoda = {
+			name = "Cherry Soda",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 140, 168),
+			panel = Color3.fromRGB(255, 214, 220),
+			grip = Color3.fromRGB(220, 60, 80),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 245, 250),
+		},
+		SkinRevolver3TaffyTwist = {
+			name = "Taffy Twist",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 179, 217),
+			panel = Color3.fromRGB(255, 227, 240),
+			grip = Color3.fromRGB(255, 92, 168),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+	},
+	Revolver_4 = {
+		SkinRevolver4MilkTea = {
+			name = "Milk Tea",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(232, 214, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(180, 148, 120),
+			hardware = Color3.fromRGB(110, 90, 70),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinRevolver4Princess = {
+			name = "Princess",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 220, 120),
+			panel = Color3.fromRGB(255, 240, 200),
+			grip = Color3.fromRGB(255, 245, 250),
+			hardware = Color3.fromRGB(138, 116, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinRevolver4MatchaBloom = {
+			name = "Matcha Bloom",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(214, 240, 220),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(78, 102, 83),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	Revolver_5 = {
+		SkinRevolver5BubbleBath = {
+			name = "Bubble Bath",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(255, 130, 190),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(168, 216, 255),
+		},
+		SkinRevolver5SakuraStorm = {
+			name = "Sakura Storm",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 227, 240),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(214, 66, 143),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinRevolver5Princess = {
+			name = "Princess",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 220, 120),
+			panel = Color3.fromRGB(255, 240, 200),
+			grip = Color3.fromRGB(255, 245, 250),
+			hardware = Color3.fromRGB(138, 116, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+	},
+	Shotgun_1 = {
+		SkinShotgun1Frostbite = {
+			name = "Frostbite",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(232, 245, 255),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(168, 216, 255),
+			hardware = Color3.fromRGB(110, 140, 160),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinShotgun1GrapeCrush = {
+			name = "Grape Crush",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(180, 140, 220),
+			panel = Color3.fromRGB(232, 220, 255),
+			grip = Color3.fromRGB(120, 80, 160),
+			hardware = Color3.fromRGB(70, 50, 90),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinShotgun1TaffyTwist = {
+			name = "Taffy Twist",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 179, 217),
+			panel = Color3.fromRGB(255, 227, 240),
+			grip = Color3.fromRGB(255, 92, 168),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+	},
+	Shotgun_3 = {
+		SkinShotgun3RoseGold = {
+			name = "Rose Gold",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(240, 200, 180),
+			panel = Color3.fromRGB(255, 232, 220),
+			grip = Color3.fromRGB(220, 160, 140),
+			hardware = Color3.fromRGB(138, 100, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinShotgun3TaffyTwist = {
+			name = "Taffy Twist",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 179, 217),
+			panel = Color3.fromRGB(255, 227, 240),
+			grip = Color3.fromRGB(255, 92, 168),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinShotgun3WatermelonSugar = {
+			name = "Watermelon Sugar",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 140, 180),
+			panel = Color3.fromRGB(214, 240, 220),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(214, 66, 143),
+		},
+	},
+	Shotgun_4 = {
+		SkinShotgun4CottonCandy = {
+			name = "Cotton Candy",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(168, 216, 255),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 255, 255),
+		},
+		SkinShotgun4Princess = {
+			name = "Princess",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 220, 120),
+			panel = Color3.fromRGB(255, 240, 200),
+			grip = Color3.fromRGB(255, 245, 250),
+			hardware = Color3.fromRGB(138, 116, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinShotgun4TaffyTwist = {
+			name = "Taffy Twist",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 179, 217),
+			panel = Color3.fromRGB(255, 227, 240),
+			grip = Color3.fromRGB(255, 92, 168),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+	},
+	Shotgun_SawedOff = {
+		SkinShotgunSawedOffMilkTea = {
+			name = "Milk Tea",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(232, 214, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(180, 148, 120),
+			hardware = Color3.fromRGB(110, 90, 70),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinShotgunSawedOffLavenderHaze = {
+			name = "Lavender Haze",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(232, 220, 255),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(170, 140, 220),
+			hardware = Color3.fromRGB(92, 72, 120),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinShotgunSawedOffCottonCandy = {
+			name = "Cotton Candy",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(168, 216, 255),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 255, 255),
+		},
+	},
+	Shotgun_ShortStock = {
+		SkinShotgunShortStockBubbleBath = {
+			name = "Bubble Bath",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(255, 130, 190),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(168, 216, 255),
+		},
+		SkinShotgunShortStockSakuraStorm = {
+			name = "Sakura Storm",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 227, 240),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(214, 66, 143),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinShotgunShortStockNeapolitan = {
+			name = "Neapolitan",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 245, 250),
+			panel = Color3.fromRGB(232, 214, 200),
+			grip = Color3.fromRGB(255, 179, 217),
+			hardware = Color3.fromRGB(110, 90, 70),
+			accent = Color3.fromRGB(214, 66, 143),
+		},
+	},
+	SniperRifle_1 = {
+		SkinSniperRifle1Frostbite = {
+			name = "Frostbite",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(232, 245, 255),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(168, 216, 255),
+			hardware = Color3.fromRGB(110, 140, 160),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinSniperRifle1SakuraStorm = {
+			name = "Sakura Storm",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 227, 240),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(214, 66, 143),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinSniperRifle1CherrySoda = {
+			name = "Cherry Soda",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 140, 168),
+			panel = Color3.fromRGB(255, 214, 220),
+			grip = Color3.fromRGB(220, 60, 80),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 245, 250),
+		},
+	},
+	SniperRifle_2 = {
+		SkinSniperRifle2BubbleBath = {
+			name = "Bubble Bath",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(255, 130, 190),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(168, 216, 255),
+		},
+		SkinSniperRifle2RoseGold = {
+			name = "Rose Gold",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(240, 200, 180),
+			panel = Color3.fromRGB(255, 232, 220),
+			grip = Color3.fromRGB(220, 160, 140),
+			hardware = Color3.fromRGB(138, 100, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinSniperRifle2WatermelonSugar = {
+			name = "Watermelon Sugar",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 140, 180),
+			panel = Color3.fromRGB(214, 240, 220),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(214, 66, 143),
+		},
+	},
+	SniperRifle_3 = {
+		SkinSniperRifle3BlueberryMilk = {
+			name = "Blueberry Milk",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(220, 232, 255),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(127, 163, 232),
+			hardware = Color3.fromRGB(74, 88, 120),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinSniperRifle3TaffyTwist = {
+			name = "Taffy Twist",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 179, 217),
+			panel = Color3.fromRGB(255, 227, 240),
+			grip = Color3.fromRGB(255, 92, 168),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinSniperRifle3MilkTea = {
+			name = "Milk Tea",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(232, 214, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(180, 148, 120),
+			hardware = Color3.fromRGB(110, 90, 70),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	SniperRifle_4 = {
+		SkinSniperRifle4MatchaBloom = {
+			name = "Matcha Bloom",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(214, 240, 220),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(78, 102, 83),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinSniperRifle4MilkTea = {
+			name = "Milk Tea",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(232, 214, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(180, 148, 120),
+			hardware = Color3.fromRGB(110, 90, 70),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinSniperRifle4Princess = {
+			name = "Princess",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 220, 120),
+			panel = Color3.fromRGB(255, 240, 200),
+			grip = Color3.fromRGB(255, 245, 250),
+			hardware = Color3.fromRGB(138, 116, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+	},
+	SniperRifle_5 = {
+		SkinSniperRifle5CottonCandy = {
+			name = "Cotton Candy",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(168, 216, 255),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 255, 255),
+		},
+		SkinSniperRifle5LavenderHaze = {
+			name = "Lavender Haze",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(232, 220, 255),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(170, 140, 220),
+			hardware = Color3.fromRGB(92, 72, 120),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinSniperRifle5Neapolitan = {
+			name = "Neapolitan",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 245, 250),
+			panel = Color3.fromRGB(232, 214, 200),
+			grip = Color3.fromRGB(255, 179, 217),
+			hardware = Color3.fromRGB(110, 90, 70),
+			accent = Color3.fromRGB(214, 66, 143),
+		},
+	},
+	SubmachineGun_1 = {
+		SkinSubmachineGun1WatermelonSugar = {
+			name = "Watermelon Sugar",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 140, 180),
+			panel = Color3.fromRGB(214, 240, 220),
+			grip = Color3.fromRGB(127, 191, 142),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(214, 66, 143),
+		},
+		SkinSubmachineGun1Dragonfruit = {
+			name = "Dragonfruit",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 92, 168),
+			panel = Color3.fromRGB(255, 227, 240),
+			grip = Color3.fromRGB(70, 55, 78),
+			hardware = Color3.fromRGB(50, 38, 54),
+			accent = Color3.fromRGB(214, 255, 120),
+		},
+		SkinSubmachineGun1Princess = {
+			name = "Princess",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 220, 120),
+			panel = Color3.fromRGB(255, 240, 200),
+			grip = Color3.fromRGB(255, 245, 250),
+			hardware = Color3.fromRGB(138, 116, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+	},
+	SubmachineGun_2 = {
+		SkinSubmachineGun2MilkTea = {
+			name = "Milk Tea",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(232, 214, 200),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(180, 148, 120),
+			hardware = Color3.fromRGB(110, 90, 70),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinSubmachineGun2BubbleBath = {
+			name = "Bubble Bath",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(255, 130, 190),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(168, 216, 255),
+		},
+		SkinSubmachineGun2GrapeCrush = {
+			name = "Grape Crush",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(180, 140, 220),
+			panel = Color3.fromRGB(232, 220, 255),
+			grip = Color3.fromRGB(120, 80, 160),
+			hardware = Color3.fromRGB(70, 50, 90),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	SubmachineGun_3 = {
+		SkinSubmachineGun3CherrySoda = {
+			name = "Cherry Soda",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 140, 168),
+			panel = Color3.fromRGB(255, 214, 220),
+			grip = Color3.fromRGB(220, 60, 80),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 245, 250),
+		},
+		SkinSubmachineGun3RoseGold = {
+			name = "Rose Gold",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(240, 200, 180),
+			panel = Color3.fromRGB(255, 232, 220),
+			grip = Color3.fromRGB(220, 160, 140),
+			hardware = Color3.fromRGB(138, 100, 85),
+			accent = Color3.fromRGB(255, 196, 88),
+		},
+		SkinSubmachineGun3BlueberryMilk = {
+			name = "Blueberry Milk",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(220, 232, 255),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(127, 163, 232),
+			hardware = Color3.fromRGB(74, 88, 120),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+	},
+	SubmachineGun_4 = {
+		SkinSubmachineGun4SakuraStorm = {
+			name = "Sakura Storm",
+			price = 100,
+			rarity = "Common",
+			body = Color3.fromRGB(255, 227, 240),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(214, 66, 143),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 92, 168),
+		},
+		SkinSubmachineGun4CottonCandy = {
+			name = "Cotton Candy",
+			price = 150,
+			rarity = "Rare",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 245, 250),
+			grip = Color3.fromRGB(168, 216, 255),
+			hardware = Color3.fromRGB(92, 72, 88),
+			accent = Color3.fromRGB(255, 255, 255),
+		},
+		SkinSubmachineGun4BubbleBath = {
+			name = "Bubble Bath",
+			price = 300,
+			rarity = "Epic",
+			body = Color3.fromRGB(255, 214, 236),
+			panel = Color3.fromRGB(255, 255, 255),
+			grip = Color3.fromRGB(255, 130, 190),
+			hardware = Color3.fromRGB(138, 92, 119),
+			accent = Color3.fromRGB(168, 216, 255),
+		},
+	},
+} :: { [string]: { [string]: GunSkinDef } }
 
 GunSkinCatalog.universal = {
-	CamoGingham = { name = "Gingham Picnic", rarity = "Rare", price = 250, textureId = "" },
-	CamoCandyStripe = { name = "Candy Stripe", rarity = "Rare", price = 250, textureId = "" },
-	CamoSweetheart = { name = "Sweetheart", rarity = "Epic", price = 400, textureId = "" },
-	CamoSprinkles = { name = "Sprinkles", rarity = "Epic", price = 400, textureId = "" },
-	CamoLeopardLuxe = { name = "Leopard Luxe", rarity = "Epic", price = 400, textureId = "" },
-	CamoPinkCamo = { name = "Pink Camo", rarity = "Epic", price = 400, textureId = "" },
-	CamoHexTech = { name = "Hex Tech", rarity = "Epic", price = 400, textureId = "" },
-	CamoCowCutie = { name = "Cow Cutie", rarity = "Epic", price = 400, textureId = "" },
-	CamoStarlight = { name = "Starlight", rarity = "Legendary", price = 600, textureId = "" },
-	CamoGalaxyBerry = { name = "Galaxy Berry", rarity = "Legendary", price = 600, textureId = "" },
-} :: { [string]: CamoDef }
+	CamoGingham = {
+		name = "Gingham Picnic",
+		price = 250,
+		rarity = "Rare",
+		textureId = "", -- TODO: upload assets/textures/camo_gingham.png, paste rbxassetid
+	},
+	CamoCandyStripe = {
+		name = "Candy Stripe",
+		price = 250,
+		rarity = "Rare",
+		textureId = "", -- TODO: upload assets/textures/camo_candystripe.png, paste rbxassetid
+	},
+	CamoSweetheart = {
+		name = "Sweetheart",
+		price = 400,
+		rarity = "Epic",
+		textureId = "", -- TODO: upload assets/textures/camo_sweetheart.png, paste rbxassetid
+	},
+	CamoSprinkles = {
+		name = "Sprinkles",
+		price = 400,
+		rarity = "Epic",
+		textureId = "", -- TODO: upload assets/textures/camo_sprinkles.png, paste rbxassetid
+	},
+	CamoLeopard = {
+		name = "Leopard Luxe",
+		price = 400,
+		rarity = "Epic",
+		textureId = "", -- TODO: upload assets/textures/camo_leopard.png, paste rbxassetid
+	},
+	CamoPinkCamo = {
+		name = "Pink Camo",
+		price = 400,
+		rarity = "Epic",
+		textureId = "", -- TODO: upload assets/textures/camo_pinkcamo.png, paste rbxassetid
+	},
+	CamoHexTech = {
+		name = "Hex Tech",
+		price = 400,
+		rarity = "Epic",
+		textureId = "", -- TODO: upload assets/textures/camo_hextech.png, paste rbxassetid
+	},
+	CamoCowCutie = {
+		name = "Cow Cutie",
+		price = 400,
+		rarity = "Epic",
+		textureId = "", -- TODO: upload assets/textures/camo_cowcutie.png, paste rbxassetid
+	},
+	CamoStarlight = {
+		name = "Starlight",
+		price = 600,
+		rarity = "Legendary",
+		textureId = "", -- TODO: upload assets/textures/camo_starlight.png, paste rbxassetid
+	},
+	CamoGalaxyBerry = {
+		name = "Galaxy Berry",
+		price = 600,
+		rarity = "Legendary",
+		textureId = "", -- TODO: upload assets/textures/camo_galaxyberry.png, paste rbxassetid
+	},
+} :: { [string]: UniversalCamoDef }
 
--- Recolors an imported gun model's named parts. Missing parts (some guns
--- lack Panel/Accent) are skipped without erroring. Returns success.
-function GunSkinCatalog.applyColorSkin(gun: Model, skinId: string?): boolean
-	local def = if skinId then GunSkinCatalog.perGun[skinId] else nil
-	if not def then
-		return false
-	end
-	for partName, color in def.colors do
+local ROLE_PARTS = { "Body", "Panel", "Grip", "Hardware", "Accent" }
+
+-- Recolors a gun model's role parts to a color skin. Missing parts are
+-- skipped so simpler guns (no Panel/Accent) still work.
+function GunSkinCatalog.applyColorSkin(gun: Model, def: GunSkinDef)
+	local colors: { [string]: Color3 } = {
+		Body = def.body,
+		Panel = def.panel,
+		Grip = def.grip,
+		Hardware = def.hardware,
+		Accent = def.accent,
+	}
+	for _, partName in ROLE_PARTS do
 		local part = gun:FindFirstChild(partName)
 		if part and part:IsA("BasePart") then
-			part.Color = color
-			if part:IsA("MeshPart") then
-				part.TextureID = "" -- clearing a camo restores the color skin
-			end
+			part.Color = colors[partName]
 		end
 	end
-	return true
 end
 
--- Applies a universal camo texture to every MeshPart. Camo OVERRIDES the
--- color skin. Blank textureId (not yet uploaded) is a no-op. Returns success.
-function GunSkinCatalog.applyUniversalCamo(gun: Model, camoId: string?): boolean
-	local def = if camoId then GunSkinCatalog.universal[camoId] else nil
-	if not def or def.textureId == "" then
-		return false
-	end
-	local applied = false
-	for _, part in gun:GetDescendants() do
-		if part:IsA("MeshPart") then
-			part.TextureID = def.textureId
-			applied = true
+-- Applies (or clears, for nil) a universal pattern camo across every
+-- MeshPart of the gun. Textures tile in world scale, so patterns match
+-- across all guns.
+function GunSkinCatalog.applyUniversalCamo(gun: Model, def: UniversalCamoDef?)
+	for _, inst in gun:GetDescendants() do
+		if inst:IsA("MeshPart") then
+			inst.TextureID = if def then def.textureId else ""
 		end
 	end
-	return applied
 end
 
 return GunSkinCatalog
