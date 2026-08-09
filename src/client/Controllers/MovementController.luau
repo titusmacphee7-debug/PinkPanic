@@ -1,8 +1,10 @@
 --!strict
--- MovementController (NOD-100) — sprint, slide, slide-jump momentum chains,
--- and stamina. Sprinting is a commitment: you can't fire until you come off
--- it (short raise delay). Slides burst you forward low to the ground and you
--- CAN fire out of them. Stamina governs the spam.
+-- MovementController (NOD-100) — sprint, ice slides, and a Source-style
+-- momentum system: slides build speed, ramps feed it (slide downhill = keep
+-- accelerating), falling trickles into it, the air carries it at full
+-- steering authority (air strafing), and bunny hops preserve it. Grounded
+-- without hopping, momentum drains back to normal. Stamina only exists to
+-- cap degenerate spam.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,15 +23,17 @@ local sprintHeld = false
 local sprinting = false
 local sliding = false
 local slideDirection = Vector3.zAxis
-local slideStartedAt = 0
+local slideSpeed = 0
 local slideEndsAt = 0
 local lastSlideAt = 0
-local chainUntil = 0
 local raiseBlockedUntil = 0
 local stamina = MovementConfig.staminaMax
 local regenPausedUntil = 0
 local originalHipHeight: number? = nil
-local slideCameraAlpha = 0 -- smoothed 0..1 for the low camera + roll
+local slideCameraAlpha = 0
+-- Momentum: extra speed above the normal ladder, carried across states.
+local momentumSpeed = 0
+local lastLandedAt = 0
 
 local staminaBar: Frame? = nil
 local staminaFill: Frame? = nil
@@ -44,6 +48,11 @@ local function character(): (Model?, Humanoid?, BasePart?)
 	return nil, nil, nil
 end
 
+local function horizontalSpeed(root: BasePart): number
+	local velocity = root.AssemblyLinearVelocity
+	return Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+end
+
 -- ---------------------------------------------------------------------------
 -- Public state (WeaponController and ViewmodelController read these)
 -- ---------------------------------------------------------------------------
@@ -56,14 +65,12 @@ function MovementController.isSliding(): boolean
 	return sliding
 end
 
--- Firing is allowed unless sprinting or still raising the weapon.
 function MovementController.canFire(): boolean
 	return not sprinting and os.clock() >= raiseBlockedUntil
 end
 
--- A blocked fire attempt breaks sprint and starts the raise delay (the
--- weapon's sprint-to-fire stat), so holding the trigger fires shortly after
--- you come off the sprint.
+-- A blocked fire attempt breaks sprint and starts the weapon's
+-- sprint-to-fire delay, so a held trigger fires shortly after.
 function MovementController.noteFireAttempt(sprintToFire: number?)
 	if sprinting then
 		sprinting = false
@@ -80,8 +87,8 @@ local function endSlide(humanoid: Humanoid?)
 		return
 	end
 	sliding = false
-	-- Momentum blends out (glide window) instead of snapping to a walk.
-	chainUntil = math.max(chainUntil, os.clock() + MovementConfig.postSlideGlideWindow)
+	-- The speed you built carries into momentum (glide-out, air, bhops).
+	momentumSpeed = math.max(momentumSpeed, slideSpeed)
 	if humanoid and originalHipHeight then
 		humanoid.HipHeight = originalHipHeight
 	end
@@ -106,11 +113,15 @@ local function trySlide()
 	regenPausedUntil = now + MovementConfig.regenDelay
 	lastSlideAt = now
 	sliding = true
-	slideStartedAt = now
 	slideEndsAt = now + MovementConfig.slideDuration
+	-- Momentum-fed entry: a bhop chain slides in FASTER than a fresh slide.
+	slideSpeed = math.max(MovementConfig.slideInitialSpeed, horizontalSpeed(root), momentumSpeed)
+	slideSpeed = math.min(slideSpeed, MovementConfig.momentumHardCap)
 
 	local flat = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
-	slideDirection = if flat.Magnitude > 2 then flat.Unit else Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z).Unit
+	slideDirection = if flat.Magnitude > 2
+		then flat.Unit
+		else Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z).Unit
 
 	if not originalHipHeight then
 		originalHipHeight = humanoid.HipHeight
@@ -118,12 +129,15 @@ local function trySlide()
 	humanoid.HipHeight = (originalHipHeight :: number) - MovementConfig.slideHipDrop
 end
 
--- Jumping out of a slide keeps momentum for a chain window.
 local function onJumping()
+	local now = os.clock()
 	if sliding then
 		local _, humanoid = character()
 		endSlide(humanoid)
-		chainUntil = os.clock() + MovementConfig.chainWindow
+	end
+	-- Bunny hop: jumping right after landing keeps momentum (tiny tax).
+	if now - lastLandedAt <= MovementConfig.bhopWindow and momentumSpeed > 0 then
+		momentumSpeed *= MovementConfig.bhopRetention
 	end
 end
 
@@ -168,31 +182,78 @@ end
 -- ---------------------------------------------------------------------------
 
 local function update(deltaTime: number)
-	local _, humanoid, root = character()
+	local model, humanoid, root = character()
 	local now = os.clock()
 
-	if not humanoid or not root then
+	if not model or not humanoid or not root then
 		sprinting = false
-		endSlide(nil)
+		sliding = false
+		momentumSpeed = 0
 		return
 	end
 
-	-- Slide physics: an ice glide — exponential decay along the locked
-	-- direction, so it's fast out of the gate and slips the rest of the way.
+	local airborne = humanoid.FloorMaterial == Enum.Material.Air
+
+	-- Slide physics: ice glide with gravity feeding it on slopes.
 	if sliding then
 		if now >= slideEndsAt then
 			endSlide(humanoid)
 		else
-			local progress = (now - slideStartedAt) / MovementConfig.slideDuration
-			local speed = MovementConfig.slideEndSpeed
-				+ (MovementConfig.slideInitialSpeed - MovementConfig.slideEndSpeed)
-					* math.exp(-MovementConfig.slideDecayRate * progress)
-			local vertical = root.AssemblyLinearVelocity.Y
-			root.AssemblyLinearVelocity = slideDirection * speed + Vector3.new(0, vertical, 0)
+			-- Slope sensing: project gravity onto the floor plane; sliding
+			-- downhill accelerates you (and keeps the slide alive), uphill
+			-- bleeds you out.
+			local params = RaycastParams.new()
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = { model }
+			local floor = workspace:Raycast(root.Position, Vector3.new(0, -6, 0), params)
+			local rampAccel = 0
+			if floor then
+				local normal = floor.Normal
+				local surfaceDown = Vector3.new(0, -1, 0) - normal * normal:Dot(Vector3.new(0, -1, 0))
+				local steepness = surfaceDown.Magnitude
+				if steepness > 0.02 then
+					rampAccel = MovementConfig.rampAccel * steepness * slideDirection:Dot(surfaceDown.Unit)
+				end
+			end
+
+			if rampAccel > 0.5 then
+				-- Downhill: accelerate and extend the ride.
+				slideSpeed += rampAccel * deltaTime
+				slideEndsAt = math.max(slideEndsAt, now + MovementConfig.rampSlideExtend)
+			else
+				-- Flat/uphill: exponential ice decay (plus uphill bleed).
+				slideSpeed = MovementConfig.slideEndSpeed
+					+ (slideSpeed - MovementConfig.slideEndSpeed)
+						* math.exp(-MovementConfig.slideDecayRate * deltaTime)
+				slideSpeed += math.min(rampAccel, 0) * deltaTime
+			end
+			slideSpeed = math.min(slideSpeed, MovementConfig.momentumHardCap)
+			if slideSpeed < MovementConfig.slideEndSpeed * 0.8 then
+				endSlide(humanoid) -- uphill killed it
+			else
+				local vertical = root.AssemblyLinearVelocity.Y
+				root.AssemblyLinearVelocity = slideDirection * slideSpeed + Vector3.new(0, vertical, 0)
+				momentumSpeed = math.max(momentumSpeed, slideSpeed)
+			end
 		end
 	end
 
-	-- Low-to-the-ground camera while sliding (first person sinks with you).
+	-- Momentum bookkeeping outside slides.
+	if not sliding then
+		if airborne then
+			-- The air carries momentum; falling feeds it a little.
+			momentumSpeed = math.max(momentumSpeed, horizontalSpeed(root))
+			if root.AssemblyLinearVelocity.Y < -3 then
+				momentumSpeed += MovementConfig.fallSpeedGain * deltaTime
+			end
+		elseif now - lastLandedAt > MovementConfig.bhopWindow then
+			-- Grounded past the hop window: drain back to the normal ladder.
+			momentumSpeed = math.max(0, momentumSpeed - MovementConfig.groundMomentumDecay * deltaTime)
+		end
+		momentumSpeed = math.min(momentumSpeed, MovementConfig.momentumHardCap)
+	end
+
+	-- Low-to-the-ground camera while sliding.
 	local slideTarget = if sliding then 1 else 0
 	slideCameraAlpha += (slideTarget - slideCameraAlpha) * math.min(deltaTime * 10, 1)
 	humanoid.CameraOffset = Vector3.new(0, -MovementConfig.slideCameraDrop * slideCameraAlpha, 0)
@@ -208,40 +269,39 @@ local function update(deltaTime: number)
 	-- Stamina drain/regen.
 	if sprinting then
 		stamina = math.max(0, stamina - MovementConfig.sprintDrainPerSecond * deltaTime)
-		regenPausedUntil = math.max(regenPausedUntil, now) -- regen waits for sprint to end
+		regenPausedUntil = math.max(regenPausedUntil, now)
 	elseif not sliding and now >= regenPausedUntil then
 		stamina = math.min(MovementConfig.staminaMax, stamina + MovementConfig.regenPerSecond * deltaTime)
 	end
 
-	-- WalkSpeed by state (slide speed is velocity-driven, not WalkSpeed).
+	-- WalkSpeed: the normal ladder, or carried momentum — whichever is
+	-- faster. Airborne this doubles as air-strafe authority: full steering
+	-- at your carried speed.
+	local ladder = if sprinting then MovementConfig.sprintWalkSpeed else MovementConfig.baseWalkSpeed
 	if sliding then
 		humanoid.WalkSpeed = MovementConfig.slideEndSpeed
-	elseif sprinting then
-		humanoid.WalkSpeed = MovementConfig.sprintWalkSpeed
-	elseif now < chainUntil then
-		humanoid.WalkSpeed = MovementConfig.chainWalkSpeed
 	else
-		humanoid.WalkSpeed = MovementConfig.baseWalkSpeed
+		humanoid.WalkSpeed = math.max(ladder, momentumSpeed)
 	end
 
-	-- FOV feel, combat only (the lobby camera owns its framing there).
+	-- FOV feel, combat only; momentum widens it so speed reads visually.
 	local camera = workspace.CurrentCamera
 	if camera and not ClientData.inLobby() then
 		local target = if sliding
 			then MovementConfig.fovSlide
 			elseif sprinting then MovementConfig.fovSprint
 			else MovementConfig.fovBase
+		local momentumStretch = math.clamp((momentumSpeed - MovementConfig.sprintWalkSpeed) / 30, 0, 1) * 6
+		target += momentumStretch
 		camera.FieldOfView += (target - camera.FieldOfView) * math.min(deltaTime * 8, 1)
 	end
 
-	-- Meter: full bar fades out, anything less shows.
 	local fill = staminaFill
 	local bar = staminaBar
 	if fill and bar then
 		local alpha = stamina / MovementConfig.staminaMax
 		fill.Size = UDim2.fromScale(alpha, 1)
-		local visible = alpha < 0.999 and not ClientData.inLobby()
-		bar.Visible = visible
+		bar.Visible = alpha < 0.999 and not ClientData.inLobby()
 	end
 end
 
@@ -273,6 +333,11 @@ function MovementController.init()
 					onJumping()
 				end
 			end)
+			humanoid.StateChanged:Connect(function(_, newState)
+				if newState == Enum.HumanoidStateType.Landed then
+					lastLandedAt = os.clock()
+				end
+			end)
 		end
 	end
 	local existing = Players.LocalPlayer.Character
@@ -282,6 +347,7 @@ function MovementController.init()
 	Players.LocalPlayer.CharacterAdded:Connect(function(model)
 		sliding = false
 		sprinting = false
+		momentumSpeed = 0
 		stamina = MovementConfig.staminaMax
 		task.spawn(hookCharacter, model)
 	end)

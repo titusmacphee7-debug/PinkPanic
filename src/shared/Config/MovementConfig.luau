@@ -1,6 +1,6 @@
 --!strict
--- MovementConfig — sprint/slide/stamina tuning (NOD-100). All feel feedback
--- lands in this file.
+-- MovementConfig — sprint/slide/momentum/stamina tuning (NOD-100). All feel
+-- feedback lands in this file.
 
 return {
 	baseWalkSpeed = 20,
@@ -10,17 +10,22 @@ return {
 	slideInitialSpeed = 44,
 	slideEndSpeed = 27,
 	slideDuration = 1.25,
-	slideDecayRate = 2.1, -- exponential glide: high = grippy, low = ice
+	slideDecayRate = 2.1, -- exponential glide on flat ground: high = grippy, low = ice
 	slideCooldown = 1.1,
 	slideHipDrop = 0.9, -- lowered profile while sliding
 	slideCameraDrop = 1.5, -- first-person camera sinks low to the ground
 	slideCameraRoll = 0.09, -- radians of camera cant while sliding
-	postSlideGlideWindow = 0.45, -- momentum blends out instead of snapping
 
-	-- Slide-jump chains: boosted ground speed for a short window after
-	-- jumping out of a slide, so slide->jump->slide flows.
-	chainWalkSpeed = 34,
-	chainWindow = 1.0,
+	-- Momentum: the shared speed pool that slides build, ramps feed, falling
+	-- trickles into, the air carries at full steering authority, and bunny
+	-- hops preserve. Grounded without hopping, it drains back to normal.
+	momentumHardCap = 62,
+	rampAccel = 34, -- speed gained per second per unit of downhill steepness
+	rampSlideExtend = 0.35, -- sliding downhill keeps extending the slide
+	fallSpeedGain = 2.5, -- horizontal speed gained per second while falling
+	bhopWindow = 0.22, -- jump within this after landing to keep momentum
+	bhopRetention = 0.97, -- momentum kept per hop (a whisper of tax)
+	groundMomentumDecay = 45, -- momentum lost per second grounded past the window
 
 	staminaMax = 150,
 	sprintDrainPerSecond = 3,
