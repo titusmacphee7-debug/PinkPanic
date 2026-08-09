@@ -31,6 +31,10 @@ type WeaponState = {
 	reloadingUntil: number,
 	reloadToken: number,
 	switchedAt: number,
+	-- Armory trial: session-memory ONLY, never written to the profile, so no
+	-- exploit can convert a trial into ownership. Evaporates on expiry and on
+	-- every resetState (respawn / round start), which rebuilds from profile.
+	trialToken: number,
 }
 
 local WeaponService = {}
@@ -78,6 +82,7 @@ local function resetState(player: Player)
 		local gunId = guns[slot]
 		ammo[slot] = if gunId then CombatStats.resolve(gunId).magSize else 0
 	end
+	local previous = states[player]
 	states[player] = {
 		slot = if guns.Primary then "Primary" else "Secondary",
 		guns = guns,
@@ -86,8 +91,10 @@ local function resetState(player: Player)
 		reloadingUntil = 0,
 		reloadToken = 0,
 		switchedAt = 0,
+		trialToken = if previous then previous.trialToken + 1 else 0, -- kills pending trials
 	}
 end
+
 
 local function pushAmmo(player: Player)
 	local state = states[player]
@@ -338,6 +345,44 @@ function WeaponService.refreshCosmetics(player: Player)
 	if character then
 		attachWorldGun(player, character)
 	end
+end
+
+-- Armory "try it in the range": temporarily slots the gun for TRIAL_SECONDS.
+-- Session state only — the profile is untouched, so no exploit can convert a
+-- trial into ownership; resetState (respawn, round start, loadout equip)
+-- reverts it for free, and expiry restores the owned loadout.
+local TRIAL_SECONDS = 60
+
+function WeaponService.tryGun(player: Player, gunId: string): boolean
+	local def = GunCatalog.get(gunId)
+	local state = states[player]
+	if not def or not state then
+		return false
+	end
+
+	local slot = def.slot
+	state.guns[slot] = gunId
+	state.ammo[slot] = CombatStats.resolve(gunId).magSize
+	state.slot = slot
+	state.switchedAt = os.clock()
+	state.reloadToken += 1
+	state.reloadingUntil = 0
+	state.trialToken += 1
+	local token = state.trialToken
+
+	pushAmmo(player)
+	local character = player.Character
+	if character then
+		attachWorldGun(player, character)
+	end
+
+	task.delay(TRIAL_SECONDS, function()
+		local current = states[player]
+		if current == state and current.trialToken == token then
+			WeaponService.refreshLoadout(player) -- back to owned guns
+		end
+	end)
+	return true
 end
 
 function WeaponService.init()

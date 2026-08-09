@@ -538,7 +538,7 @@ local function buildUi()
 	inspectPanel = Instance.new("Frame")
 	inspectPanel.AnchorPoint = Vector2.new(1, 0.5)
 	inspectPanel.Position = UDim2.new(1, -24, 0.5, 0)
-	inspectPanel.Size = UDim2.fromOffset(300, 430)
+	inspectPanel.Size = UDim2.fromOffset(300, 470)
 	stylePanel(inspectPanel, 16)
 	inspectPanel.Visible = false
 	inspectName = mkText(inspectPanel, 24, DEEP_PINK)
@@ -582,6 +582,39 @@ local function buildUi()
 	round(inspectAction, 12)
 	inspectAction.MouseButton1Click:Connect(onInspectAction)
 	inspectAction.Parent = inspectPanel
+
+	-- Free trial: server slots the gun for 60s (session-only, never owned).
+	local tryButton = Instance.new("TextButton")
+	tryButton.Position = UDim2.new(0, 16, 1, -112)
+	tryButton.Size = UDim2.new(1, -32, 0, 32)
+	tryButton.BackgroundColor3 = Color3.fromRGB(255, 130, 190)
+	tryButton.Font = Enum.Font.FredokaOne
+	tryButton.TextSize = 15
+	tryButton.TextColor3 = Color3.new(1, 1, 1)
+	tryButton.Text = "Not sure? Try it in the range! 💘"
+	round(tryButton, 12)
+	tryButton.MouseButton1Click:Connect(function()
+		local current = inspecting
+		if not current or busyRequest then
+			return
+		end
+		local gunId = current.gunId
+		busyRequest = true
+		task.spawn(function()
+			local ok, result = pcall(function(): any
+				return Remotes.func("TryGun"):InvokeServer(gunId)
+			end)
+			busyRequest = false
+			if ok and type(result) == "table" and result.ok then
+				closeInspect()
+			elseif ok and type(result) == "table" and result.error then
+				inspectMessage.Text = tostring(result.error)
+			else
+				inspectMessage.Text = "Something went wrong — try again."
+			end
+		end)
+	end)
+	tryButton.Parent = inspectPanel
 	inspectMessage = mkText(inspectPanel, 13, DEEP_PINK)
 	inspectMessage.Position = UDim2.new(0, 16, 1, -30)
 	inspectMessage.Size = UDim2.new(1, -32, 0, 18)

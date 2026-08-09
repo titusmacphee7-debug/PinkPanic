@@ -40,6 +40,7 @@ local Definitions: { [string]: RemoteKind } = {
 	BuyCamo = "Function", -- client -> server: buy a universal camo
 	EquipLoadout = "Function", -- client -> server: set primary/secondary (lobby only)
 	EquipGunCosmetics = "Function", -- client -> server: set a gun's skin/camo
+	TryGun = "Function", -- client -> server: 60s lobby trial (never persisted)
 	DataChanged = "Event", -- server -> client: profile replication (coins, xp, owned)
 }
 

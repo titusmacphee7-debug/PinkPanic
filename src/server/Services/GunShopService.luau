@@ -206,7 +206,27 @@ local function onEquipGunCosmetics(player: Player, gunId: any, skinId: any, camo
 	return { ok = true }
 end
 
+local function onTryGun(player: Player, gunId: any): Result
+	if not Guard.checkRate(player, "TryGun", 3, 10) then
+		return fail("One trial at a time, cutie!")
+	end
+	if RoundService.getState() == "Active" then
+		return fail("Trials are a lobby thing!")
+	end
+	if not Guard.isString(gunId, 50) then
+		return fail("Invalid gun.")
+	end
+	if not GunCatalog.get(gunId) then
+		return fail("Unknown gun.")
+	end
+	if not WeaponService.tryGun(player, gunId) then
+		return fail("Try again in a moment.")
+	end
+	return { ok = true }
+end
+
 function GunShopService.init()
+	Remotes.func("TryGun").OnServerInvoke = onTryGun
 	Remotes.func("BuyGun").OnServerInvoke = onBuyGun
 	Remotes.func("BuyGunSkin").OnServerInvoke = onBuyGunSkin
 	Remotes.func("BuyCamo").OnServerInvoke = onBuyCamo
