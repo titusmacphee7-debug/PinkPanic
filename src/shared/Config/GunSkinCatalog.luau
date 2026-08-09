@@ -1374,7 +1374,7 @@ GunSkinCatalog.universal = {
 	},
 } :: { [string]: UniversalCamoDef }
 
-local ROLE_PARTS = { "Body", "Panel", "Grip", "Hardware", "Accent" }
+local ROLE_PARTS = { "Body", "Panel", "Grip", "Hardware", "Accent", "Mag" }
 
 -- Recolors a gun model's role parts to a color skin. Missing parts are
 -- skipped so simpler guns (no Panel/Accent) still work.
@@ -1385,6 +1385,7 @@ function GunSkinCatalog.applyColorSkin(gun: Model, def: GunSkinDef)
 		Grip = def.grip,
 		Hardware = def.hardware,
 		Accent = def.accent,
+		Mag = def.grip, -- functional mag part (reload animations) follows the grip color
 	}
 	for _, partName in ROLE_PARTS do
 		local part = gun:FindFirstChild(partName)

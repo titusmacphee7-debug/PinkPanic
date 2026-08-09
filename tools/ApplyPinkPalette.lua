@@ -19,7 +19,7 @@ local GOLD = Color3.fromRGB(255, 196, 88)
 
 local GENERIC = {
 	-- 32-gun roster parts
-	Body = WHITE, Panel = BLUSH, Grip = PINK, Hardware = PLUM, Accent = HOT,
+	Body = WHITE, Panel = BLUSH, Grip = PINK, Hardware = PLUM, Accent = HOT, Mag = PINK,
 	-- marshmallow pistol parts
 	Slide = WHITE, Frame = BLUSH, Guard = PLUM, Barrel = PLUM, Tip = HOT, Charm = HOT,
 	-- façade defaults (overridden per model below)
