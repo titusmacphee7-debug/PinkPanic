@@ -162,16 +162,22 @@ local function aliveCharacter(player: Player): (Model?, BasePart?)
 	return character, character:FindFirstChild("Head") :: BasePart?
 end
 
-local function damageAtDistance(stats: CombatStats.Resolved, distance: number): number
-	if distance <= stats.falloffStart then
-		return stats.totalDamage
-	end
-	local span = math.max(stats.range - stats.falloffStart, 1)
-	local alpha = math.clamp((distance - stats.falloffStart) / span, 0, 1)
-	return stats.totalDamage + (stats.falloffEndDamage - stats.totalDamage) * alpha
-end
+-- Projectile ballistics (NOD-111): every bullet is simulated server-side
+-- with per-gun velocity and gravity drop, stepped each Heartbeat with
+-- segment raycasts. Damage uses the shared falloff curve at TRAVELED
+-- distance, so a shotgun pellet 70 studs downrange is confetti.
+type Projectile = {
+	shooter: Player,
+	character: Model,
+	stats: CombatStats.Resolved,
+	position: Vector3,
+	velocity: Vector3,
+	traveled: number,
+}
+local projectiles: { Projectile } = {}
+local MAX_PROJECTILES = 500
 
-type HitTotal = { damage: number, position: Vector3 }
+type HitTotal = { damage: number, position: Vector3, weaponName: string }
 
 local function onFireWeapon(player: Player, origin: any, direction: any)
 	if RoundService.getState() ~= "Active" then
@@ -215,12 +221,29 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 		pushAmmo(player)
 	end
 
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { character }
+	if stats.kind == "Melee" then
+		-- Melee stays instant: short server raycast.
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { character }
+		local result = workspace:Raycast(origin, direction * stats.range, params)
+		Remotes.event("ShotFired"):FireAllClients(player, origin, direction, 0, 0, stats.range, 1)
+		if result then
+			local hitModel = result.Instance:FindFirstAncestorOfClass("Model")
+			local victim = hitModel and Players:GetPlayerFromCharacter(hitModel)
+			if victim and victim ~= player then
+				local damage = math.floor(stats.damageNear + 0.5)
+				local applied, killed = CombatService.applyDamage(player, victim, damage, stats.name)
+				if applied then
+					Remotes.event("DamageDealt"):FireClient(player, damage, result.Position, killed)
+				end
+			end
+		end
+		return
+	end
 
-	local totals: { [Player]: HitTotal } = {}
-	local firstEndpoint: Vector3? = nil
+	-- Spawn simulated projectiles: bullet 1 flies exactly where the client
+	-- aimed; extra pellets get server-rolled spread.
 	local spreadRad = math.rad(stats.spreadDeg)
 	for pellet = 1, stats.pellets do
 		local dir: Vector3 = direction
@@ -231,46 +254,87 @@ local function onFireWeapon(player: Player, origin: any, direction: any)
 				0
 			)).LookVector
 		end
-
-		local result = workspace:Raycast(origin, dir * stats.range, params)
-		local endpoint = if result then result.Position else origin + dir * stats.range
-		if not firstEndpoint then
-			firstEndpoint = endpoint
-		end
-		if not result then
-			continue
-		end
-
-		local hitModel = result.Instance:FindFirstAncestorOfClass("Model")
-		local victim = hitModel and Players:GetPlayerFromCharacter(hitModel)
-		if not victim or victim == player then
-			continue
-		end
-
-		local distance = (result.Position - origin).Magnitude
-		local pelletDamage = damageAtDistance(stats, distance) / stats.pellets
-		if result.Instance.Name == "Head" then
-			pelletDamage *= stats.headshotMult
-		end
-		local total = totals[victim]
-		if total then
-			total.damage += pelletDamage
-			total.position = result.Position
-		else
-			totals[victim] = { damage = pelletDamage, position = result.Position }
+		if #projectiles < MAX_PROJECTILES then
+			table.insert(projectiles, {
+				shooter = player,
+				character = character,
+				stats = stats,
+				position = origin,
+				velocity = dir * stats.velocity,
+				traveled = 0,
+			})
 		end
 	end
 
-	Remotes.event("ShotFired"):FireAllClients(player, origin, firstEndpoint or origin + direction * stats.range)
+	-- Everyone animates the shot with real ballistics.
+	Remotes.event("ShotFired"):FireAllClients(
+		player, origin, direction, stats.velocity, stats.drop, stats.travelMax, stats.pellets
+	)
+end
 
-	for victim, total in totals do
-		local damage = math.floor(total.damage + 0.5)
-		if damage <= 0 then
-			continue
+-- Steps all live projectiles; accumulates damage per victim per frame so a
+-- shotgun blast lands as ONE damage event, not nine hitmarkers.
+local function stepProjectiles(deltaTime: number)
+	if #projectiles == 0 then
+		return
+	end
+	local frameTotals: { [Player]: { [Player]: HitTotal } } = {}
+
+	for index = #projectiles, 1, -1 do
+		local p = projectiles[index]
+		p.velocity += Vector3.new(0, -p.stats.drop * deltaTime, 0)
+		local step = p.velocity * deltaTime
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { p.character }
+		local result = workspace:Raycast(p.position, step, params)
+
+		if result then
+			local distance = p.traveled + (result.Position - p.position).Magnitude
+			local hitModel = result.Instance:FindFirstAncestorOfClass("Model")
+			local victim = hitModel and Players:GetPlayerFromCharacter(hitModel)
+			if victim and victim ~= p.shooter then
+				local pelletDamage = CombatStats.pelletDamageAt(p.stats, distance)
+				if result.Instance.Name == "Head" then
+					pelletDamage *= p.stats.headshotMult
+				end
+				local byShooter = frameTotals[p.shooter]
+				if not byShooter then
+					byShooter = {}
+					frameTotals[p.shooter] = byShooter
+				end
+				local total = byShooter[victim]
+				if total then
+					total.damage += pelletDamage
+					total.position = result.Position
+				else
+					byShooter[victim] = {
+						damage = pelletDamage,
+						position = result.Position,
+						weaponName = p.stats.name,
+					}
+				end
+			end
+			table.remove(projectiles, index)
+		else
+			p.position += step
+			p.traveled += step.Magnitude
+			if p.traveled >= p.stats.travelMax then
+				table.remove(projectiles, index)
+			end
 		end
-		local applied, killed = CombatService.applyDamage(player, victim, damage, stats.name)
-		if applied then
-			Remotes.event("DamageDealt"):FireClient(player, damage, total.position, killed)
+	end
+
+	for shooter, victims in frameTotals do
+		for victim, total in victims do
+			local damage = math.floor(total.damage + 0.5)
+			if damage <= 0 then
+				continue
+			end
+			local applied, killed = CombatService.applyDamage(shooter, victim, damage, total.weaponName)
+			if applied then
+				Remotes.event("DamageDealt"):FireClient(shooter, damage, total.position, killed)
+			end
 		end
 	end
 end
@@ -409,6 +473,8 @@ function WeaponService.init()
 	Players.PlayerRemoving:Connect(function(player)
 		states[player] = nil
 	end)
+
+	game:GetService("RunService").Heartbeat:Connect(stepProjectiles)
 
 	Remotes.event("FireWeapon").OnServerEvent:Connect(onFireWeapon)
 	Remotes.event("ReloadWeapon").OnServerEvent:Connect(onReloadWeapon)

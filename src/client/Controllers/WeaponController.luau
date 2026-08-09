@@ -95,10 +95,6 @@ local function shoot()
 	end
 	EffectsController.playShotSound(0.6)
 
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	local character = Players.LocalPlayer.Character
-	params.FilterDescendantsInstances = if character then { character } else {}
 	local muzzle = ViewmodelController.getMuzzlePosition()
 		or origin + camera.CFrame.RightVector * 0.6 - camera.CFrame.UpVector * 0.4
 	local tracerCount = math.min(stats.pellets, 3)
@@ -107,10 +103,13 @@ local function shoot()
 		if pellet > 1 then
 			dir = (aim * CFrame.Angles(rng:NextNumber(-spread, spread), rng:NextNumber(-spread, spread), 0)).LookVector
 		end
-		local result = workspace:Raycast(origin, dir * stats.range, params)
-		local endpoint = if result then result.Position else origin + dir * stats.range
-		EffectsController.drawTracer(muzzle, endpoint)
+		EffectsController.launchProjectileVisual(muzzle, dir, stats.velocity, stats.drop, stats.travelMax)
 	end
+end
+
+-- Weapon weight: heavy guns slow you down, light ones speed you up.
+local function pushSpeedMult()
+	MovementController.setWeaponSpeedMult(currentStats().moveSpeedMult)
 end
 
 function WeaponController.init()
@@ -127,6 +126,7 @@ function WeaponController.init()
 			local slot = KEY_TO_SLOT[input.KeyCode]
 			if slot then
 				selectSlot(slot)
+				pushSpeedMult()
 			end
 		end
 	end)
@@ -156,6 +156,7 @@ function WeaponController.init()
 					data.reloading == true,
 					CombatStats.resolve(data.gunId).reloadSeconds
 				)
+				pushSpeedMult()
 			end
 		end
 	end)

@@ -1,20 +1,26 @@
 --!strict
--- CombatStats — resolves any carried weapon (roster gun or the legacy knife)
--- into one unified combat-stats shape both client and server compute
--- identically. GunCatalog stores per-pellet damage and RPM; combat wants
--- totals and shots/second; class tables supply handling and falloff feel.
+-- CombatStats — resolves any carried weapon (roster gun or knife) into the
+-- unified combat-stats shape both client and server compute identically,
+-- with optional attachment modifiers applied (AttachmentConfig). Ballistics
+-- helpers (per-pellet damage at distance) live here so the falloff curve has
+-- exactly one implementation.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
+local AttachmentConfig = require(ReplicatedStorage.Shared.Config.AttachmentConfig)
 
 export type Resolved = {
 	id: string,
 	name: string,
 	class: string,
 	kind: "Ranged" | "Melee",
-	totalDamage: number,
+	damageNear: number, -- per bullet/pellet
+	damageFar: number,
+	rangeNear: number,
+	rangeFar: number,
+	travelMax: number, -- bullets die here
 	pellets: number,
 	headshotMult: number,
 	fireRate: number, -- shots per second
@@ -22,68 +28,89 @@ export type Resolved = {
 	spreadDeg: number,
 	magSize: number,
 	reloadSeconds: number,
-	range: number,
-	falloffStart: number,
-	falloffEndDamage: number,
+	velocity: number,
+	drop: number,
+	moveSpeedMult: number,
 	equipTime: number,
 	sprintToFire: number,
 	adsTime: number,
+	range: number, -- alias of travelMax for client visuals
 }
-
-type Handling = { equip: number, s2f: number, ads: number, auto: boolean }
-local CLASS_HANDLING: { [string]: Handling } = {
-	Pistol = { equip = 0.25, s2f = 0.15, ads = 0.18, auto = false },
-	Revolver = { equip = 0.3, s2f = 0.2, ads = 0.22, auto = false },
-	SMG = { equip = 0.35, s2f = 0.2, ads = 0.24, auto = true },
-	Shotgun = { equip = 0.5, s2f = 0.3, ads = 0.3, auto = false },
-	Rifle = { equip = 0.45, s2f = 0.25, ads = 0.3, auto = true },
-	Carbine = { equip = 0.4, s2f = 0.22, ads = 0.26, auto = true },
-	Bullpup = { equip = 0.42, s2f = 0.24, ads = 0.28, auto = true },
-	Sniper = { equip = 0.55, s2f = 0.35, ads = 0.4, auto = false },
-}
-
--- Falloff character per class: where damage starts dropping (fraction of
--- range) and what fraction of total damage remains at max range.
-local FALLOFF: { [string]: { start: number, endFactor: number } } = {
-	Shotgun = { start = 0.2, endFactor = 0.3 },
-	Sniper = { start = 0.5, endFactor = 0.85 },
-}
-local FALLOFF_DEFAULT = { start = 0.35, endFactor = 0.45 }
 
 local CombatStats = {}
 
-function CombatStats.forGun(gunId: string): Resolved?
+local MODIFIABLE = {
+	damageNear = true, damageFar = true, rangeNear = true, rangeFar = true,
+	headshotMult = true, fireRate = true, spreadDeg = true, magSize = true,
+	reloadSeconds = true, velocity = true, drop = true, moveSpeedMult = true,
+	equipTime = true, sprintToFire = true, adsTime = true,
+}
+
+local function applyAttachments(resolved: Resolved, attachmentIds: { string }?)
+	if not attachmentIds then
+		return
+	end
+	local r = resolved :: any
+	for _, id in attachmentIds do
+		local def = AttachmentConfig.get(id)
+		if not def then
+			continue
+		end
+		for _, modifier in def.modifiers do
+			local stat = modifier.stat
+			-- rpm convenience: modifiers may target rpm; map to fireRate.
+			if stat == "rpm" then
+				stat = "fireRate"
+			end
+			if MODIFIABLE[stat] and type(r[stat]) == "number" then
+				if modifier.mul then
+					r[stat] *= modifier.mul
+				end
+				if modifier.add then
+					r[stat] += modifier.add
+				end
+			end
+		end
+	end
+	resolved.magSize = math.max(1, math.floor(resolved.magSize + 0.5))
+	resolved.travelMax = resolved.rangeFar * 1.6
+	resolved.range = resolved.travelMax
+end
+
+function CombatStats.forGun(gunId: string, attachmentIds: { string }?): Resolved?
 	local def = GunCatalog.get(gunId)
 	if not def then
 		return nil
 	end
-	local stats = def.stats
-	local handling = CLASS_HANDLING[def.class] or CLASS_HANDLING.Pistol
-	local falloff = FALLOFF[def.class] or FALLOFF_DEFAULT
-	local pellets = stats.pellets or 1
-	local total = stats.damage * pellets
-	return {
+	local s = def.stats
+	local travelMax = s.rangeFar * 1.6
+	local resolved: Resolved = {
 		id = gunId,
 		name = def.name,
 		class = def.class,
 		kind = "Ranged",
-		totalDamage = total,
-		pellets = pellets,
-		headshotMult = stats.headshotMult,
-		fireRate = stats.rpm / 60,
-		-- Machine pistols (Pixie) go auto by RPM even in a semi class.
-		auto = handling.auto or stats.rpm >= 500,
-		spreadDeg = stats.spreadDeg,
-		magSize = stats.magSize,
-		-- Shell-by-shell reloads are a polish item; full reload for now.
-		reloadSeconds = stats.reloadSeconds,
-		range = stats.rangeStuds,
-		falloffStart = stats.rangeStuds * falloff.start,
-		falloffEndDamage = total * falloff.endFactor,
-		equipTime = handling.equip,
-		sprintToFire = handling.s2f,
-		adsTime = handling.ads,
+		damageNear = s.damageNear,
+		damageFar = s.damageFar,
+		rangeNear = s.rangeNear,
+		rangeFar = s.rangeFar,
+		travelMax = travelMax,
+		pellets = s.pellets or 1,
+		headshotMult = s.headshotMult,
+		fireRate = s.rpm / 60,
+		auto = s.auto,
+		spreadDeg = s.spreadDeg,
+		magSize = s.magSize,
+		reloadSeconds = s.reloadSeconds,
+		velocity = s.velocity,
+		drop = s.drop,
+		moveSpeedMult = s.moveSpeedMult,
+		equipTime = s.equipTime,
+		sprintToFire = s.sprintToFire,
+		adsTime = s.adsTime,
+		range = travelMax,
 	}
+	applyAttachments(resolved, attachmentIds)
+	return resolved
 end
 
 function CombatStats.knife(): Resolved
@@ -93,7 +120,11 @@ function CombatStats.knife(): Resolved
 		name = "Knife",
 		class = "Melee",
 		kind = "Melee",
-		totalDamage = config.damage,
+		damageNear = config.damage,
+		damageFar = config.damage,
+		rangeNear = config.range,
+		rangeFar = config.range,
+		travelMax = config.range,
 		pellets = 1,
 		headshotMult = config.headshotMultiplier,
 		fireRate = config.fireRate,
@@ -101,21 +132,33 @@ function CombatStats.knife(): Resolved
 		spreadDeg = 0,
 		magSize = 0,
 		reloadSeconds = 0,
-		range = config.range,
-		falloffStart = config.range,
-		falloffEndDamage = config.damage,
+		velocity = 0,
+		drop = 0,
+		moveSpeedMult = 1.06, -- knife feet: classic
 		equipTime = config.equipTime,
 		sprintToFire = config.sprintToFire,
 		adsTime = config.adsTime,
+		range = config.range,
 	}
 end
 
--- One resolver for anything a slot can hold.
-function CombatStats.resolve(id: string): Resolved
+function CombatStats.resolve(id: string, attachmentIds: { string }?): Resolved
 	if id == "Knife" then
 		return CombatStats.knife()
 	end
-	return CombatStats.forGun(id) or CombatStats.forGun("Pistol_1") :: Resolved
+	return CombatStats.forGun(id, attachmentIds) or CombatStats.knife()
+end
+
+-- Per-bullet (per-pellet) damage after falloff at a traveled distance.
+function CombatStats.pelletDamageAt(stats: Resolved, distance: number): number
+	if distance <= stats.rangeNear then
+		return stats.damageNear
+	end
+	if distance >= stats.rangeFar then
+		return stats.damageFar
+	end
+	local alpha = (distance - stats.rangeNear) / math.max(stats.rangeFar - stats.rangeNear, 1)
+	return stats.damageNear + (stats.damageFar - stats.damageNear) * alpha
 end
 
 return CombatStats

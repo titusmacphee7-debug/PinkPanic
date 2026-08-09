@@ -57,6 +57,13 @@ end
 -- Public state (WeaponController and ViewmodelController read these)
 -- ---------------------------------------------------------------------------
 
+-- Weapon weight from the held gun (WeaponController pushes it).
+local weaponSpeedMult = 1
+
+function MovementController.setWeaponSpeedMult(multiplier: number)
+	weaponSpeedMult = math.clamp(multiplier, 0.85, 1.1)
+end
+
 function MovementController.isSprinting(): boolean
 	return sprinting
 end
@@ -277,7 +284,8 @@ local function update(deltaTime: number)
 	-- WalkSpeed: the normal ladder, or carried momentum — whichever is
 	-- faster. Airborne this doubles as air-strafe authority: full steering
 	-- at your carried speed.
-	local ladder = if sprinting then MovementConfig.sprintWalkSpeed else MovementConfig.baseWalkSpeed
+	local ladder = (if sprinting then MovementConfig.sprintWalkSpeed else MovementConfig.baseWalkSpeed)
+		* weaponSpeedMult
 	if sliding then
 		humanoid.WalkSpeed = MovementConfig.slideEndSpeed
 	else

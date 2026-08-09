@@ -96,7 +96,10 @@ local function stylePanel(frame: Frame, radius: number)
 end
 
 local function statLine(stats: CombatStats.Resolved): string
-	return `💥 {stats.totalDamage}  ·  {math.floor(stats.fireRate * 60 + 0.5)} RPM  ·  {stats.magSize} mag`
+	local damage = if stats.pellets > 1
+		then `{stats.damageNear}x{stats.pellets}`
+		else `{stats.damageNear}`
+	return `💥 {damage}  ·  {math.floor(stats.fireRate * 60 + 0.5)} RPM  ·  {stats.magSize} mag`
 end
 
 local function setBusy(busy: boolean)
@@ -276,15 +279,19 @@ local function populateInspect(gunId: string)
 			child:Destroy()
 		end
 	end
+	local damageText = if stats.pellets > 1
+		then `{stats.damageNear}x{stats.pellets} → {stats.damageFar}x{stats.pellets}`
+		else `{stats.damageNear} → {stats.damageFar}`
 	local rows = {
-		{ "Damage", `{stats.totalDamage}{if stats.pellets > 1 then ` ({stats.pellets} pellets)` else ""}` },
+		{ "Damage", damageText },
+		{ "Falloff", `{stats.rangeNear}–{stats.rangeFar} studs` },
 		{ "Fire rate", `{math.floor(stats.fireRate * 60 + 0.5)} RPM` },
 		{ "Mag", `{stats.magSize}` },
 		{ "Reload", `{stats.reloadSeconds}s` },
-		{ "Range", `{stats.range} studs` },
+		{ "Velocity", `{stats.velocity} studs/s` },
 		{ "Headshot", `x{stats.headshotMult}` },
-		{ "Pull-out", `{stats.equipTime}s` },
-		{ "Sprint-to-fire", `{stats.sprintToFire}s` },
+		{ "Mobility", `{math.floor(stats.moveSpeedMult * 100 + 0.5)}%` },
+		{ "Pull-out / ADS", `{stats.equipTime}s / {stats.adsTime}s` },
 	}
 	for index, row in rows do
 		local label = mkText(inspectStatsList, 15, TEXT_DARK)
