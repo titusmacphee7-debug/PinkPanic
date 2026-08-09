@@ -24,6 +24,7 @@ local Definitions: { [string]: RemoteKind } = {
 	-- Round loop (M2)
 	RoundStateChanged = "Event", -- server -> clients: state machine transitions
 	ScoreUpdated = "Event", -- server -> clients: live standings
+	EnterPortal = "Event", -- client -> server: Panic Portal pad (starts Studio-solo rounds)
 
 	-- Lobby (M6)
 	LobbyShot = "Event", -- client -> server: cosmetic lobby shot (target pops)

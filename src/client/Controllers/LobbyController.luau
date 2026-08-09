@@ -129,6 +129,11 @@ local function applyZone(zone: BasePart?)
 			ShopController.setOpen(true)
 		elseif action == "loadout" then
 			SettingsController.setOpen(true)
+		elseif action == "portal" then
+			-- The Panic Portal: asks the server to start the round (Studio
+			-- solo starts on demand; live lobbies run the normal timer).
+			showBanner("Entering the arena... 💗")
+			Remotes.event("EnterPortal"):FireServer()
 		end
 	end
 end

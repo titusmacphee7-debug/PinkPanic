@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local Guard = require(ReplicatedStorage.Shared.Net.Guard)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local CombatService = require(script.Parent.CombatService)
 local LobbyService = require(script.Parent.LobbyService)
@@ -107,15 +108,26 @@ local function onDeath(victim: Player, attacker: Player?, _weaponId: string?)
 	Remotes.event("ScoreUpdated"):FireAllClients(serializeScores())
 end
 
+-- Studio solo: the round waits for the Panic Portal instead of auto-starting,
+-- so the lobby (fixed camera, pads, armory) is actually testable alone. With
+-- 2+ players — or outside Studio — rounds run on the normal timer.
+local portalRequested = false
+
+local function soloHold(): boolean
+	return RunService:IsStudio() and #Players:GetPlayers() <= 1 and not portalRequested
+end
+
 local function runLoop()
 	while true do
-		-- Waiting: not enough players for a match.
+		-- Waiting: not enough players for a match (or, solo in Studio, the
+		-- portal hasn't been stepped on yet).
 		state = "Waiting"
 		endsAt = 0
 		broadcast()
-		while #Players:GetPlayers() < minPlayers() do
+		while #Players:GetPlayers() < minPlayers() or soloHold() do
 			task.wait(1)
 		end
+		portalRequested = false
 
 		-- Intermission: countdown to the round.
 		state = "Intermission"
@@ -163,6 +175,14 @@ end
 
 function RoundService.init()
 	CombatService.onDeathConnect(onDeath)
+
+	-- The Panic Portal pad: in Studio solo it starts the round on demand.
+	Remotes.event("EnterPortal").OnServerEvent:Connect(function(player)
+		if not Guard.checkRate(player, "EnterPortal", 2, 1) then
+			return
+		end
+		portalRequested = true
+	end)
 
 	Players.PlayerAdded:Connect(function(player)
 		if state == "Active" then
