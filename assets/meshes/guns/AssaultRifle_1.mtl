@@ -1,0 +1,30 @@
+newmtl Baseplate1Mtl
+Material Color
+Ka 0.103634 0.103634 0.103634
+Kd 0.103634 0.103634 0.103634
+Ks 0.00650253 0.00650253 0.00650253 
+
+d 1
+
+Ns 0
+
+map_Ka Baseplate1_diff.png
+map_Kd Baseplate1_diff.png
+map_d Baseplate1_diff.png
+
+map_Bump Baseplate1_nmap.png
+
+newmtl Baseplate2Mtl
+Material Color
+Ka 0 0 0
+Kd 0 0 0
+Ks 0 0 0 
+
+d 0.2
+
+Ns 0
+
+map_Ka Baseplate2_diff.png
+map_Kd Baseplate2_diff.png
+map_d Baseplate2_diff.png
+
