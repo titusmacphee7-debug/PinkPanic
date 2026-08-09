@@ -22,6 +22,11 @@ export type LifetimeStats = {
 	roundsWon: number,
 }
 
+export type GunCosmetics = {
+	skinId: string?,
+	camoId: string?,
+}
+
 export type PlayerData = {
 	version: number,
 	coins: number,
@@ -31,6 +36,12 @@ export type PlayerData = {
 	ownedSkins: { string },
 	ownedCharms: { string },
 	equipped: EquippedLoadout,
+	-- Gun roster era (schema v2, docs/GUNS_HANDOFF.md §4.2):
+	ownedGuns: { string },
+	ownedGunSkins: { string },
+	ownedCamos: { string },
+	loadout: { primary: string?, secondary: string },
+	gunCosmetics: { [string]: GunCosmetics },
 	settings: PlayerSettings,
 	stats: LifetimeStats,
 	firstJoinedAt: number,
@@ -39,7 +50,7 @@ export type PlayerData = {
 
 local PlayerDataSchema = {}
 
-PlayerDataSchema.VERSION = 1
+PlayerDataSchema.VERSION = 2
 
 function PlayerDataSchema.default(): PlayerData
 	return {
@@ -50,6 +61,11 @@ function PlayerDataSchema.default(): PlayerData
 		ownedWeapons = { "Pistol" },
 		ownedSkins = {},
 		ownedCharms = {},
+		ownedGuns = { "Pistol_1" },
+		ownedGunSkins = {},
+		ownedCamos = {},
+		loadout = { primary = nil, secondary = "Pistol_1" },
+		gunCosmetics = {},
 		equipped = {
 			weapon = "Pistol",
 			skins = {},
@@ -72,6 +88,17 @@ end
 
 -- Migrations[n] upgrades a profile from version n to n + 1.
 local Migrations: { [number]: (any) -> () } = {}
+
+-- v1 -> v2: the gun roster era (docs/GUNS_HANDOFF.md §4.2). Everyone gets
+-- the free starter and empty collections; the legacy four-weapon fields
+-- remain untouched until Phase C retires them.
+Migrations[1] = function(data)
+	data.ownedGuns = { "Pistol_1" }
+	data.ownedGunSkins = {}
+	data.ownedCamos = {}
+	data.loadout = { primary = nil, secondary = "Pistol_1" }
+	data.gunCosmetics = {}
+end
 
 -- Fills in any missing keys from the default profile (new fields added in the
 -- same version, partial saves) without touching data the player already has.
