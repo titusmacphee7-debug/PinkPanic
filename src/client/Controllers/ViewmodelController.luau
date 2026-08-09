@@ -11,6 +11,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
+local CombatStats = require(ReplicatedStorage.Shared.Config.CombatStats)
 local GunModelLoader = require(ReplicatedStorage.Shared.Assets.GunModelLoader)
 local ClientData = require(script.Parent.Parent.ClientData)
 local MovementController = require(script.Parent.MovementController)
@@ -37,6 +38,12 @@ local swayX = 0
 local swayY = 0
 local loweredAlpha = 0
 local cantAlpha = 0
+-- Procedural animation state (equip raise, reload choreography, landing dip)
+local equipStartedAt = 0
+local equipDuration = 0.3
+local reloadEndsAt = 0
+local reloadDuration = 1
+local landKick = 0
 
 local function localCharacterAlive(): boolean
 	local character = Players.LocalPlayer.Character
@@ -111,11 +118,39 @@ local function update(dt: number)
 
 	local sprintPose = CFrame.new(-0.45 * loweredAlpha, -0.12 * loweredAlpha, 0.18 * loweredAlpha)
 		* CFrame.Angles(0.28 * loweredAlpha, 0.7 * loweredAlpha, 0.12 * loweredAlpha)
+
+	-- Pull-out: the gun sweeps up from low-right over the weapon's equipTime.
+	local now = os.clock()
+	local equipRemaining = 1 - math.clamp((now - equipStartedAt) / equipDuration, 0, 1)
+	local e = equipRemaining * equipRemaining -- ease-out on the way up
+	local equipPose = CFrame.new(0.2 * e, -1.15 * e, 0.3 * e)
+		* CFrame.Angles(-0.9 * e, 0.55 * e, 0.2 * e)
+
+	-- Reload: dip in -> mag-swap wobble -> confident return, spanning the
+	-- weapon's exact reloadSeconds so animation and gameplay always agree.
+	local reloadPose = CFrame.identity
+	if now < reloadEndsAt then
+		local p = 1 - (reloadEndsAt - now) / reloadDuration
+		local inAmount = math.sin(math.min(p / 0.22, 1) * math.pi / 2)
+		local outAmount = if p > 0.82 then 1 - (p - 0.82) / 0.18 else 1
+		local amount = inAmount * math.max(outAmount, 0)
+		local wobble = math.sin(p * math.pi * 5) * 0.07 * amount
+		reloadPose = CFrame.new(0.05 * amount, -0.55 * amount, 0.18 * amount)
+			* CFrame.Angles(-0.38 * amount + wobble, 0.22 * amount, 0.55 * amount)
+	end
+
+	-- Landing dip: the gun sinks and recovers when you hit the ground.
+	landKick = math.max(0, landKick - dt * 4)
+	local landPose = CFrame.new(0, -0.35 * landKick, 0) * CFrame.Angles(-0.2 * landKick, 0, 0)
+
 	local cframe = camera.CFrame
 		* BASE_OFFSET
 		* classOffset()
 		* CFrame.new(swayX, swayY + bob, recoil * 0.4)
 		* sprintPose
+		* equipPose
+		* reloadPose
+		* landPose
 		* CFrame.Angles(recoil, swayX * 0.5, cantAlpha * 0.35)
 	gun:PivotTo(cframe)
 end
@@ -127,6 +162,21 @@ function ViewmodelController.setWeapon(weaponId: string)
 	end
 	currentWeapon = weaponId
 	hideModel()
+	-- Pull-out animation paced by the weapon's own equip stat.
+	equipDuration = math.max(CombatStats.resolve(weaponId).equipTime, 0.15)
+	equipStartedAt = os.clock()
+	reloadEndsAt = 0
+end
+
+-- WeaponController relays the server's reload state so the choreography
+-- spans the weapon's exact reload window.
+function ViewmodelController.setReloading(active: boolean, duration: number?)
+	if active then
+		reloadDuration = math.max(duration or 1, 0.2)
+		reloadEndsAt = os.clock() + reloadDuration
+	else
+		reloadEndsAt = 0
+	end
 end
 
 -- Cosmetic changes re-dress the in-hand gun.
@@ -154,6 +204,26 @@ end
 
 function ViewmodelController.init()
 	RunService:BindToRenderStep("PinkPanicViewmodel", Enum.RenderPriority.Camera.Value + 1, update)
+
+	-- Landing dip hookup (re-hooked per character).
+	local function hookCharacter(model: Model)
+		local humanoid = model:WaitForChild("Humanoid", 5)
+		if humanoid and humanoid:IsA("Humanoid") then
+			humanoid.StateChanged:Connect(function(_, newState)
+				if newState == Enum.HumanoidStateType.Landed then
+					landKick = 0.7
+				end
+			end)
+		end
+	end
+	local existing = Players.LocalPlayer.Character
+	if existing then
+		task.spawn(hookCharacter, existing)
+	end
+	Players.LocalPlayer.CharacterAdded:Connect(function(model)
+		equipStartedAt = os.clock() -- fresh spawn raises the gun too
+		task.spawn(hookCharacter, model)
+	end)
 end
 
 return ViewmodelController

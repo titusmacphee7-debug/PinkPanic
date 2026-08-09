@@ -152,6 +152,10 @@ function WeaponController.init()
 			end
 			if type(data.gunId) == "string" then
 				ViewmodelController.setWeapon(data.gunId)
+				ViewmodelController.setReloading(
+					data.reloading == true,
+					CombatStats.resolve(data.gunId).reloadSeconds
+				)
 			end
 		end
 	end)
