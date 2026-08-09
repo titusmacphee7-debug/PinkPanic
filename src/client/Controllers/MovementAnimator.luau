@@ -8,8 +8,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local SPRINT_SPEED_THRESHOLD = 20
-local SLIDE_SPEED_THRESHOLD = 27
+local SPRINT_SPEED_THRESHOLD = 26
+local SLIDE_SPEED_THRESHOLD = 36
 local SPRINT_LEAN = math.rad(9) -- forward
 local SLIDE_LEAN = math.rad(-24) -- backward, low
 local SMOOTHING = 10
