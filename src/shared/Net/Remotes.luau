@@ -29,6 +29,9 @@ local Definitions: { [string]: RemoteKind } = {
 	LobbyShot = "Event", -- client -> server: cosmetic lobby shot (target pops)
 	TargetPopped = "Event", -- server -> clients: a lobby target burst
 
+	-- Movement (NOD-100/NOD-105)
+	MovementState = "Event", -- client -> server: stance (slide/crouch) for pose replication
+
 	-- Economy (M4)
 	PurchaseItem = "Function", -- client -> server: buy from catalog, returns result
 	EquipItem = "Function", -- client -> server: equip owned cosmetic, returns result

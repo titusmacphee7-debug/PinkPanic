@@ -12,6 +12,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local MovementConfig = require(ReplicatedStorage.Shared.Config.MovementConfig)
+local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local ClientData = require(script.Parent.Parent.ClientData)
 
 local HOT_PINK = Color3.fromRGB(255, 92, 168)
@@ -39,6 +40,11 @@ local crouchCameraAlpha = 0
 -- zooms the FOV.
 local adsAlpha = 0
 local adsZoom = 0
+-- Stance replication (throttled, change-driven) so everyone poses this
+-- character correctly.
+local sentSliding = false
+local sentCrouching = false
+local lastStanceSentAt = 0
 -- Momentum: extra speed above the normal ladder, carried across states.
 local momentumSpeed = 0
 local lastLandedAt = 0
@@ -353,6 +359,15 @@ local function update(deltaTime: number)
 	-- Crouch: key held, grounded, and nothing faster going on. A slide with
 	-- the key still down melts into a crouch when it ends.
 	crouching = crouchHeld and not sprinting and not sliding and not airborne
+
+	-- Tell the server the stance changed (trailing send is guaranteed: the
+	-- condition re-checks every frame until the send goes through).
+	if (sliding ~= sentSliding or crouching ~= sentCrouching) and now - lastStanceSentAt > 0.1 then
+		sentSliding = sliding
+		sentCrouching = crouching
+		lastStanceSentAt = now
+		Remotes.event("MovementState"):FireServer(sliding, crouching)
+	end
 
 	-- Profile: slide, crouch, or standing — one place owns hip and camera.
 	if not originalHipHeight then
