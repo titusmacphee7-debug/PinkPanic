@@ -6,6 +6,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
@@ -25,6 +26,12 @@ local scores: { [Player]: Score } = {}
 
 local function now(): number
 	return workspace:GetServerTimeNow()
+end
+
+-- Solo Studio playtests still cycle rounds (lobby -> arena -> lobby);
+-- real servers keep the configured minimum.
+local function minPlayers(): number
+	return if RunService:IsStudio() then 1 else GameConfig.minPlayers
 end
 
 -- Combat gating (WeaponService): real shots only land during a live round.
@@ -106,7 +113,7 @@ local function runLoop()
 		state = "Waiting"
 		endsAt = 0
 		broadcast()
-		while #Players:GetPlayers() < GameConfig.minPlayers do
+		while #Players:GetPlayers() < minPlayers() do
 			task.wait(1)
 		end
 
@@ -115,7 +122,7 @@ local function runLoop()
 		endsAt = now() + GameConfig.intermissionSeconds
 		broadcast()
 		task.wait(GameConfig.intermissionSeconds)
-		if #Players:GetPlayers() < GameConfig.minPlayers then
+		if #Players:GetPlayers() < minPlayers() then
 			continue -- someone left during the countdown; back to Waiting
 		end
 
