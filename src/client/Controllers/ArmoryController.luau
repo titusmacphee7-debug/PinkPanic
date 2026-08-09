@@ -19,6 +19,7 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local GunSkinCatalog = require(ReplicatedStorage.Shared.Config.GunSkinCatalog)
 local CombatStats = require(ReplicatedStorage.Shared.Config.CombatStats)
+local MovementConfig = require(ReplicatedStorage.Shared.Config.MovementConfig)
 local GunModelLoader = require(ReplicatedStorage.Shared.Assets.GunModelLoader)
 local ClientData = require(script.Parent.Parent.ClientData)
 
@@ -282,6 +283,10 @@ local function populateInspect(gunId: string)
 	local damageText = if stats.pellets > 1
 		then `{stats.damageNear}x{stats.pellets} → {stats.damageFar}x{stats.pellets}`
 		else `{stats.damageNear} → {stats.damageFar}`
+	-- Movement while holding this gun, in real studs/s (weight applied).
+	local function spd(base: number): number
+		return math.floor(base * stats.moveSpeedMult + 0.5)
+	end
 	local rows = {
 		{ "Damage", damageText },
 		{ "Falloff", `{stats.rangeNear}–{stats.rangeFar} studs` },
@@ -290,7 +295,10 @@ local function populateInspect(gunId: string)
 		{ "Reload", `{stats.reloadSeconds}s` },
 		{ "Velocity", `{stats.velocity} studs/s` },
 		{ "Headshot", `x{stats.headshotMult}` },
-		{ "Mobility", `{math.floor(stats.moveSpeedMult * 100 + 0.5)}%` },
+		{
+			"Speed",
+			`{spd(MovementConfig.baseWalkSpeed)} walk · {spd(MovementConfig.sprintWalkSpeed)} sprint · {spd(MovementConfig.slideInitialSpeed)} slide`,
+		},
 		{ "Pull-out / ADS", `{stats.equipTime}s / {stats.adsTime}s` },
 	}
 	for index, row in rows do

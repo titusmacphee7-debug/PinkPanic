@@ -34,6 +34,16 @@ local slideCameraAlpha = 0
 -- Momentum: extra speed above the normal ladder, carried across states.
 local momentumSpeed = 0
 local lastLandedAt = 0
+-- Skid: releasing the keys glides you to a stop instead of instant brakes.
+local skidding = false
+local skidSpeed = 0
+local lastMoveDirection = Vector3.zAxis
+local lastMovingSpeed = 0
+-- The engine control module, for reading REAL player input: the skid's own
+-- injected Humanoid:Move would otherwise read back as "the player is
+-- steering" and cancel the skid every other frame. Loaded async in init;
+-- skids only arm once it's available.
+local controls: any = nil
 
 local staminaBar: Frame? = nil
 local staminaFill: Frame? = nil
@@ -122,7 +132,7 @@ local function trySlide()
 	sliding = true
 	slideEndsAt = now + MovementConfig.slideDuration
 	-- Momentum-fed entry: a bhop chain slides in FASTER than a fresh slide.
-	slideSpeed = math.max(MovementConfig.slideInitialSpeed, horizontalSpeed(root), momentumSpeed)
+	slideSpeed = math.max(MovementConfig.slideInitialSpeed * weaponSpeedMult, horizontalSpeed(root), momentumSpeed)
 	slideSpeed = math.min(slideSpeed, MovementConfig.momentumHardCap)
 
 	local flat = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
@@ -188,6 +198,26 @@ end
 -- Main loop
 -- ---------------------------------------------------------------------------
 
+-- Anti-gravity assist while airborne: jumps hang longer and falls float a
+-- touch, without touching global gravity (shells and ragdolls keep theirs).
+local function ensureFloatForce(root: BasePart): VectorForce
+	local existing = root:FindFirstChild("PinkPanicFloat")
+	if existing and existing:IsA("VectorForce") then
+		return existing
+	end
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "PinkPanicFloatAttachment"
+	attachment.Parent = root
+	local force = Instance.new("VectorForce")
+	force.Name = "PinkPanicFloat"
+	force.Attachment0 = attachment
+	force.RelativeTo = Enum.ActuatorRelativeTo.World
+	force.ApplyAtCenterOfMass = true
+	force.Enabled = false
+	force.Parent = root
+	return force
+end
+
 local function update(deltaTime: number)
 	local model, humanoid, root = character()
 	local now = os.clock()
@@ -195,11 +225,39 @@ local function update(deltaTime: number)
 	if not model or not humanoid or not root then
 		sprinting = false
 		sliding = false
+		skidding = false
 		momentumSpeed = 0
 		return
 	end
 
 	local airborne = humanoid.FloorMaterial == Enum.Material.Air
+
+	-- Real input beats MoveDirection: the latter includes our own skid
+	-- injection, the former is only what the player is pressing.
+	local realInput: Vector3? = nil
+	if controls then
+		local ok, vector = pcall(function()
+			return controls:GetMoveVector()
+		end)
+		if ok and typeof(vector) == "Vector3" then
+			realInput = vector
+		end
+	end
+	local moving = if realInput
+		then realInput.Magnitude > 0.05
+		else humanoid.MoveDirection.Magnitude > 0.1
+	if moving and not skidding then
+		lastMoveDirection = humanoid.MoveDirection
+		lastMovingSpeed = horizontalSpeed(root)
+	end
+
+	local float = ensureFloatForce(root)
+	float.Force = Vector3.new(
+		0,
+		root.AssemblyMass * workspace.Gravity * (1 - MovementConfig.jumpGravityScale),
+		0
+	)
+	float.Enabled = airborne
 
 	-- Slide physics: ice glide with gravity feeding it on slopes.
 	if sliding then
@@ -265,8 +323,30 @@ local function update(deltaTime: number)
 	slideCameraAlpha += (slideTarget - slideCameraAlpha) * math.min(deltaTime * 10, 1)
 	humanoid.CameraOffset = Vector3.new(0, -MovementConfig.slideCameraDrop * slideCameraAlpha, 0)
 
+	-- Friction: no input at speed = skid along the last direction, bleeding
+	-- speed gradually instead of the engine's instant brake.
+	if skidding then
+		skidSpeed -= MovementConfig.skidFriction * deltaTime
+		momentumSpeed = math.min(momentumSpeed, math.max(skidSpeed, 0))
+		if
+			moving
+			or airborne
+			or sliding
+			or ClientData.inLobby()
+			or skidSpeed <= MovementConfig.skidStopSpeed
+		then
+			skidding = false
+		end
+	elseif realInput and not moving and not sliding and not airborne and not ClientData.inLobby() then
+		local speed = math.max(horizontalSpeed(root), lastMovingSpeed)
+		if speed > MovementConfig.skidMinSpeed then
+			skidding = true
+			skidSpeed = speed
+		end
+		lastMovingSpeed = 0
+	end
+
 	-- Sprint state: held + moving + stamina, never while sliding.
-	local moving = humanoid.MoveDirection.Magnitude > 0.1
 	if sprinting then
 		sprinting = sprintHeld and moving and stamina > 1 and not sliding
 	else
@@ -288,6 +368,8 @@ local function update(deltaTime: number)
 		* weaponSpeedMult
 	if sliding then
 		humanoid.WalkSpeed = MovementConfig.slideEndSpeed
+	elseif skidding then
+		humanoid.WalkSpeed = math.max(skidSpeed, 0)
 	else
 		humanoid.WalkSpeed = math.max(ladder, momentumSpeed)
 	end
@@ -316,6 +398,16 @@ end
 function MovementController.init()
 	buildStaminaBar()
 
+	task.spawn(function()
+		local ok, result = pcall(function()
+			local playerScripts = Players.LocalPlayer:WaitForChild("PlayerScripts")
+			return (require(playerScripts:WaitForChild("PlayerModule")) :: any):GetControls()
+		end)
+		if ok and result then
+			controls = result
+		end
+	end)
+
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then
 			return
@@ -336,6 +428,8 @@ function MovementController.init()
 		local humanoid = model:WaitForChild("Humanoid", 5)
 		if humanoid and humanoid:IsA("Humanoid") then
 			originalHipHeight = nil
+			humanoid.UseJumpPower = false
+			humanoid.JumpHeight = MovementConfig.jumpHeight
 			humanoid.Jumping:Connect(function(active)
 				if active then
 					onJumping()
@@ -355,12 +449,25 @@ function MovementController.init()
 	Players.LocalPlayer.CharacterAdded:Connect(function(model)
 		sliding = false
 		sprinting = false
+		skidding = false
 		momentumSpeed = 0
 		stamina = MovementConfig.staminaMax
 		task.spawn(hookCharacter, model)
 	end)
 
 	RunService.Heartbeat:Connect(update)
+
+	-- Skid steering: keep the character drifting along its last direction
+	-- after the player's own control module has run (last Move call wins).
+	RunService:BindToRenderStep("PinkPanicSkid", Enum.RenderPriority.Input.Value + 1, function()
+		if not skidding then
+			return
+		end
+		local _, humanoid = character()
+		if humanoid then
+			humanoid:Move(lastMoveDirection, false)
+		end
+	end)
 
 	-- Camera cant while sliding: applied after the engine camera each frame,
 	-- combat only (the lobby camera composes its own shot).

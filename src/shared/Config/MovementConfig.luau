@@ -7,6 +7,16 @@ return {
 	sprintWalkSpeed = 30, -- +50%
 	fireRaiseDelay = 0.25, -- fallback sprint-to-fire; weapons override per-config
 
+	-- Jump: higher and floatier than stock Roblox, and it carries your speed.
+	jumpHeight = 9.5, -- stock is ~6.4 studs
+	jumpGravityScale = 0.76, -- character gravity while airborne (lower = floatier)
+
+	-- Friction: releasing the keys skids you to a stop instead of the
+	-- engine's instant brake.
+	skidFriction = 45, -- studs/s^2 bled while skidding (matches momentum decay)
+	skidMinSpeed = 12, -- skids only start above this speed
+	skidStopSpeed = 6, -- control snaps back below this
+
 	slideInitialSpeed = 44,
 	slideEndSpeed = 27,
 	slideDuration = 1.25,
