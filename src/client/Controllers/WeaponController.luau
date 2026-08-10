@@ -50,6 +50,7 @@ local ADS_ZOOM: { [string]: number } = {
 local RECOIL_SCALE = 0.5
 local recoilPitch = 0 -- radians of climb currently applied
 local recoilYaw = 0
+local appliedSensitivity = 1
 
 -- Per-gun ceilings: a gun can climb ~3.5 shots' worth before topping out,
 -- so the calm guns top out low and the mean ones top out high.
@@ -237,9 +238,15 @@ function WeaponController.init()
 
 		-- Zoomed FOV needs matching mouse sensitivity or aiming feels twitchy:
 		-- scale by the FOV ratio while aimed (snipers get the biggest cut).
-		UserInputService.MouseDeltaSensitivity = if inCombat
-			then math.max((70 - zoom * adsAlpha) / 70, 0.4)
-			else 1
+		-- Some contexts refuse this property, so write it only on change and
+		-- never let a rejection spam the log.
+		local wanted = if inCombat then math.max((70 - zoom * adsAlpha) / 70, 0.4) else 1
+		if math.abs(wanted - appliedSensitivity) > 0.01 then
+			appliedSensitivity = wanted
+			pcall(function()
+				UserInputService.MouseDeltaSensitivity = wanted
+			end)
+		end
 
 		local settle = math.exp(-dt * stats.recoilRecovery / 1.6)
 		recoilPitch *= settle
