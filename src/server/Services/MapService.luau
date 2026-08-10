@@ -266,11 +266,30 @@ local function buildSpawns()
 end
 
 function MapService.init()
-	if workspace:FindFirstChild(MAP_NAME) then
+	local existing = workspace:FindFirstChild(MAP_NAME)
+
+	-- A hand-built map named "Arena" replaces the generated mall entirely:
+	-- put SpawnLocations inside it and rounds happen there. Any saved
+	-- generated mall gets cleaned up.
+	if workspace:FindFirstChild("Arena") then
+		if existing then
+			existing:Destroy()
+		end
 		return
 	end
+
+	-- A mall saved from an older session at the wrong location (or without
+	-- the origin stamp) is stale: destroy and regenerate in place.
+	if existing then
+		if existing:GetAttribute("ArenaOrigin") == ARENA_ORIGIN then
+			return
+		end
+		existing:Destroy()
+	end
+
 	local newFolder = Instance.new("Folder")
 	newFolder.Name = MAP_NAME
+	newFolder:SetAttribute("ArenaOrigin", ARENA_ORIGIN)
 	folder = newFolder
 
 	buildFloorAndWalls()

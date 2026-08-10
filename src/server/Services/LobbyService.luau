@@ -189,11 +189,14 @@ end
 
 -- Round flow: arena spawns live only while a round is Active.
 function LobbyService.setArenaActive(active: boolean)
-	local arena = workspace:FindFirstChild(ARENA_NAME)
-	if arena then
-		for _, child in arena:GetChildren() do
-			if child:IsA("SpawnLocation") then
-				child.Enabled = active
+	-- Generated mall or a hand-built map named "Arena" — whichever exists.
+	for _, containerName in { ARENA_NAME, "Arena" } do
+		local arena = workspace:FindFirstChild(containerName)
+		if arena then
+			for _, child in arena:GetDescendants() do
+				if child:IsA("SpawnLocation") then
+					child.Enabled = active
+				end
 			end
 		end
 	end
@@ -270,6 +273,12 @@ end
 function LobbyService.init()
 	local custom = workspace:FindFirstChild("Lobby")
 	if custom then
+		-- The hand-built lobby wins: destroy any placeholder plaza that got
+		-- saved into the place file back when it was generated.
+		local legacy = workspace:FindFirstChild(LOBBY_NAME)
+		if legacy then
+			legacy:Destroy()
+		end
 		setupCustomLobby(custom)
 		return
 	end

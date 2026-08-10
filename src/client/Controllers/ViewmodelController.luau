@@ -49,6 +49,31 @@ local landKick = 0
 -- ADS blend pushed by WeaponController (0 = hip, 1 = aimed).
 local adsAlpha = 0
 
+-- Gun cycling (docs/GUNS_SPLIT_MANIFEST.md): split models carry moving
+-- parts — Slide/Bolt blow back per shot, Pump strokes after, Cylinder
+-- advances a notch, Mag drops during the reload. Rest offsets are captured
+-- at build; every frame the parts are re-posed relative to the receiver.
+type MovingPart = { part: BasePart, rest: CFrame }
+local movingParts: { [string]: MovingPart } = {}
+local MOVING_NAMES = { "Slide", "Bolt", "Pump", "Cylinder", "Mag" }
+local lastCycleAt = 0
+local cylinderAngle = 0
+local cylinderTarget = 0
+
+local function captureMovingParts(gun: Model)
+	table.clear(movingParts)
+	local primary = gun.PrimaryPart
+	if not primary then
+		return
+	end
+	for _, name in MOVING_NAMES do
+		local part = gun:FindFirstChild(name)
+		if part and part:IsA("BasePart") then
+			movingParts[name] = { part = part, rest = primary.CFrame:ToObjectSpace(part.CFrame) }
+		end
+	end
+end
+
 local function localCharacterAlive(): boolean
 	local character = Players.LocalPlayer.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -81,6 +106,7 @@ local function ensureModel(): Model
 	end
 	built.Parent = workspace.CurrentCamera
 	model = built
+	captureMovingParts(built)
 	return built
 end
 
@@ -89,6 +115,7 @@ local function hideModel()
 		model:Destroy()
 		model = nil
 	end
+	table.clear(movingParts)
 end
 
 local function update(dt: number)
@@ -162,6 +189,51 @@ local function update(dt: number)
 		* landPose
 		* CFrame.Angles(recoil, swayX * 0.5, cantAlpha * 0.35)
 	gun:PivotTo(cframe)
+
+	-- Gun cycling: re-pose the moving parts relative to the receiver.
+	local primary = gun.PrimaryPart
+	if primary and next(movingParts) ~= nil then
+		local sinceShot = now - lastCycleAt
+		-- Slide/Bolt: instant blowback, spring return over ~110ms.
+		local blow = math.clamp(1 - sinceShot / 0.11, 0, 1)
+		-- Pump: back-and-forward stroke shortly after the shot.
+		local pumpAlpha = 0
+		local pumpPhase = (sinceShot - 0.1) / 0.4
+		if pumpPhase > 0 and pumpPhase < 1 then
+			pumpAlpha = math.sin(pumpPhase * math.pi)
+		end
+		-- Cylinder eases to its next notch.
+		cylinderAngle += (cylinderTarget - cylinderAngle) * math.min(dt * 18, 1)
+		-- Mag: out for the middle of the reload, back in for the finish.
+		local magAlpha = 0
+		if now < reloadEndsAt then
+			local rp = 1 - (reloadEndsAt - now) / reloadDuration
+			if rp < 0.3 then
+				magAlpha = rp / 0.3
+			elseif rp < 0.72 then
+				magAlpha = 1
+			else
+				magAlpha = math.max(1 - (rp - 0.72) / 0.28, 0)
+			end
+		end
+
+		for name, moving in movingParts do
+			local offset = CFrame.identity
+			if name == "Slide" then
+				offset = CFrame.new(0, 0, moving.part.Size.Z * 0.42 * blow)
+			elseif name == "Bolt" then
+				offset = CFrame.new(0, 0, math.min(moving.part.Size.Z * 0.6, 0.5) * blow)
+			elseif name == "Pump" then
+				offset = CFrame.new(0, 0, math.min(moving.part.Size.Z * 0.5, 0.9) * pumpAlpha)
+			elseif name == "Cylinder" then
+				offset = CFrame.Angles(0, 0, cylinderAngle)
+			elseif name == "Mag" then
+				offset = CFrame.new(0, -moving.part.Size.Y * 1.4 * magAlpha, 0.06 * magAlpha)
+					* CFrame.Angles(0.3 * magAlpha, 0, 0.12 * magAlpha)
+			end
+			moving.part.CFrame = primary.CFrame * moving.rest * offset
+		end
+	end
 end
 
 -- Called on slot switches and server slot pushes; rebuilds next frame.
@@ -175,6 +247,9 @@ function ViewmodelController.setWeapon(weaponId: string)
 	equipDuration = math.max(CombatStats.resolve(weaponId).equipTime, 0.15)
 	equipStartedAt = os.clock()
 	reloadEndsAt = 0
+	lastCycleAt = 0
+	cylinderAngle = 0
+	cylinderTarget = 0
 end
 
 -- WeaponController relays the server's reload state so the choreography
@@ -198,17 +273,30 @@ end
 
 -- Visual kick scaled by the gun's real recoil stat (degrees of climb per
 -- shot), so the viewmodel and the camera agree about how mean the gun is.
+-- Also drives the gun cycle: slide/bolt blowback, pump stroke, cylinder
+-- advance — one notch per shot.
 function ViewmodelController.kick(recoilVert: number?)
 	local strength = math.max(recoilVert or 1, 0.4)
 	recoil = math.min(recoil + KICK_PER_SHOT * strength, KICK_MAX)
+	lastCycleAt = os.clock()
+	if movingParts.Cylinder then
+		local magSize = CombatStats.resolve(currentWeapon).magSize
+		cylinderTarget += math.pi * 2 / math.max(magSize, 5)
+	end
 end
 
 function ViewmodelController.setAdsAlpha(alpha: number)
 	adsAlpha = math.clamp(alpha, 0, 1)
 end
 
--- Where shells pop out: the right side of the in-hand gun's receiver.
+-- Where shells pop out: the real ejection port (the Slide/Bolt's right
+-- side on split models), else the right side of the receiver.
 function ViewmodelController.getEjectCFrame(): CFrame?
+	local port = movingParts.Slide or movingParts.Bolt
+	if port then
+		local part = port.part
+		return part.CFrame * CFrame.new(part.Size.X / 2 + 0.03, 0, 0)
+	end
 	local gun = model
 	local primary = gun and gun.PrimaryPart
 	if primary then
