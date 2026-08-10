@@ -41,10 +41,17 @@ local ADS_ZOOM: { [string]: number } = {
 
 -- Recoil: fixed spread never grows (no bloom, ever) — sustained fire
 -- climbs the CAMERA instead, and the crosshair always tells the truth.
+--
+-- ONE KNOB TUNES ALL 32 GUNS: RECOIL_SCALE multiplies every gun's per-shot
+-- kick. 0 = no recoil at all, 0.5 = current (gentle), 1 = the raw catalog
+-- numbers. Change this number alone to make the whole game kick more or
+-- less; per-gun personality (which gun kicks hardest) is preserved either
+-- way. Ceilings scale with it so nothing can ever fight the player.
+local RECOIL_SCALE = 0.5
 local recoilPitch = 0 -- radians of climb currently applied
 local recoilYaw = 0
-local RECOIL_PITCH_MAX = math.rad(3.2)
-local RECOIL_YAW_MAX = math.rad(1.2)
+local RECOIL_PITCH_MAX = math.rad(3.2) * RECOIL_SCALE
+local RECOIL_YAW_MAX = math.rad(1.2) * RECOIL_SCALE
 
 -- Aim-error feel knobs (per-gun numbers live in GunCatalog).
 local MOVE_SPREAD_DEG = 0.3 -- tiny penalty at full stride; barely noticeable
@@ -117,7 +124,7 @@ local function shoot()
 	local origin = camera.CFrame.Position
 	Remotes.event("FireWeapon"):FireServer(origin, aim.LookVector)
 
-	ViewmodelController.kick(stats.recoilVert)
+	ViewmodelController.kick(stats.recoilVert * RECOIL_SCALE)
 	if stats.kind == "Melee" then
 		EffectsController.playShotSound(0.45)
 		return
@@ -125,7 +132,7 @@ local function shoot()
 
 	-- Camera recoil for the NEXT shot: vertical climb with light sideways
 	-- jitter, calmer while aimed or crouched.
-	local calm = (1 - 0.25 * adsAlpha) * (if crouched then CROUCH_RECOIL_MULT else 1)
+	local calm = RECOIL_SCALE * (1 - 0.25 * adsAlpha) * (if crouched then CROUCH_RECOIL_MULT else 1)
 	recoilPitch = math.min(
 		recoilPitch + math.rad(stats.recoilVert) * rng:NextNumber(0.9, 1.1) * calm,
 		RECOIL_PITCH_MAX
