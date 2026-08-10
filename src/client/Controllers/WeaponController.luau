@@ -42,16 +42,22 @@ local ADS_ZOOM: { [string]: number } = {
 -- Recoil: fixed spread never grows (no bloom, ever) — sustained fire
 -- climbs the CAMERA instead, and the crosshair always tells the truth.
 --
--- ONE KNOB TUNES ALL 32 GUNS: RECOIL_SCALE multiplies every gun's per-shot
--- kick. 0 = no recoil at all, 0.5 = current (gentle), 1 = the raw catalog
--- numbers. Change this number alone to make the whole game kick more or
--- less; per-gun personality (which gun kicks hardest) is preserved either
--- way. Ceilings scale with it so nothing can ever fight the player.
+-- Every gun keeps its OWN kick (recoilVert/recoilHoriz/recoilRecovery in
+-- GunCatalog) and its OWN ceiling — a heavy sniper climbs far, an SMG
+-- barely lifts. RECOIL_SCALE is just a master volume over all of it:
+-- 0 = none, 0.5 = current (gentle), 1 = raw catalog numbers. Turning it
+-- changes how hard the game kicks overall, never which gun kicks hardest.
 local RECOIL_SCALE = 0.5
 local recoilPitch = 0 -- radians of climb currently applied
 local recoilYaw = 0
-local RECOIL_PITCH_MAX = math.rad(3.2) * RECOIL_SCALE
-local RECOIL_YAW_MAX = math.rad(1.2) * RECOIL_SCALE
+
+-- Per-gun ceilings: a gun can climb ~3.5 shots' worth before topping out,
+-- so the calm guns top out low and the mean ones top out high.
+local function recoilCeilings(stats: CombatStats.Resolved): (number, number)
+	local pitch = math.clamp(stats.recoilVert * 3.5, 0.5, 7) * RECOIL_SCALE
+	local yaw = math.clamp(stats.recoilHoriz * 3, 0.15, 3) * RECOIL_SCALE
+	return math.rad(pitch), math.rad(yaw)
+end
 
 -- Aim-error feel knobs (per-gun numbers live in GunCatalog).
 local MOVE_SPREAD_DEG = 0.3 -- tiny penalty at full stride; barely noticeable
@@ -133,14 +139,15 @@ local function shoot()
 	-- Camera recoil for the NEXT shot: vertical climb with light sideways
 	-- jitter, calmer while aimed or crouched.
 	local calm = RECOIL_SCALE * (1 - 0.25 * adsAlpha) * (if crouched then CROUCH_RECOIL_MULT else 1)
+	local pitchMax, yawMax = recoilCeilings(stats)
 	recoilPitch = math.min(
 		recoilPitch + math.rad(stats.recoilVert) * rng:NextNumber(0.9, 1.1) * calm,
-		RECOIL_PITCH_MAX
+		pitchMax
 	)
 	recoilYaw = math.clamp(
 		recoilYaw + math.rad(stats.recoilHoriz) * rng:NextNumber(-1, 1) * calm,
-		-RECOIL_YAW_MAX,
-		RECOIL_YAW_MAX
+		-yawMax,
+		yawMax
 	)
 
 	EffectsController.playShotSound(0.6)
