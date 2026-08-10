@@ -317,7 +317,10 @@ function ViewmodelController.getMuzzlePosition(): Vector3?
 end
 
 function ViewmodelController.init()
-	RunService:BindToRenderStep("PinkPanicViewmodel", Enum.RenderPriority.Camera.Value + 1, update)
+	-- LAST in the camera chain (engine 200 → lobby camera +1 → recoil +2 →
+	-- slide roll +3 → gun +4): the gun must be posed from the camera's FINAL
+	-- CFrame or it lags the recoil/roll by a frame and jitters, worst in ADS.
+	RunService:BindToRenderStep("PinkPanicViewmodel", Enum.RenderPriority.Camera.Value + 4, update)
 
 	-- Landing dip hookup (re-hooked per character).
 	local function hookCharacter(model: Model)

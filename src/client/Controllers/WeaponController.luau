@@ -218,7 +218,14 @@ function WeaponController.init()
 			1
 		)
 		ViewmodelController.setAdsAlpha(adsAlpha)
-		MovementController.setAds(adsAlpha, ADS_ZOOM[stats.class] or 10)
+		local zoom = ADS_ZOOM[stats.class] or 10
+		MovementController.setAds(adsAlpha, zoom)
+
+		-- Zoomed FOV needs matching mouse sensitivity or aiming feels twitchy:
+		-- scale by the FOV ratio while aimed (snipers get the biggest cut).
+		UserInputService.MouseDeltaSensitivity = if inCombat
+			then math.max((70 - zoom * adsAlpha) / 70, 0.4)
+			else 1
 
 		local settle = math.exp(-dt * stats.recoilRecovery / 1.6)
 		recoilPitch *= settle
