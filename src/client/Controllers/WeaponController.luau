@@ -227,11 +227,13 @@ function WeaponController.init()
 
 		local target = if adsHeld and inCombat and stats.kind ~= "Melee" then 1 else 0
 		local step = dt / math.max(stats.adsTime, 0.06)
-		adsAlpha = math.clamp(
-			adsAlpha + (if target > adsAlpha then step else -step * 1.5),
-			0,
-			1
-		)
+		-- Clamp TO the target, never past it: overshooting made adsAlpha
+		-- oscillate every frame at full ADS (the aim jitter).
+		if adsAlpha < target then
+			adsAlpha = math.min(adsAlpha + step, target)
+		elseif adsAlpha > target then
+			adsAlpha = math.max(adsAlpha - step * 1.5, target)
+		end
 		ViewmodelController.setAdsAlpha(adsAlpha)
 		local zoom = ADS_ZOOM[stats.class] or 10
 		MovementController.setAds(adsAlpha, zoom)
