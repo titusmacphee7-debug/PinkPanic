@@ -108,38 +108,14 @@ local function onDeath(victim: Player, attacker: Player?, _weaponId: string?)
 	Remotes.event("ScoreUpdated"):FireAllClients(serializeScores())
 end
 
--- Studio solo: the round waits for the Panic Portal instead of auto-starting,
--- so the lobby (fixed camera, pads, armory) is actually testable alone. With
--- 2+ players — or outside Studio — rounds run on the normal timer. If no
--- portal pad exists in the lobby, solo auto-starts like before: a deleted
--- pad can never soft-lock the game.
+-- Studio solo: the round waits for a deliberate start (the START GAME button
+-- or a Panic Portal pad) instead of auto-starting, so the lobby — fixed
+-- camera, pads, armory — is actually testable alone. With 2+ players, or
+-- outside Studio, rounds run on the normal timer.
 local portalRequested = false
-local portalPadCached: boolean? = nil
-
-local function portalPadExists(): boolean
-	local cached = portalPadCached
-	if cached ~= nil then
-		return cached
-	end
-	local lobby = workspace:FindFirstChild("Lobby")
-	local found = false
-	if lobby then
-		for _, descendant in lobby:GetDescendants() do
-			if descendant:IsA("BasePart") and descendant:GetAttribute("PadAction") == "portal" then
-				found = true
-				break
-			end
-		end
-	end
-	portalPadCached = found
-	return found
-end
 
 local function soloHold(): boolean
-	return RunService:IsStudio()
-		and #Players:GetPlayers() <= 1
-		and not portalRequested
-		and portalPadExists()
+	return RunService:IsStudio() and #Players:GetPlayers() <= 1 and not portalRequested
 end
 
 local function runLoop()

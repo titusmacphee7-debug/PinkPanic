@@ -26,8 +26,12 @@ local LobbyController = {}
 
 local currentZone: BasePart? = nil
 local banner: TextLabel? = nil
+local startButton: TextButton? = nil
 local bannerToken = 0
 local lastShotAt = 0
+
+-- Forward declaration: buildBanner's button callback closes over this.
+local showBanner: (text: string) -> ()
 
 local function lobbyFolder(): Folder?
 	return workspace:FindFirstChild("PinkPanicLobby") :: Folder?
@@ -72,10 +76,53 @@ local function buildBanner()
 	label.Parent = screen
 	banner = label
 
+	-- START GAME: the deliberate way into a round. Always available in the
+	-- lobby, so testing never depends on a pad existing.
+	local button = Instance.new("TextButton")
+	button.Name = "StartGame"
+	button.AnchorPoint = Vector2.new(0.5, 1)
+	button.Position = UDim2.new(0.5, 0, 1, -38)
+	button.Size = UDim2.fromOffset(300, 62)
+	button.BackgroundColor3 = HOT_PINK
+	button.BorderSizePixel = 0
+	button.Font = Enum.Font.FredokaOne
+	button.TextSize = 26
+	button.TextColor3 = PINK_WHITE
+	button.Text = "START GAME 💗"
+	button.Visible = false
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 18)
+	corner.Parent = button
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = PINK_WHITE
+	stroke.Thickness = 3
+	stroke.Transparency = 0.25
+	stroke.Parent = button
+	button.Activated:Connect(function()
+		Remotes.event("EnterPortal"):FireServer()
+		showBanner("Starting the round... 💗")
+	end)
+	button.Parent = screen
+	startButton = button
+
 	screen.Parent = playerGui
 end
 
-local function showBanner(text: string)
+-- The button lives and dies with lobby state.
+local function updateStartButton()
+	local button = startButton
+	if not button then
+		return
+	end
+	button.Visible = ClientData.inLobby()
+		and not ClientData.menuOpen()
+		and not ClientData.armoryBusy
+	button.Text = if ClientData.roundState == "Intermission"
+		then "STARTING... 💗"
+		else "START GAME 💗"
+end
+
+function showBanner(text: string)
 	local label = banner
 	if not label then
 		return
@@ -139,6 +186,7 @@ local function applyZone(zone: BasePart?)
 end
 
 local function updateZones()
+	updateStartButton()
 	if not ClientData.inLobby() then
 		applyZone(nil)
 		return
