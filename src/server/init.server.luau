@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-11-T · profile schema v3 (NOD-132)"
+local BUILD_TAG = "2026-08-11-U · asset registries (NOD-145)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,6 +32,7 @@ Diagnostics.expect(
 	"AssetTree",
 	"ContentAudit",
 	"CombatStats",
+	"AssetRegistry",
 	"MapService",
 	"LobbyService",
 	"PlayerDataService",
@@ -50,6 +51,7 @@ local RarityConfig: any = Diagnostics.load("Rarity", ReplicatedStorage.Shared.Co
 local AssetTree: any = Diagnostics.load("AssetTree", ReplicatedStorage.Shared.Systems.AssetTree)
 local ContentAudit: any = Diagnostics.load("ContentAudit", ReplicatedStorage.Shared.Systems.ContentAudit)
 local CombatStats: any = Diagnostics.load("CombatStats", ReplicatedStorage.Shared.Systems.CombatStats)
+local AssetRegistry: any = Diagnostics.load("AssetRegistry", ReplicatedStorage.Shared.Systems.AssetRegistry)
 
 local MapService: any = Diagnostics.load("MapService", script.Services.MapService)
 local LobbyService: any = Diagnostics.load("LobbyService", script.Services.LobbyService)
@@ -84,6 +86,11 @@ end
 -- A typo'd stat name is found here, once, rather than never.
 if CombatStats then
 	Diagnostics.start("CombatStats", CombatStats.validate)
+end
+
+-- After AssetTree, which creates the folders it scans.
+if AssetRegistry then
+	Diagnostics.start("AssetRegistry", AssetRegistry.load)
 end
 
 local BOOT_ORDER: { { name: string, module: any } } = {

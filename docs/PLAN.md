@@ -317,15 +317,31 @@ again, and so attachments can mount without per-gun code.
 **Moving parts** (named parts, separate from the body):
 `Slide`, `Bolt`, `Pump`, `Cylinder`, `Mag`, `ChargingHandle`, `Trigger`, `Hammer`
 
-**Skin regions** (for camos): `Body`, `Barrel`, `Stock`, `Grip`, `Magazine`,
-`Accent`
+**Regions** — every mesh part carries one of these names, and the name decides
+what paints it (§4.5):
 
-**THE SHARED UV LAYOUT — the single most important line in this document**
+| Region | Painted by |
+|---|---|
+| `Body` | camo |
+| `Panel` | camo |
+| `Grip` | skin colour |
+| `Hardware` | skin colour |
+| `Accent` | skin colour |
 
-Every gun in the game is UV-unwrapped to the **same normalized layout**. Not
-per-gun. Not even per-class. One layout, all 38 weapons.
+A camo covers the receiver and handguard, not the whole weapon — the contrast is
+what makes it read as applied rather than dipped. Override per part with a
+`TakesCamo` attribute when a specific gun wants a painted stock or a bare
+receiver.
 
-Why it decides whether camos are a feature or a graveyard:
+**THE SHARED UV LAYOUT**
+
+Universal camos are UV-unwrapped to the **same normalized layout** across every
+gun, so one texture lands correctly on all of them.
+
+Gun-specific camos are authored against their own weapon's UV and do not depend
+on this. Since most camos are gun-specific (§4.5), the shared layout gates the
+universal subset rather than the whole feature — but that subset is the one that
+scales, so it still has to be right before any model is built:
 
 |  | per-gun UVs | shared UVs |
 |---|---|---|
@@ -384,19 +400,46 @@ Titus is generating a very large number of cutesy-pink camos. The engineering
 requirement is therefore not "make camos work" — it is **make adding the 300th
 camo cost nothing.**
 
+### Most camos are gun-specific
+
+**Correction to an earlier assumption.** Titus is authoring most camos for a
+*specific gun*, drawn against that weapon's own UV layout. Only some are
+universal.
+
+That changes what the shared UV layout is for. It is no longer the thing the
+whole camo feature depends on — it is what the **universal subset** needs in
+order to map onto any gun. Still required, still has to reach Cowork before
+models are built, but it gates one set rather than all of them.
+
+It also means the camo count is driven by guns × looks rather than by looks
+alone, which is exactly why the pipeline has to cost nothing per item.
+
 ### Convention over configuration
 
 There is no per-camo code and no per-camo config entry. A camo exists because a
-texture exists.
+texture exists, and **the folder it sits in says which gun it belongs to** — so
+the scope cannot be misconfigured or forgotten, because it is not configured at
+all.
 
 ```
 ReplicatedStorage/Assets/Camos/
-  Camo_StrawberryMilk        (Texture asset or a StringValue holding an id)
-  Camo_BubblegumSwirl
-  Camo_HeartCheck
-  Camo_SleepyClouds
-  ...
+  Universal/                    shared UV; works on every gun
+    Camo_StrawberryMilk
+    Camo_BubblegumSwirl
+  PerGun/                       one folder per gun id, auto-created from the catalog
+    AssaultRifle_2/
+      Camo_CherryBomb
+      Camo_PicnicPunch
+    SubmachineGun_3/
+      Camo_Jitterbug
 ```
+
+`AssetRegistry.camosFor(gunId)` returns that gun's camos plus the universal set.
+Every surface calls it rather than filtering itself, so a gun-specific camo can
+never leak onto a weapon it was not drawn for.
+
+A camo filed under a gun id that does not exist is a **boot failure naming it**,
+not a camo that silently never appears.
 
 `CamoRegistry` scans that folder at boot and derives everything:
 
@@ -408,20 +451,50 @@ ReplicatedStorage/Assets/Camos/
 Drop a texture in the folder → it is in the game, in the shop, previewable, and
 equippable. No code change, no restart of the pipeline, no PR.
 
+### A camo covers part of the gun, not all of it
+
+**Like CoD.** A camo paints the receiver and handguard; the barrel, magazine,
+grip and hardware keep their own finish. That contrast is most of why camos read
+as *applied to* a weapon rather than *replacing* it — a gun uniformly wrapped in
+one texture looks like a toy, and washes out the silhouette that makes weapons
+recognisable at a glance.
+
+It also protects the per-gun skin system: skins recolour `Grip`, `Hardware` and
+`Accent`, so a camo that painted everything would erase the skin underneath it
+and make the two features mutually exclusive.
+
+| Region | Camo | Skin colour |
+|---|---|---|
+| `Body` | ✅ painted | — |
+| `Panel` | ✅ painted | — |
+| `Grip` | — | ✅ |
+| `Hardware` | — | ✅ |
+| `Accent` | — | ✅ |
+
+Per the tag-content-never-infer rule, a model may override the default on any
+part with a `TakesCamo` boolean attribute — some weapons want a painted stock,
+some want a bare receiver. The default above applies when nothing is tagged, so
+a correctly-named model needs no attributes at all.
+
+Attachments never take camo. They are their own parts with their own finish,
+which is what keeps a built gun looking assembled rather than dipped.
+
 ### Applying it
 
-One texture ID written to the skin-region MeshParts:
+One texture ID written to the camo regions only:
 
 ```lua
 for _, part in gun:GetDescendants() do
-    if part:IsA("MeshPart") and SKIN_REGIONS[part.Name] then
+    if part:IsA("MeshPart") and takesCamo(part) then
         part.TextureID = camo.textureId
     end
 end
 ```
 
-Because of the shared UV layout (§3.4) this is the *entire* application logic
-for every gun in the game. Optional `SurfaceAppearance` support layers on later
+That is the entire application logic, and it is the same code for both scopes —
+a universal camo relies on the shared UV layout (§3.4) to land correctly on any
+gun, while a gun-specific camo was drawn against that one gun's UV and lands
+correctly by construction. Optional `SurfaceAppearance` support layers on later
 for PBR camos (normal/roughness/metalness) without changing this path.
 
 ### Character outfits — Arsenal-style, per Leah

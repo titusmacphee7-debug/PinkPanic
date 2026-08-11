@@ -48,7 +48,12 @@ local TREE: { Node } = {
 	-- ---------------------------------------------------------------------
 	{ path = "ReplicatedStorage/Assets", note = "Game content the client renders. Code lives in Shared." },
 
-	{ path = "ReplicatedStorage/Assets/Camos", note = "One texture per camo, named Camo_<Name>. Drop it in; it is in the game." },
+	-- Camos split by scope. MOST camos are gun-specific — authored for one
+	-- weapon's UV layout — and only some are universal. The folder a camo sits
+	-- in is what says which, so nothing has to be configured.
+	{ path = "ReplicatedStorage/Assets/Camos", note = "Camos. Universal/ works on every gun; PerGun/<GunId>/ is that gun only." },
+	{ path = "ReplicatedStorage/Assets/Camos/Universal", note = "Camo_<Name>. Must use the shared UV layout so it maps onto any gun." },
+	{ path = "ReplicatedStorage/Assets/Camos/PerGun", note = "One folder per gun id, auto-created from the catalog. Drop a camo into its gun's folder." },
 	{ path = "ReplicatedStorage/Assets/Outfits", note = "Outfit_<Name>. Layers over the player's own avatar, never replaces it." },
 	{ path = "ReplicatedStorage/Assets/Charms", note = "Charm_<Name>. Models welded to the gun's Mount_Charm socket." },
 	{ path = "ReplicatedStorage/Assets/KillEffects", note = "KillEffect_<Name>. Plays on YOUR kill. Hearts and sparkles live here." },
@@ -93,6 +98,25 @@ local function ensureFolder(parent: Instance, name: string): (Instance, boolean)
 	return folder, true
 end
 
+-- A camo folder per gun, derived from the catalog rather than listed here.
+-- This is the "a place for everything that's up and coming" rule applied to
+-- content: every gun already has its camo folder waiting, and because the
+-- folder name IS the gun id, ContentAudit can check it like anything else.
+local function ensurePerGunCamoFolders(parent: Instance): number
+	local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
+	local created = 0
+	for gunId in GunCatalog.guns do
+		if not parent:FindFirstChild(gunId) then
+			local folder = Instance.new("Folder")
+			folder.Name = gunId
+			folder:SetAttribute("Purpose", `Camos for {gunId} only. Authored against this gun's UV.`)
+			folder.Parent = parent
+			created += 1
+		end
+	end
+	return created
+end
+
 -- Creates anything missing. Returns how many were new, so the manifest can say
 -- "built 4" the first time and stay quiet afterwards.
 -- Edit mode is explicitly allowed, and is in fact the important case. At
@@ -121,6 +145,10 @@ function AssetTree.ensure(): number
 		-- looking at Properties tells you what belongs in it. Documentation
 		-- nobody has to go and find.
 		cursor:SetAttribute("Purpose", node.note)
+
+		if node.path == "ReplicatedStorage/Assets/Camos/PerGun" then
+			created += ensurePerGunCamoFolders(cursor)
+		end
 	end
 
 	return created
