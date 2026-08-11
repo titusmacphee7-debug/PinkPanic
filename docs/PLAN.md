@@ -40,6 +40,10 @@ and readable for competitive clarity, and the celebration goes on the kill.
 **Cosmetic categories she named:** gun skins · knife skins · charms · stickers ·
 kill effects · death effects · emotes · player titles · outfits.
 
+Titus later set the **launch** scope to five of these plus one addition: camos,
+outfits, charms, kill effects, and **bullet tracers**. The rest are deferred to
+post-launch on the same registry — see §4.5.
+
 **Economy: crates**, opened with currency earned in game, or bought with gems.
 
 **Everything should feel nice to touch** — cutesy click effects, sparkles, cute
@@ -434,21 +438,47 @@ resolved against a normalized hit volume** derived from the rig, not against
 whatever mesh the player is wearing. Fairness comes from the hit resolution, not
 from making everyone look the same.
 
-### The full cosmetic set
+### The launch cosmetic set — five categories
 
-Nine categories, all of them Leah's list, all on the same registry pattern:
+Titus set the launch scope at five. All five ship together, all on the same
+registry pattern, all on the same rarity tiers:
 
 | Category | Applies to | Notes |
 |---|---|---|
-| Gun camo | skin-region MeshParts | shared UV, one texture fits all guns |
-| Knife skin | melee model | same pipeline |
-| Charm | `Mount_Charm` socket | dangles, small physics |
-| Sticker | decals on gun surfaces | placed per-gun, slot positions in the model |
-| Kill effect | plays on YOUR kill | **hearts and sparkles live here** |
-| Death effect | plays on YOUR death | |
-| Emote | rig animation | wheel |
-| Title | nameplate + scoreboard | text + colour |
-| Outfit | avatar layer | clothing + accessories |
+| **Camo** | skin-region MeshParts | shared UV, one texture fits all guns |
+| **Outfit** | avatar layer | clothing + accessories, Arsenal-style over the player's own avatar |
+| **Charm** | `Mount_Charm` socket | dangles, small physics |
+| **Kill effect** | plays on YOUR kill | **hearts and sparkles live here** |
+| **Bullet tracer** | projectile trail | colour, shape, particle — the one you see constantly |
+
+Bullet tracers are the highest-value item on this list per unit of work. You
+look at your own tracer every single time you fire, which makes it the cosmetic
+with the most screen time in the game and the easiest one to want.
+
+Deferred from Leah's original nine, not cancelled: knife skins, stickers, death
+effects, emotes, titles. They reuse the same registry and the same rarity
+tiers, so adding a category later is a new folder and a new apply function —
+not a new system.
+
+### Everything purchasable is also earnable
+
+**Titus's rule: any cosmetic you can buy, you can also get free-to-play.**
+
+There is no gem-exclusive item anywhere in the game. Gems buy *speed*, never
+*access*. Concretely:
+
+- Every crate is purchasable with gems **and** with earned coins.
+- Every item in a crate's pool is reachable from the coin path.
+- Direct-purchase shop items are always also a crate drop, a challenge reward,
+  or a level unlock.
+- **Limited** items are limited by *time or event*, not by payment — a returning
+  event puts them back in reach of a free player.
+- No cosmetic is ever gated behind a Robux-only wall.
+
+The engineering consequence: every cosmetic definition must declare at least one
+**free acquisition path**, and boot validation fails loudly if any item has a
+gem price with no free route. That check is what keeps the rule true at item
+#400 rather than just at launch.
 
 ### Rules
 
@@ -531,10 +561,16 @@ because that is most of what makes them worth having.
 Two currencies and a crate as the primary cosmetic sink:
 
 - **Coins** — earned by playing. Buy crates, buy some items directly.
-- **Gems** — premium, bought with Robux. Buy crates and premium-only items.
+- **Gems** — premium, bought with Robux. Buy the *same* crates and the *same*
+  items, faster.
+
+**Gems buy speed, never access.** Titus's rule: anything purchasable is also
+obtainable free-to-play. There is no gem-exclusive cosmetic in the game, every
+crate has a coin price alongside its gem price, and every item has at least one
+free acquisition path. Boot validation enforces it — see §4.5.
 
 **Crates** are the main way cosmetics are acquired. Themed lines per category
-(gun camos, outfits, charms, effects). Non-negotiables:
+(camos, outfits, charms, kill effects, tracers). Non-negotiables:
 
 - **Published odds, always visible in the UI.** This is both the honest thing
   and what keeps us compliant with Roblox's paid-random-item disclosure rules
