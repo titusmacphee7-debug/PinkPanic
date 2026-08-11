@@ -327,7 +327,7 @@ function EffectsController.init()
 	-- round loop, so nothing clears them now — call EffectsController.clearShells()
 	-- from the new loop's round-start transition.
 
-	Remotes.event("ShotFired").OnClientEvent:Connect(function(shooter, origin, direction, velocity, drop, travelMax, pellets)
+	Remotes.listen("ShotFired", function(shooter, origin, direction, velocity, drop, travelMax, pellets)
 		-- The local player already drew their own effects at fire time.
 		if shooter == Players.LocalPlayer then
 			return

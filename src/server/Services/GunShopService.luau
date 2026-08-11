@@ -228,12 +228,12 @@ local function onTryGun(player: Player, gunId: any): Result
 end
 
 function GunShopService.init()
-	Remotes.func("TryGun").OnServerInvoke = onTryGun
-	Remotes.func("BuyGun").OnServerInvoke = onBuyGun
-	Remotes.func("BuyGunSkin").OnServerInvoke = onBuyGunSkin
-	Remotes.func("BuyCamo").OnServerInvoke = onBuyCamo
-	Remotes.func("EquipLoadout").OnServerInvoke = onEquipLoadout
-	Remotes.func("EquipGunCosmetics").OnServerInvoke = onEquipGunCosmetics
+	Remotes.handleFunction("TryGun", onTryGun)
+	Remotes.handleFunction("BuyGun", onBuyGun)
+	Remotes.handleFunction("BuyGunSkin", onBuyGunSkin)
+	Remotes.handleFunction("BuyCamo", onBuyCamo)
+	Remotes.handleFunction("EquipLoadout", onEquipLoadout)
+	Remotes.handleFunction("EquipGunCosmetics", onEquipGunCosmetics)
 end
 
 return GunShopService

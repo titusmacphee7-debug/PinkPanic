@@ -300,7 +300,7 @@ local function lobbyShoot()
 	EffectsController.drawTracer(origin, hitPosition)
 	EffectsController.playShotSound(0.5)
 
-	Remotes.event("LobbyShot"):FireServer(hitPosition, result and result.Instance)
+	Remotes.fireServer("LobbyShot", hitPosition, result and result.Instance)
 end
 
 local function onTargetPopped(position: any, color: any)
@@ -350,7 +350,7 @@ function LobbyController.init()
 		end
 	end)
 
-	Remotes.event("TargetPopped").OnClientEvent:Connect(onTargetPopped)
+	Remotes.listen("TargetPopped", onTargetPopped)
 end
 
 return LobbyController

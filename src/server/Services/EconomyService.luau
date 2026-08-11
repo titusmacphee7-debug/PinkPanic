@@ -19,7 +19,7 @@ function EconomyService.push(player: Player)
 	if not data then
 		return
 	end
-	Remotes.event("DataChanged"):FireClient(player, {
+	Remotes.fireClient("DataChanged", player, {
 		coins = data.coins,
 		xp = data.xp,
 		level = data.level,

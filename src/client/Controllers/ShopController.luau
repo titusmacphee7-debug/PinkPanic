@@ -102,16 +102,16 @@ local function cardClicked(kind: string, itemId: string, def: any)
 	if equipped == itemId then
 		if kind == "charm" then
 			request(function()
-				return Remotes.func("EquipItem"):InvokeServer("charm", nil)
+				return Remotes.invoke("EquipItem", "charm", nil)
 			end)
 		end
 	elseif owned then
 		request(function()
-			return Remotes.func("EquipItem"):InvokeServer(kind, itemId)
+			return Remotes.invoke("EquipItem", kind, itemId)
 		end)
 	else
 		request(function()
-			return Remotes.func("PurchaseItem"):InvokeServer(itemId)
+			return Remotes.invoke("PurchaseItem", itemId)
 		end)
 	end
 end

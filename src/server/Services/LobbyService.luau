@@ -174,7 +174,7 @@ local function onLobbyShot(player: Player, hitPosition: any, hitInstance: any)
 	if (hitPosition - origin).Magnitude > 250 then
 		return
 	end
-	Remotes.event("ShotFired"):FireAllClients(player, origin, hitPosition)
+	Remotes.fireAllClients("ShotFired", player, origin, hitPosition)
 
 	-- Balloon pops: any part tagged LobbyTarget inside the lobby (so a
 	-- hand-built range works the same as the old generated one).
@@ -190,7 +190,7 @@ local function onLobbyShot(player: Player, hitPosition: any, hitInstance: any)
 	then
 		local balloon = hitInstance
 		poppedTargets[balloon] = true
-		Remotes.event("TargetPopped"):FireAllClients(balloon.Position, balloon.Color)
+		Remotes.fireAllClients("TargetPopped", balloon.Position, balloon.Color)
 		balloon.Transparency = 1
 		balloon.CanQuery = false
 		task.delay(2.5, function()
@@ -320,7 +320,7 @@ function LobbyService.init()
 	-- (players spawning straight into the arena outside a round) and left
 	-- LobbyShot with no server listener at all.
 	LobbyService.setArenaActive(false)
-	Remotes.event("LobbyShot").OnServerEvent:Connect(onLobbyShot)
+	Remotes.handleEvent("LobbyShot", onLobbyShot)
 
 	local lobby = workspace:FindFirstChild("Lobby")
 	if not lobby then

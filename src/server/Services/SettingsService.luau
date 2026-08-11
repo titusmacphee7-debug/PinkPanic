@@ -56,7 +56,7 @@ local function onUpdateSettings(player: Player, payload: any): { [string]: any }
 end
 
 function SettingsService.init()
-	Remotes.func("UpdateSettings").OnServerInvoke = onUpdateSettings
+	Remotes.handleFunction("UpdateSettings", onUpdateSettings)
 end
 
 return SettingsService

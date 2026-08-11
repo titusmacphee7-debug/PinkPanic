@@ -9,7 +9,7 @@ local Diagnostics = require(ReplicatedStorage.Shared.Diagnostics)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-11-N · diagnostics manifest online"
+local CLIENT_BUILD_TAG = "2026-08-11-O · net layer: every remote has an owner"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false
@@ -34,9 +34,7 @@ local Remotes: any = Diagnostics.load("Remotes", ReplicatedStorage.Shared.Net.Re
 -- was RoundStateChanged until the round loop was deleted; DataChanged is the
 -- barrier now because the economy is the one system guaranteed to exist.
 if Remotes then
-	Diagnostics.start("Remotes", function()
-		Remotes.event("DataChanged")
-	end)
+	Diagnostics.start("Remotes", Remotes.awaitReady)
 end
 
 -- Loaded through Diagnostics so a controller with a syntax error is one DEAD
@@ -67,6 +65,13 @@ for _, controller in controllers do
 	if controller.module then
 		Diagnostics.start(controller.name, controller.module.init)
 	end
+end
+
+-- The mirror of the server's check: a server-to-client remote nobody listens
+-- for means the server is firing into nothing, which looks identical to the
+-- server not firing at all.
+if Remotes then
+	Remotes.assertListeners()
 end
 
 Diagnostics.report(CLIENT_BUILD_TAG)

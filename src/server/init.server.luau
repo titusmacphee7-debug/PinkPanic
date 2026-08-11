@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-11-N · diagnostics manifest online"
+local BUILD_TAG = "2026-08-11-O · net layer: every remote has an owner"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -72,6 +72,13 @@ for _, service in BOOT_ORDER do
 	if service.module then
 		Diagnostics.start(service.name, service.module.init)
 	end
+end
+
+-- Must run after every service has had its chance to attach handlers. Any
+-- client-to-server remote still unclaimed at this point is a hole: the client
+-- fires it, nothing happens, and there is no error to explain why.
+if Remotes then
+	Remotes.assertHandlers()
 end
 
 -- Guard has no init() of its own; it is alive if it loaded. Leaking a player's

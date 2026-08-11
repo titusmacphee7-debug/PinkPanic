@@ -447,15 +447,15 @@ local function onInspectAction()
 			local primary, secondary = ClientData.loadout()
 			local currentSkin, currentCamo = ClientData.gunCosmeticsFor(gunId)
 			if not ownsGun then
-				return Remotes.func("BuyGun"):InvokeServer(gunId)
+				return Remotes.invoke("BuyGun", gunId)
 			elseif previewSkinId and not ClientData.ownsGunSkin(previewSkinId) then
-				return Remotes.func("BuyGunSkin"):InvokeServer(gunId, previewSkinId)
+				return Remotes.invoke("BuyGunSkin", gunId, previewSkinId)
 			elseif previewSkinId ~= currentSkin then
-				return Remotes.func("EquipGunCosmetics"):InvokeServer(gunId, previewSkinId, currentCamo)
+				return Remotes.invoke("EquipGunCosmetics", gunId, previewSkinId, currentCamo)
 			else
 				local newPrimary = if def.slot == "Primary" then gunId else primary
 				local newSecondary = if def.slot == "Secondary" then gunId else secondary
-				return Remotes.func("EquipLoadout"):InvokeServer(newPrimary, newSecondary)
+				return Remotes.invoke("EquipLoadout", newPrimary, newSecondary)
 			end
 		end)
 		busyRequest = false
@@ -627,7 +627,7 @@ local function buildUi()
 		busyRequest = true
 		task.spawn(function()
 			local ok, result = pcall(function(): any
-				return Remotes.func("TryGun"):InvokeServer(gunId)
+				return Remotes.invoke("TryGun", gunId)
 			end)
 			busyRequest = false
 			if ok and type(result) == "table" and result.ok then

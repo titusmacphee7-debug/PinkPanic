@@ -130,7 +130,7 @@ function ClientData.owns(kind: string, itemId: string): boolean
 end
 
 function ClientData.init()
-	Remotes.event("DataChanged").OnClientEvent:Connect(function(data)
+	Remotes.listen("DataChanged", function(data)
 		if type(data) == "table" then
 			ClientData.snapshot = data
 			changedEvent:Fire(data)

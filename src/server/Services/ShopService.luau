@@ -103,8 +103,8 @@ local function onEquip(player: Player, kind: any, itemId: any): { [string]: any 
 end
 
 function ShopService.init()
-	Remotes.func("PurchaseItem").OnServerInvoke = onPurchase
-	Remotes.func("EquipItem").OnServerInvoke = onEquip
+	Remotes.handleFunction("PurchaseItem", onPurchase)
+	Remotes.handleFunction("EquipItem", onEquip)
 end
 
 return ShopService

@@ -55,7 +55,7 @@ end
 local function persist(payload: { [string]: any })
 	task.spawn(function()
 		pcall(function()
-			return Remotes.func("UpdateSettings"):InvokeServer(payload)
+			return Remotes.invoke("UpdateSettings", payload)
 		end)
 	end)
 end

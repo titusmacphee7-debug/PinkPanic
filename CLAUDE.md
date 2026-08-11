@@ -112,6 +112,19 @@ no round loop, no combat, no lobby camera, no cursor release, no pads. Every
 "separate bug" reported for days was that one dead server. The console said so
 in one line.
 
+**Never write source files with PowerShell.** `Set-Content -Encoding utf8` in
+Windows PowerShell 5.1 does two things at once that both break Luau: it writes a
+**UTF-8 BOM**, which Luau rejects outright (`Expected identifier when parsing
+expression, got Unicode character U+feff`), and a `Get-Content -Raw | Set-Content`
+round-trip **double-encodes every non-ASCII character** (`—` becomes `â€”`,
+`⚠️` becomes `âš ï¸`). This codebase is full of em dashes and emoji, so the damage
+is immediate and spread across the file. Use the Edit/Write tools, which handle
+UTF-8 correctly. PowerShell is for git and processes, not for source.
+
+**Rojo syncs into the Edit DataModel, not a running Play session.** If a fix
+"didn't work," check whether Studio was in Play mode when the file changed —
+Play holds a snapshot from when it started. Stop, let Rojo sync, Play again.
+
 **Reading `BUILD_TAG` out of the source does NOT prove the build is running.**
 `script_grep` finding the current tag only proves Rojo synced the file. If the
 module doesn't compile, the `print` never executes and Output still shows the

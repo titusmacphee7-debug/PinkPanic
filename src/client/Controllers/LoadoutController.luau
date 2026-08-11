@@ -119,7 +119,7 @@ local function equipSlot(gunId: string, slot: string)
 	end
 	local def = GunCatalog.get(gunId)
 	request(function()
-		return Remotes.func("EquipLoadout"):InvokeServer(primary, secondary)
+		return Remotes.invoke("EquipLoadout", primary, secondary)
 	end, `Equipped {if def then def.name else gunId}`)
 end
 
@@ -280,11 +280,11 @@ local function buildSkins(parent: Instance, gunId: string, order: number)
 			end
 			if owned then
 				request(function()
-					return Remotes.func("EquipGunCosmetics"):InvokeServer(gunId, entry.id, equippedCamo)
+					return Remotes.invoke("EquipGunCosmetics", gunId, entry.id, equippedCamo)
 				end)
 			else
 				request(function()
-					return Remotes.func("BuyGunSkin"):InvokeServer(gunId, entry.id)
+					return Remotes.invoke("BuyGunSkin", gunId, entry.id)
 				end, `Bought {entry.name}`)
 			end
 		end)
@@ -400,12 +400,12 @@ local function buildCamos(parent: Instance, gunId: string, order: number)
 			end
 			if owned then
 				request(function()
-					return Remotes.func("EquipGunCosmetics"):InvokeServer(gunId, equippedSkin, camoId)
+					return Remotes.invoke("EquipGunCosmetics", gunId, equippedSkin, camoId)
 				end)
 			else
 				-- The server refuses unreleased camos; let its message speak.
 				request(function()
-					return Remotes.func("BuyCamo"):InvokeServer(camoId)
+					return Remotes.invoke("BuyCamo", camoId)
 				end, `Bought {def.name}`)
 			end
 		end)
@@ -1053,7 +1053,7 @@ local function refreshDetail()
 			equipSlot(gunId, def.slot)
 		else
 			request(function()
-				return Remotes.func("BuyGun"):InvokeServer(gunId)
+				return Remotes.invoke("BuyGun", gunId)
 			end, `Bought {def.name}`)
 		end
 	end)
@@ -1069,7 +1069,7 @@ local function refreshDetail()
 		Components.stroke(try, Theme.color.primary, 2, 0.2)
 		try.Activated:Connect(function()
 			request(function()
-				return Remotes.func("TryGun"):InvokeServer(gunId)
+				return Remotes.invoke("TryGun", gunId)
 			end, `Trying {def.name} for 60s — lobby only`)
 		end)
 	end
