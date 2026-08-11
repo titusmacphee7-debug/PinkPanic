@@ -15,7 +15,11 @@ local Guard = require(ReplicatedStorage.Shared.Net.Guard)
 local LEGACY_LOBBY_NAME = "PinkPanicLobby" -- retired generated plaza
 local ARENA_NAMES = { "PinkPanicMap", "Arena" }
 
+-- Mirrors Theme.color primary / primaryDeep / surfaceRaised. Theme lives in
+-- src/client and the server can't require it, so these are kept in step by
+-- hand (see docs/design/DESIGN_SYSTEM.md).
 local HOT_PINK = Color3.fromRGB(255, 92, 168)
+local DEEP_PINK = Color3.fromRGB(214, 66, 143)
 local PINK_WHITE = Color3.fromRGB(255, 245, 250)
 
 local LobbyService = {}
@@ -33,9 +37,11 @@ local poppedTargets: { [BasePart]: boolean } = {}
 -- Per-pad tuning without touching code (the usual attribute convention):
 --   PadSignForward — studs toward the camera  (default SIGN_FORWARD)
 --   PadSignHeight  — studs above the pad      (default SIGN_HEIGHT)
+--   PadSignScale   — multiplies the plate size    (default 1)
 local SIGN_FORWARD = 6
-local SIGN_HEIGHT = 7
-local SIGN_SIZE = Vector3.new(13, 2.6, 0.2)
+local SIGN_HEIGHT = 8
+local SIGN_SIZE = Vector3.new(24, 5.4, 0.2)
+local SIGN_MAX_DISTANCE = 500
 
 local function sign(text: string, pad: BasePart, lookAt: Vector3?)
 	local forward = pad:GetAttribute("PadSignForward")
@@ -54,9 +60,12 @@ local function sign(text: string, pad: BasePart, lookAt: Vector3?)
 		cframe = CFrame.lookAt(position, position + direction)
 	end
 
+	local scaleAttr = pad:GetAttribute("PadSignScale")
+	local scale = if type(scaleAttr) == "number" and scaleAttr > 0 then scaleAttr else 1
+
 	local anchor = Instance.new("Part")
 	anchor.Name = "SignAnchor"
-	anchor.Size = SIGN_SIZE
+	anchor.Size = Vector3.new(SIGN_SIZE.X * scale, SIGN_SIZE.Y * scale, SIGN_SIZE.Z)
 	anchor.CFrame = cframe
 	anchor.Anchored = true
 	anchor.CanCollide = false
@@ -72,19 +81,46 @@ local function sign(text: string, pad: BasePart, lookAt: Vector3?)
 	surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
 	surface.PixelsPerStud = 64
 	surface.AlwaysOnTop = false
-	surface.MaxDistance = 220
+	surface.MaxDistance = SIGN_MAX_DISTANCE
 	surface.LightInfluence = 0
+
+	-- Hot pink text floating over a pink town is nearly unreadable — the
+	-- contrast problem, not the size, is what made these hard to make out.
+	-- A near-white plate with deep-pink text reads cleanly against any
+	-- storefront behind it.
+	local plate = Instance.new("Frame")
+	plate.Size = UDim2.fromScale(1, 1)
+	plate.BackgroundColor3 = PINK_WHITE
+	plate.BackgroundTransparency = 0.08
+	plate.BorderSizePixel = 0
+	plate.Parent = surface
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.35, 0)
+	corner.Parent = plate
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = HOT_PINK
+	stroke.Thickness = 6
+	stroke.Transparency = 0.15
+	stroke.Parent = plate
+
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0.05, 0)
+	padding.PaddingRight = UDim.new(0.05, 0)
+	padding.PaddingTop = UDim.new(0.12, 0)
+	padding.PaddingBottom = UDim.new(0.12, 0)
+	padding.Parent = plate
 
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.FredokaOne
 	label.TextScaled = true
-	label.TextColor3 = HOT_PINK
-	label.TextStrokeColor3 = PINK_WHITE
-	label.TextStrokeTransparency = 0.3
+	label.TextColor3 = DEEP_PINK
 	label.Text = text
-	label.Parent = surface
+	label.Parent = plate
+
 	surface.Parent = anchor
 
 	anchor.Parent = pad
