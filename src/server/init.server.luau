@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-11-R · structure + conventions (NOD-128)"
+local BUILD_TAG = "2026-08-11-S · one modifier pipeline (NOD-130)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,6 +31,7 @@ Diagnostics.expect(
 	"Rarity",
 	"AssetTree",
 	"ContentAudit",
+	"CombatStats",
 	"MapService",
 	"LobbyService",
 	"PlayerDataService",
@@ -48,6 +49,7 @@ local Guard: any = Diagnostics.load("Guard", ReplicatedStorage.Shared.Net.Guard)
 local RarityConfig: any = Diagnostics.load("Rarity", ReplicatedStorage.Shared.Config.Rarity)
 local AssetTree: any = Diagnostics.load("AssetTree", ReplicatedStorage.Shared.Systems.AssetTree)
 local ContentAudit: any = Diagnostics.load("ContentAudit", ReplicatedStorage.Shared.Systems.ContentAudit)
+local CombatStats: any = Diagnostics.load("CombatStats", ReplicatedStorage.Shared.Systems.CombatStats)
 
 local MapService: any = Diagnostics.load("MapService", script.Services.MapService)
 local LobbyService: any = Diagnostics.load("LobbyService", script.Services.LobbyService)
@@ -76,6 +78,12 @@ end
 -- After AssetTree, so the folders it looks in are guaranteed to exist.
 if ContentAudit then
 	Diagnostics.start("ContentAudit", ContentAudit.run)
+end
+
+-- Checks every attachment and perk modifier against the MODIFIABLE whitelist.
+-- A typo'd stat name is found here, once, rather than never.
+if CombatStats then
+	Diagnostics.start("CombatStats", CombatStats.validate)
 end
 
 local BOOT_ORDER: { { name: string, module: any } } = {

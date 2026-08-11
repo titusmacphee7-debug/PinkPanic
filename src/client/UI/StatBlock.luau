@@ -14,7 +14,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local CombatStats = require(ReplicatedStorage.Shared.Config.CombatStats)
+local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
 local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local Theme = require(script.Parent.Theme)
 local Components = require(script.Parent.Components)

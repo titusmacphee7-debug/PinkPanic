@@ -18,7 +18,7 @@ local UserInputService = game:GetService("UserInputService")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local GunSkinCatalog = require(ReplicatedStorage.Shared.Config.GunSkinCatalog)
-local CombatStats = require(ReplicatedStorage.Shared.Config.CombatStats)
+local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
 local GunModelLoader = require(ReplicatedStorage.Shared.Loaders.GunModelLoader)
 local ClientData = require(script.Parent.Parent.ClientData)
 
