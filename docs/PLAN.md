@@ -40,9 +40,10 @@ and readable for competitive clarity, and the celebration goes on the kill.
 **Cosmetic categories she named:** gun skins · knife skins · charms · stickers ·
 kill effects · death effects · emotes · player titles · outfits.
 
-Titus later set the **launch** scope to five of these plus one addition: camos,
-outfits, charms, kill effects, and **bullet tracers**. The rest are deferred to
-post-launch on the same registry — see §4.5.
+Titus set the **launch** scope at eight: camos, outfits, charms, kill effects,
+emotes, titles, plus two additions — **bullet tracers** and **name tags**. Knife
+skins, stickers and death effects are deferred to post-launch on the same
+registry — see §4.5.
 
 **Economy: crates**, opened with currency earned in game, or bought with gems.
 
@@ -438,10 +439,10 @@ resolved against a normalized hit volume** derived from the rig, not against
 whatever mesh the player is wearing. Fairness comes from the hit resolution, not
 from making everyone look the same.
 
-### The launch cosmetic set — five categories
+### The launch cosmetic set — eight categories
 
-Titus set the launch scope at five. All five ship together, all on the same
-registry pattern, all on the same rarity tiers:
+All eight ship together, all on the same registry pattern, all on the same
+rarity tiers:
 
 | Category | Applies to | Notes |
 |---|---|---|
@@ -450,15 +451,34 @@ registry pattern, all on the same rarity tiers:
 | **Charm** | `Mount_Charm` socket | dangles, small physics |
 | **Kill effect** | plays on YOUR kill | **hearts and sparkles live here** |
 | **Bullet tracer** | projectile trail | colour, shape, particle — the one you see constantly |
+| **Emote** | rig animation | wheel, third-person, **the one real system on this list** |
+| **Title** | the *text* beside your name | scoreboard, killfeed, nameplate |
+| **Name tag** | the *plate* your name sits on | frame, background, glitter, font treatment |
 
-Bullet tracers are the highest-value item on this list per unit of work. You
-look at your own tracer every single time you fire, which makes it the cosmetic
-with the most screen time in the game and the easiest one to want.
+**Title and name tag are deliberately two things.** The title is the phrase
+("Sugar Rush"); the name tag is the plate it sits on. Splitting them doubles the
+combinations from one pool of art and means a player who has earned a rare title
+can still show it on a plate they like. Collapsing them into one item throws that
+away for no saving — it is the same registry either way.
 
-Deferred from Leah's original nine, not cancelled: knife skins, stickers, death
-effects, emotes, titles. They reuse the same registry and the same rarity
-tiers, so adding a category later is a new folder and a new apply function —
-not a new system.
+Name tags are worth more than they look: the plate floats over your head in
+world space, so it is the only cosmetic on this list that **everyone else sees
+constantly**. Titles are mostly read on the scoreboard.
+
+Bullet tracers are the highest value per unit of work. You look at your own
+tracer every single time you fire, which gives it more screen time than anything
+else in the game.
+
+**Emotes are not an apply function.** Every other category here is "write a
+texture / weld a model / play a particle." Emotes need an input surface (the
+wheel), keyframed rig clips, third-person replication, a camera decision, and
+cancel rules. That makes them dependent on the animation system, so the emote
+*system* lands in M11 and only emote ownership and equipping live with the rest
+of the cosmetics. See §11.
+
+Still deferred, not cancelled: knife skins, stickers, death effects. Same
+registry, same tiers — adding one later is a folder and an apply function, not a
+new system.
 
 ### Everything purchasable is also earnable
 
@@ -570,7 +590,8 @@ crate has a coin price alongside its gem price, and every item has at least one
 free acquisition path. Boot validation enforces it — see §4.5.
 
 **Crates** are the main way cosmetics are acquired. Themed lines per category
-(camos, outfits, charms, kill effects, tracers). Non-negotiables:
+(camos, outfits, charms, kill effects, tracers, emotes, titles, name tags).
+Non-negotiables:
 
 - **Published odds, always visible in the UI.** This is both the honest thing
   and what keeps us compliant with Roblox's paid-random-item disclosure rules
@@ -747,7 +768,7 @@ work done twice.
   lean, slide, crouch, air, landing, recoil kick, weapon sway, ADS transition.
   Scales with any speed and never desyncs.
 - **Keyframed** (Moon Animator, one-shots where procedural is weak): reload
-  variants, inspect, dive, execution/finisher, mantle.
+  variants, inspect, dive, execution/finisher, mantle, **emotes**.
 
 They compose: **clips own `Transform`, the procedural layer owns the joint
 base.** This is not either/or, and it is why the rig work matters.
@@ -758,6 +779,27 @@ Rig note carried forward: the character uses `AnimationConstraint`, not
 **What Titus provides here:** Moon Animator clips against a spec I'll write
 (frame counts, timing, which joints, export naming). That spec is its own issue
 and lands before any clip work starts.
+
+### Emotes
+
+Emotes are a cosmetic category (§4.5) but an **animation feature**, which is why
+they live here rather than with the camos. They are the only cosmetic in the game
+that needs an input surface, replication, and a camera decision.
+
+- **The wheel.** Radial, 8 equipped slots, opens on hold and fires on release —
+  fast enough to use mid-match without it being a death sentence.
+- **Third person.** CoD swings the camera out for an emote and it is the right
+  call: an emote nobody can see, including you, is not a cosmetic. The camera
+  returns on cancel.
+- **Replication.** Everyone nearby sees it. This is the whole point — emotes are
+  a social item, and their value is entirely in being seen.
+- **Cancel rules.** Fire, ADS, sprint, damage taken, and death all cancel
+  immediately. Emoting is a choice to be vulnerable, and it has to *stay* one.
+- **Lobby and in-match.** Both. The lobby is where they get used most, but the
+  in-match risk is what makes them funny.
+
+The emote clip list goes in the same Moon Animator spec as everything else, so
+Titus produces them in one pass rather than two.
 
 ---
 
