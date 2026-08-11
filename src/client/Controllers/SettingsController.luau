@@ -192,9 +192,11 @@ local function buildGui()
 	screen.Name = "SettingsUI"
 	screen.ResetOnSpawn = false
 
+	-- FULL-SCREEN, deliberately — see the note in ShopController. A 1x1 button
+	-- parked offscreen frees the cursor but sinks no clicks, so every click on
+	-- this panel also fired a lobby shot through it.
 	modalUnlock = Instance.new("TextButton")
-	modalUnlock.Size = UDim2.fromOffset(1, 1)
-	modalUnlock.Position = UDim2.new(0, -10, 0, -10)
+	modalUnlock.Size = UDim2.fromScale(1, 1)
 	modalUnlock.BackgroundTransparency = 1
 	modalUnlock.Text = ""
 	modalUnlock.Visible = false

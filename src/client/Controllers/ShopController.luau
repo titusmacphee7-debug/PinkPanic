@@ -223,10 +223,13 @@ local function buildGui()
 	screen.Name = "ShopUI"
 	screen.ResetOnSpawn = false
 
+	-- FULL-SCREEN, deliberately. This used to be a 1x1 button parked offscreen
+	-- at (-10,-10): it released the mouse lock but blocked nothing, so clicks
+	-- on the panel passed straight through into the game and fired a lobby
+	-- shot. Created before the panel, so the panel still draws on top.
 	modalUnlock = Instance.new("TextButton")
 	modalUnlock.Name = "ModalUnlock"
-	modalUnlock.Size = UDim2.fromOffset(1, 1)
-	modalUnlock.Position = UDim2.new(0, -10, 0, -10)
+	modalUnlock.Size = UDim2.fromScale(1, 1)
 	modalUnlock.BackgroundTransparency = 1
 	modalUnlock.Text = ""
 	modalUnlock.Visible = false

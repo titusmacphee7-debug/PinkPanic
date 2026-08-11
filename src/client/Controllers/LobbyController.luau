@@ -342,7 +342,15 @@ function LobbyController.init()
 		if gameProcessed then
 			return
 		end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 and ClientData.inLobby() then
+		-- menuOpen() matters as much as inLobby(): WeaponController.shoot
+		-- already checks it, this didn't, and the Shop/Settings panels sank no
+		-- clicks — so clicking anywhere on an open panel also fired a shot.
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			and ClientData.inLobby()
+			and not ClientData.menuOpen()
+			and not ClientData.armoryBusy
+		then
 			lobbyShoot()
 		end
 	end)

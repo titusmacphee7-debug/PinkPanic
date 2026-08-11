@@ -42,6 +42,11 @@ type DisplayRecord = { gunId: string, slot: BasePart, model: Model }
 local displays: { [Model]: DisplayRecord } = {}
 local displayFolder: Folder? = nil
 local hoveredRecord: DisplayRecord? = nil
+-- Module scope so updateHover can dismiss a dialog the player walked away
+-- from. Left open, it holds armoryBusy true, which hides START GAME for the
+-- rest of the session.
+local pendingRecord: DisplayRecord? = nil
+local DIALOG_WALK_AWAY = 28
 local inspecting: { gunId: string, model: Model, base: CFrame, yaw: number, pitch: number }? = nil
 local dragging = false
 local previewSkinId: string? = nil
@@ -538,7 +543,7 @@ local function buildUi()
 	local cancelButton = dialogButton("Cancel", 146, Color3.fromRGB(180, 150, 165))
 	dialog.Parent = screen
 
-	local pendingRecord: DisplayRecord? = nil
+	-- pendingRecord is declared at module scope (see the note there).
 	lookButton.MouseButton1Click:Connect(function()
 		dialog.Visible = false
 		if pendingRecord then
@@ -663,6 +668,21 @@ end
 -- ---------------------------------------------------------------------------
 
 local function updateHover()
+	-- Walking away from an open "Take a look?" dialog used to strand it on
+	-- screen with armoryBusy still true, which permanently hid START GAME.
+	if dialog.Visible and pendingRecord then
+		local character = Players.LocalPlayer.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local slot = pendingRecord.slot
+		if root and root:IsA("BasePart") and slot then
+			if (root.Position - slot.Position).Magnitude > DIALOG_WALK_AWAY then
+				dialog.Visible = false
+				pendingRecord = nil
+				setBusy(false)
+			end
+		end
+	end
+
 	if not ClientData.inLobby() or ClientData.menuOpen() or inspecting or dialog.Visible then
 		if hoveredRecord then
 			hoveredRecord = nil
@@ -707,6 +727,13 @@ function ArmoryController.init()
 		else
 			closeInspect()
 			hideHover()
+			-- The dialog used to survive the round start: clicking "Take a
+			-- look" mid-combat then spawned a gun in the world and opened an
+			-- inspection panel over gameplay. Clearing armoryBusy also matters
+			-- because LobbyController hides START GAME while it's set, so a
+			-- dialog left open was a permanent soft-lock out of every round.
+			dialog.Visible = false
+			setBusy(false)
 		end
 	end)
 
