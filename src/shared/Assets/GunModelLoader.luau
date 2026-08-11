@@ -33,12 +33,29 @@ local function templatesFolder(): Instance?
 	return assets and assets:FindFirstChild("GunModels")
 end
 
+-- Bumped whenever normalize's output changes. The old idempotence check was
+-- "does a Muzzle exist" — but Muzzle attachments get baked into the place file
+-- if the game is ever saved while running, so that check made normalize a
+-- permanent no-op on stale models. Pistol_1 was found carrying a Muzzle at
+-- Z +36 on a model 3.2 studs deep, and no later fix could ever run.
+--
+-- The flip below is decided from live geometry, so re-running is safe: an
+-- already-correct model measures correct and is left alone.
+local NORMALIZE_VERSION = 2
+
 local function normalize(model: Model)
-	-- Idempotence marker: a Muzzle on the PrimaryPart means we're done.
-	local primary = model.PrimaryPart
-	if primary and primary:FindFirstChild("Muzzle") then
+	if model:GetAttribute("PPNormalized") == NORMALIZE_VERSION then
 		return
 	end
+
+	-- Clear anything a previous pass left behind before rebuilding it.
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("Attachment") and descendant.Name == "Muzzle" then
+			descendant:Destroy()
+		end
+	end
+
+	local primary = model.PrimaryPart
 
 	local body = model:FindFirstChild("Body")
 	local largest: BasePart? = if body and body:IsA("BasePart") then body else nil
@@ -105,6 +122,8 @@ local function normalize(model: Model)
 	muzzle.Name = "Muzzle"
 	muzzle.WorldCFrame = boundsCF * CFrame.new(0, 0, -boundsSize.Z / 2)
 	muzzle.Parent = largest
+
+	model:SetAttribute("PPNormalized", NORMALIZE_VERSION)
 end
 
 -- Normalizes every imported template (call once from the server at boot;

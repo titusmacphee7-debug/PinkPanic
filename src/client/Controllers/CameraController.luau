@@ -160,6 +160,19 @@ local function update(deltaTime: number)
 		humanoid.AutoRotate = true
 	end
 
+	-- Roblox's default TransparencyController keeps fading the local character
+	-- via LocalTransparencyModifier even while CameraType is Scriptable, which
+	-- left the player see-through in the lobby (measured at 0.76 on 24 of 29
+	-- parts, with Transparency itself still 0). It re-asserts every frame, so
+	-- we re-assert back. Only writes when it has actually drifted.
+	if characterModel then
+		for _, part in characterModel:GetDescendants() do
+			if part:IsA("BasePart") and part.LocalTransparencyModifier > 0.01 then
+				part.LocalTransparencyModifier = 0
+			end
+		end
+	end
+
 	local desired = desiredLobbyCFrame(deltaTime)
 	if not desired then
 		return
