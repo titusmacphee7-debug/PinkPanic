@@ -25,12 +25,17 @@ Theme.color = {
 	-- Brand
 	primary = Color3.fromRGB(255, 92, 168), -- hot pink: buttons, selection, focus
 	primaryDeep = Color3.fromRGB(214, 66, 143), -- pressed / borders / headings
+	primaryLight = Color3.fromRGB(255, 130, 190), -- secondary actions, trial buttons
 	primarySoft = Color3.fromRGB(255, 150, 200), -- tracers, glows, subtle accents
 
 	-- Surfaces, lightest to heaviest
 	surface = Color3.fromRGB(255, 227, 240), -- blush: panel backgrounds
 	surfaceRaised = Color3.fromRGB(255, 245, 250), -- cards and rows on top of surface
 	surfaceSunken = Color3.fromRGB(246, 208, 226), -- wells, tracks, empty slots
+
+	-- Lines
+	border = Color3.fromRGB(240, 200, 220), -- resting card stroke; primary when selected
+	neutral = Color3.fromRGB(180, 150, 165), -- cancel / dismiss, deliberately unexciting
 
 	-- Text
 	text = Color3.fromRGB(96, 56, 78), -- plum: body copy on light surfaces
@@ -42,10 +47,12 @@ Theme.color = {
 	danger = Color3.fromRGB(235, 90, 90),
 	kill = Color3.fromRGB(255, 64, 96),
 	success = Color3.fromRGB(120, 200, 150),
+	brass = Color3.fromRGB(255, 208, 130), -- ejected shells
 
 	-- Overlays: locked cards, modal dimming, viewport backdrops
 	scrim = Color3.fromRGB(52, 28, 44),
 	viewportBackdrop = Color3.fromRGB(66, 40, 58),
+	viewportAmbient = Color3.fromRGB(220, 210, 218),
 }
 
 -- Rarity is NOT defined here. It lives in shared/Config/Rarity.luau because it
@@ -104,6 +111,48 @@ Theme.locked = {
 	scrimTransparency = 0.45,
 	contentTransparency = 0.35,
 	icon = "🔒",
+}
+
+-- ---------------------------------------------------------------------------
+-- Motion. Tokens rather than per-call TweenInfo, because timing is as much a
+-- brand as colour is — Pink Panic should feel bouncy and quick everywhere, not
+-- bouncy on one screen and linear on the next.
+-- ---------------------------------------------------------------------------
+
+Theme.duration = {
+	instant = 0.08, -- hover, press
+	quick = 0.16, -- most state changes
+	normal = 0.28, -- panel open/close
+	slow = 0.5, -- celebratory moments
+	reveal = 1.6, -- crate opening; the one place slowness is the product
+}
+
+Theme.easing = {
+	-- Default for anything appearing: overshoots slightly, which is where the
+	-- cuteness lives.
+	enter = TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	exit = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+	press = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+	hover = TweenInfo.new(0.16, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+	-- Values that should read as data rather than motion (bars, counters).
+	value = TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+}
+
+-- How far a surface sits above the one behind it. Drives shadow strength and
+-- stroke weight so depth is consistent rather than per-panel guesswork.
+Theme.elevation = {
+	flat = { shadow = 0, stroke = 1 },
+	card = { shadow = 0.35, stroke = 1 },
+	panel = { shadow = 0.5, stroke = 2 },
+	modal = { shadow = 0.7, stroke = 2 },
+}
+
+-- Press bounce, per Leah's "cutesy click effects". A component that scales by
+-- this on press feels alive; one that doesn't feels like a web form.
+Theme.juice = {
+	pressScale = 0.96,
+	hoverScale = 1.03,
+	hoverLift = 2, -- pixels
 }
 
 return Theme

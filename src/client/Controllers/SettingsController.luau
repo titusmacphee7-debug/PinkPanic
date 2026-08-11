@@ -10,12 +10,8 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
 local ClientData = require(script.Parent.Parent.ClientData)
+local Theme = require(script.Parent.Parent.UI.Theme)
 
-local HOT_PINK = Color3.fromRGB(255, 92, 168)
-local DEEP_PINK = Color3.fromRGB(214, 66, 143)
-local BLUSH = Color3.fromRGB(255, 227, 240)
-local ROW_WHITE = Color3.fromRGB(255, 245, 250)
-local TEXT_DARK = Color3.fromRGB(96, 56, 78)
 
 local UserGameSettings = UserSettings():GetService("UserGameSettings")
 
@@ -73,13 +69,13 @@ local function mkSlider(
 	local bar = Instance.new("Frame")
 	bar.Position = UDim2.new(0, 24, 0, yOffset)
 	bar.Size = UDim2.new(1, -48, 0, 10)
-	bar.BackgroundColor3 = ROW_WHITE
+	bar.BackgroundColor3 = Theme.color.surfaceRaised
 	bar.BorderSizePixel = 0
 	round(bar, 5)
 
 	local fill = Instance.new("Frame")
 	fill.Size = UDim2.fromScale(0.5, 1)
-	fill.BackgroundColor3 = HOT_PINK
+	fill.BackgroundColor3 = Theme.color.primary
 	fill.BorderSizePixel = 0
 	round(fill, 5)
 	fill.Parent = bar
@@ -88,7 +84,7 @@ local function mkSlider(
 	knob.AnchorPoint = Vector2.new(0.5, 0.5)
 	knob.Position = UDim2.new(0.5, 0, 0.5, 0)
 	knob.Size = UDim2.fromOffset(18, 18)
-	knob.BackgroundColor3 = DEEP_PINK
+	knob.BackgroundColor3 = Theme.color.primaryDeep
 	knob.Text = ""
 	round(knob, 9)
 	knob.Parent = bar
@@ -147,8 +143,8 @@ end
 local function highlightWeapon(selected: string)
 	for weaponId, button in weaponButtons do
 		local isSelected = weaponId == selected
-		button.BackgroundColor3 = if isSelected then HOT_PINK else ROW_WHITE
-		button.TextColor3 = if isSelected then Color3.new(1, 1, 1) else TEXT_DARK
+		button.BackgroundColor3 = if isSelected then Theme.color.primary else Theme.color.surfaceRaised
+		button.TextColor3 = if isSelected then Color3.new(1, 1, 1) else Theme.color.text
 	end
 end
 
@@ -207,7 +203,7 @@ local function buildGui()
 	openButton.AnchorPoint = Vector2.new(0, 1)
 	openButton.Position = UDim2.new(0, 160, 1, -12)
 	openButton.Size = UDim2.fromOffset(42, 42)
-	openButton.BackgroundColor3 = HOT_PINK
+	openButton.BackgroundColor3 = Theme.color.primary
 	openButton.Font = Enum.Font.FredokaOne
 	openButton.TextSize = 20
 	openButton.TextColor3 = Color3.new(1, 1, 1)
@@ -222,15 +218,15 @@ local function buildGui()
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
 	panel.Size = UDim2.fromOffset(400, 330)
-	panel.BackgroundColor3 = BLUSH
+	panel.BackgroundColor3 = Theme.color.surface
 	panel.Visible = false
 	round(panel, 18)
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = HOT_PINK
+	stroke.Color = Theme.color.primary
 	stroke.Thickness = 2
 	stroke.Parent = panel
 
-	local title = mkText(panel, 24, DEEP_PINK)
+	local title = mkText(panel, 24, Theme.color.primaryDeep)
 	title.Position = UDim2.new(0, 0, 0, 12)
 	title.Size = UDim2.new(1, 0, 0, 30)
 	title.Text = "🎀 SETTINGS 🎀"
@@ -239,7 +235,7 @@ local function buildGui()
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position = UDim2.new(1, -10, 0, 10)
 	close.Size = UDim2.fromOffset(30, 30)
-	close.BackgroundColor3 = HOT_PINK
+	close.BackgroundColor3 = Theme.color.primary
 	close.Font = Enum.Font.FredokaOne
 	close.TextSize = 16
 	close.TextColor3 = Color3.new(1, 1, 1)
@@ -250,7 +246,7 @@ local function buildGui()
 	end)
 	close.Parent = panel
 
-	local sensLabel = mkText(panel, 17, TEXT_DARK)
+	local sensLabel = mkText(panel, 17, Theme.color.text)
 	sensLabel.Position = UDim2.new(0, 24, 0, 56)
 	sensLabel.Size = UDim2.new(1, -48, 0, 20)
 	sensLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -263,7 +259,7 @@ local function buildGui()
 		persist({ sensitivity = value })
 	end)
 
-	local volLabel = mkText(panel, 17, TEXT_DARK)
+	local volLabel = mkText(panel, 17, Theme.color.text)
 	volLabel.Position = UDim2.new(0, 24, 0, 112)
 	volLabel.Size = UDim2.new(1, -48, 0, 20)
 	volLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -272,7 +268,7 @@ local function buildGui()
 		persist({ volume = value })
 	end)
 
-	local loadoutLabel = mkText(panel, 17, TEXT_DARK)
+	local loadoutLabel = mkText(panel, 17, Theme.color.text)
 	loadoutLabel.Position = UDim2.new(0, 24, 0, 176)
 	loadoutLabel.Size = UDim2.new(1, -48, 0, 20)
 	loadoutLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -289,10 +285,10 @@ local function buildGui()
 	for _, weaponId in GameConfig.loadout do
 		local button = Instance.new("TextButton")
 		button.Size = UDim2.fromOffset(82, 36)
-		button.BackgroundColor3 = ROW_WHITE
+		button.BackgroundColor3 = Theme.color.surfaceRaised
 		button.Font = Enum.Font.FredokaOne
 		button.TextSize = 14
-		button.TextColor3 = TEXT_DARK
+		button.TextColor3 = Theme.color.text
 		button.Text = WeaponConfig[weaponId].displayName
 		round(button, 10)
 		button.MouseButton1Click:Connect(function()
@@ -304,7 +300,7 @@ local function buildGui()
 	end
 	row.Parent = panel
 
-	local hint = mkText(panel, 14, DEEP_PINK)
+	local hint = mkText(panel, 14, Theme.color.primaryDeep)
 	hint.Position = UDim2.new(0, 24, 1, -60)
 	hint.Size = UDim2.new(1, -48, 0, 40)
 	hint.TextWrapped = true

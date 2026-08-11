@@ -8,12 +8,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local ClientData = require(script.Parent.Parent.ClientData)
+local Theme = require(script.Parent.Parent.UI.Theme)
 
-local HOT_PINK = Color3.fromRGB(255, 92, 168)
-local DEEP_PINK = Color3.fromRGB(214, 66, 143)
-local BLUSH = Color3.fromRGB(255, 227, 240)
-local TEXT_DARK = Color3.fromRGB(96, 56, 78)
-local GOLD = Color3.fromRGB(255, 196, 88)
 
 local EconomyController = {}
 
@@ -45,25 +41,25 @@ local function buildGui()
 	panel = Instance.new("Frame")
 	panel.Position = UDim2.new(0, 12, 0, 12)
 	panel.Size = UDim2.fromOffset(210, 74)
-	panel.BackgroundColor3 = BLUSH
+	panel.BackgroundColor3 = Theme.color.surface
 	panel.BackgroundTransparency = 0.08
 	panel.BorderSizePixel = 0
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 14)
 	corner.Parent = panel
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = HOT_PINK
+	stroke.Color = Theme.color.primary
 	stroke.Thickness = 2
 	stroke.Transparency = 0.35
 	stroke.Parent = panel
 
-	coinsLabel = mkText(panel, 20, TEXT_DARK)
+	coinsLabel = mkText(panel, 20, Theme.color.text)
 	coinsLabel.Position = UDim2.new(0, 12, 0, 6)
 	coinsLabel.Size = UDim2.new(1, -24, 0, 24)
 	coinsLabel.TextXAlignment = Enum.TextXAlignment.Left
 	coinsLabel.Text = "🪙 0"
 
-	levelLabel = mkText(panel, 16, DEEP_PINK)
+	levelLabel = mkText(panel, 16, Theme.color.primaryDeep)
 	levelLabel.Position = UDim2.new(0, 12, 0, 32)
 	levelLabel.Size = UDim2.new(0, 70, 0, 18)
 	levelLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -72,7 +68,7 @@ local function buildGui()
 	local xpBar = Instance.new("Frame")
 	xpBar.Position = UDim2.new(0, 12, 0, 54)
 	xpBar.Size = UDim2.new(1, -24, 0, 10)
-	xpBar.BackgroundColor3 = Color3.fromRGB(255, 245, 250)
+	xpBar.BackgroundColor3 = Theme.color.surfaceRaised
 	xpBar.BorderSizePixel = 0
 	local barCorner = Instance.new("UICorner")
 	barCorner.CornerRadius = UDim.new(1, 0)
@@ -80,7 +76,7 @@ local function buildGui()
 
 	xpFill = Instance.new("Frame")
 	xpFill.Size = UDim2.fromScale(0, 1)
-	xpFill.BackgroundColor3 = HOT_PINK
+	xpFill.BackgroundColor3 = Theme.color.primary
 	xpFill.BorderSizePixel = 0
 	local fillCorner = Instance.new("UICorner")
 	fillCorner.CornerRadius = UDim.new(1, 0)
@@ -88,7 +84,7 @@ local function buildGui()
 	xpFill.Parent = xpBar
 	xpBar.Parent = panel
 
-	xpText = mkText(panel, 12, DEEP_PINK)
+	xpText = mkText(panel, 12, Theme.color.primaryDeep)
 	xpText.AnchorPoint = Vector2.new(1, 0)
 	xpText.Position = UDim2.new(1, -12, 0, 32)
 	xpText.Size = UDim2.new(0, 110, 0, 18)
@@ -99,12 +95,12 @@ local function buildGui()
 end
 
 local function popCoinGain(amount: number)
-	local pop = mkText(panel, 18, GOLD)
+	local pop = mkText(panel, 18, Theme.color.coin)
 	pop.AnchorPoint = Vector2.new(0, 0)
 	pop.Position = UDim2.new(1, 10, 0, 8)
 	pop.Size = UDim2.fromOffset(80, 24)
 	pop.TextXAlignment = Enum.TextXAlignment.Left
-	pop.TextStrokeColor3 = TEXT_DARK
+	pop.TextStrokeColor3 = Theme.color.text
 	pop.TextStrokeTransparency = 0.6
 	pop.Text = `+{amount} 🪙`
 	TweenService:Create(pop, TweenInfo.new(0.9, Enum.EasingStyle.Quad), {

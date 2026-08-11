@@ -13,13 +13,12 @@ local UserInputService = game:GetService("UserInputService")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local ClientData = require(script.Parent.Parent.ClientData)
+local Theme = require(script.Parent.Parent.UI.Theme)
 local CameraController = require(script.Parent.CameraController)
 local EffectsController = require(script.Parent.EffectsController)
 local ShopController = require(script.Parent.ShopController)
 local LoadoutController = require(script.Parent.LoadoutController)
 
-local HOT_PINK = Color3.fromRGB(255, 92, 168)
-local PINK_WHITE = Color3.fromRGB(255, 245, 250)
 
 local SHOT_COOLDOWN = 0.25
 
@@ -94,8 +93,8 @@ local function buildBanner()
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.FredokaOne
 	label.TextSize = 34
-	label.TextColor3 = HOT_PINK
-	label.TextStrokeColor3 = PINK_WHITE
+	label.TextColor3 = Theme.color.primary
+	label.TextStrokeColor3 = Theme.color.surfaceRaised
 	label.TextStrokeTransparency = 0.2
 	label.TextTransparency = 1
 	label.Text = ""
@@ -109,18 +108,18 @@ local function buildBanner()
 	button.AnchorPoint = Vector2.new(0.5, 1)
 	button.Position = UDim2.new(0.5, 0, 1, -38)
 	button.Size = UDim2.fromOffset(300, 62)
-	button.BackgroundColor3 = HOT_PINK
+	button.BackgroundColor3 = Theme.color.primary
 	button.BorderSizePixel = 0
 	button.Font = Enum.Font.FredokaOne
 	button.TextSize = 26
-	button.TextColor3 = PINK_WHITE
+	button.TextColor3 = Theme.color.surfaceRaised
 	button.Text = "START GAME 💗"
 	button.Visible = false
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 18)
 	corner.Parent = button
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = PINK_WHITE
+	stroke.Color = Theme.color.surfaceRaised
 	stroke.Thickness = 3
 	stroke.Transparency = 0.25
 	stroke.Parent = button
@@ -311,7 +310,7 @@ local function onTargetPopped(position: any, color: any)
 	burst.Shape = Enum.PartType.Ball
 	burst.Size = Vector3.new(1, 1, 1)
 	burst.Position = position
-	burst.Color = if typeof(color) == "Color3" then color else HOT_PINK
+	burst.Color = if typeof(color) == "Color3" then color else Theme.color.primary
 	burst.Material = Enum.Material.Neon
 	burst.Anchored = true
 	burst.CanCollide = false

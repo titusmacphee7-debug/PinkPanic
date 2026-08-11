@@ -21,18 +21,7 @@ local GunSkinCatalog = require(ReplicatedStorage.Shared.Config.GunSkinCatalog)
 local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
 local GunModelLoader = require(ReplicatedStorage.Shared.Loaders.GunModelLoader)
 local ClientData = require(script.Parent.Parent.ClientData)
-
-local HOT_PINK = Color3.fromRGB(255, 92, 168)
-local DEEP_PINK = Color3.fromRGB(214, 66, 143)
-local BLUSH = Color3.fromRGB(255, 227, 240)
-local ROW_WHITE = Color3.fromRGB(255, 245, 250)
-local TEXT_DARK = Color3.fromRGB(96, 56, 78)
-local RARITY_COLORS: { [string]: Color3 } = {
-	Common = Color3.fromRGB(150, 130, 145),
-	Rare = Color3.fromRGB(90, 140, 235),
-	Epic = Color3.fromRGB(170, 90, 220),
-	Legendary = Color3.fromRGB(235, 160, 50),
-}
+local Theme = require(script.Parent.Parent.UI.Theme)
 
 local ArmoryController = {}
 
@@ -90,11 +79,11 @@ local function round(instance: GuiObject, radius: number)
 end
 
 local function stylePanel(frame: Frame, radius: number)
-	frame.BackgroundColor3 = BLUSH
+	frame.BackgroundColor3 = Theme.color.surface
 	frame.BorderSizePixel = 0
 	round(frame, radius)
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = HOT_PINK
+	stroke.Color = Theme.color.primary
 	stroke.Thickness = 2
 	stroke.Transparency = 0.3
 	stroke.Parent = frame
@@ -209,7 +198,7 @@ local function showHover(record: DisplayRecord)
 	local stats = CombatStats.resolve(record.gunId)
 	hoverName.Text = def.name
 	hoverRarity.Text = def.rarity
-	hoverRarity.TextColor3 = RARITY_COLORS[def.rarity] or TEXT_DARK
+	hoverRarity.TextColor3 = Theme.rarityColor(def.rarity)
 	hoverStats.Text = statLine(stats)
 	setHoverViewport(record.gunId)
 	hoverCard.Visible = true
@@ -277,7 +266,7 @@ local function populateInspect(gunId: string)
 	local stats = CombatStats.resolve(gunId)
 	inspectName.Text = def.name
 	inspectRarity.Text = `{def.rarity} · {def.class} · {def.slot}`
-	inspectRarity.TextColor3 = RARITY_COLORS[def.rarity] or TEXT_DARK
+	inspectRarity.TextColor3 = Theme.rarityColor(def.rarity)
 
 	for _, child in inspectStatsList:GetChildren() do
 		if child:IsA("TextLabel") then
@@ -312,7 +301,7 @@ local function populateInspect(gunId: string)
 		{ "Pull-out / ADS", `{stats.equipTime}s / {stats.adsTime}s` },
 	}
 	for index, row in rows do
-		local label = mkText(inspectStatsList, 14, TEXT_DARK)
+		local label = mkText(inspectStatsList, 14, Theme.color.text)
 		label.LayoutOrder = index
 		label.Size = UDim2.new(1, 0, 0, 18)
 		label.TextXAlignment = Enum.TextXAlignment.Left
@@ -332,13 +321,13 @@ local function populateInspect(gunId: string)
 		chip.BackgroundColor3 = color
 		chip.Font = Enum.Font.FredokaOne
 		chip.TextSize = 11
-		chip.TextColor3 = ROW_WHITE
-		chip.TextStrokeColor3 = TEXT_DARK
+		chip.TextColor3 = Theme.color.surfaceRaised
+		chip.TextStrokeColor3 = Theme.color.text
 		chip.TextStrokeTransparency = 0.4
 		chip.Text = if owned or not price then label else `{label}\n💗{price}`
 		round(chip, 10)
 		local stroke = Instance.new("UIStroke")
-		stroke.Color = if previewSkinId == skinId then HOT_PINK else Color3.fromRGB(240, 200, 220)
+		stroke.Color = if previewSkinId == skinId then Theme.color.primary else Theme.color.border
 		stroke.Thickness = if previewSkinId == skinId then 3 else 1
 		stroke.Parent = chip
 		chip.MouseButton1Click:Connect(function()
@@ -348,7 +337,7 @@ local function populateInspect(gunId: string)
 		end)
 		chip.Parent = inspectSkinRow
 	end
-	skinChip(1, "Default", Color3.fromRGB(255, 245, 250), nil, true, nil)
+	skinChip(1, "Default", Theme.color.surfaceRaised, nil, true, nil)
 	local skins = GunSkinCatalog.perGun[gunId]
 	if skins then
 		local order = 2
@@ -495,19 +484,19 @@ local function buildUi()
 	hoverViewport = Instance.new("ViewportFrame")
 	hoverViewport.Position = UDim2.new(0, 10, 0, 10)
 	hoverViewport.Size = UDim2.new(1, -20, 0, 110)
-	hoverViewport.BackgroundColor3 = ROW_WHITE
+	hoverViewport.BackgroundColor3 = Theme.color.surfaceRaised
 	hoverViewport.BackgroundTransparency = 0.2
 	round(hoverViewport, 10)
 	hoverViewport.Parent = hoverCard
-	hoverName = mkText(hoverCard, 19, DEEP_PINK)
+	hoverName = mkText(hoverCard, 19, Theme.color.primaryDeep)
 	hoverName.Position = UDim2.new(0, 12, 0, 124)
 	hoverName.Size = UDim2.new(1, -24, 0, 22)
 	hoverName.TextXAlignment = Enum.TextXAlignment.Left
-	hoverRarity = mkText(hoverCard, 13, TEXT_DARK)
+	hoverRarity = mkText(hoverCard, 13, Theme.color.text)
 	hoverRarity.Position = UDim2.new(0, 12, 0, 146)
 	hoverRarity.Size = UDim2.new(1, -24, 0, 16)
 	hoverRarity.TextXAlignment = Enum.TextXAlignment.Left
-	hoverStats = mkText(hoverCard, 13, TEXT_DARK)
+	hoverStats = mkText(hoverCard, 13, Theme.color.text)
 	hoverStats.Position = UDim2.new(0, 12, 0, 166)
 	hoverStats.Size = UDim2.new(1, -24, 0, 16)
 	hoverStats.TextXAlignment = Enum.TextXAlignment.Left
@@ -520,7 +509,7 @@ local function buildUi()
 	dialog.Size = UDim2.fromOffset(280, 120)
 	stylePanel(dialog, 16)
 	dialog.Visible = false
-	dialogTitle = mkText(dialog, 18, DEEP_PINK)
+	dialogTitle = mkText(dialog, 18, Theme.color.primaryDeep)
 	dialogTitle.Position = UDim2.new(0, 0, 0, 12)
 	dialogTitle.Size = UDim2.new(1, 0, 0, 24)
 	local function dialogButton(text: string, x: number, color: Color3): TextButton
@@ -536,8 +525,8 @@ local function buildUi()
 		button.Parent = dialog
 		return button
 	end
-	local lookButton = dialogButton("Take a look 🎀", 14, HOT_PINK)
-	local cancelButton = dialogButton("Cancel", 146, Color3.fromRGB(180, 150, 165))
+	local lookButton = dialogButton("Take a look 🎀", 14, Theme.color.primary)
+	local cancelButton = dialogButton("Cancel", 146, Theme.color.neutral)
 	dialog.Parent = screen
 
 	-- pendingRecord is declared at module scope (see the note there).
@@ -566,11 +555,11 @@ local function buildUi()
 	inspectPanel.Size = UDim2.fromOffset(300, 500)
 	stylePanel(inspectPanel, 16)
 	inspectPanel.Visible = false
-	inspectName = mkText(inspectPanel, 24, DEEP_PINK)
+	inspectName = mkText(inspectPanel, 24, Theme.color.primaryDeep)
 	inspectName.Position = UDim2.new(0, 16, 0, 12)
 	inspectName.Size = UDim2.new(1, -32, 0, 28)
 	inspectName.TextXAlignment = Enum.TextXAlignment.Left
-	inspectRarity = mkText(inspectPanel, 14, TEXT_DARK)
+	inspectRarity = mkText(inspectPanel, 14, Theme.color.text)
 	inspectRarity.Position = UDim2.new(0, 16, 0, 42)
 	inspectRarity.Size = UDim2.new(1, -32, 0, 18)
 	inspectRarity.TextXAlignment = Enum.TextXAlignment.Left
@@ -582,7 +571,7 @@ local function buildUi()
 	statsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	statsLayout.Parent = inspectStatsList
 	inspectStatsList.Parent = inspectPanel
-	local skinsLabel = mkText(inspectPanel, 15, DEEP_PINK)
+	local skinsLabel = mkText(inspectPanel, 15, Theme.color.primaryDeep)
 	skinsLabel.Position = UDim2.new(0, 16, 0, 240)
 	skinsLabel.Size = UDim2.new(1, -32, 0, 18)
 	skinsLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -599,7 +588,7 @@ local function buildUi()
 	inspectAction = Instance.new("TextButton")
 	inspectAction.Position = UDim2.new(0, 16, 1, -72)
 	inspectAction.Size = UDim2.new(1, -32, 0, 38)
-	inspectAction.BackgroundColor3 = HOT_PINK
+	inspectAction.BackgroundColor3 = Theme.color.primary
 	inspectAction.Font = Enum.Font.FredokaOne
 	inspectAction.TextSize = 17
 	inspectAction.TextColor3 = Color3.new(1, 1, 1)
@@ -612,7 +601,7 @@ local function buildUi()
 	local tryButton = Instance.new("TextButton")
 	tryButton.Position = UDim2.new(0, 16, 1, -112)
 	tryButton.Size = UDim2.new(1, -32, 0, 32)
-	tryButton.BackgroundColor3 = Color3.fromRGB(255, 130, 190)
+	tryButton.BackgroundColor3 = Theme.color.primaryLight
 	tryButton.Font = Enum.Font.FredokaOne
 	tryButton.TextSize = 15
 	tryButton.TextColor3 = Color3.new(1, 1, 1)
@@ -640,14 +629,14 @@ local function buildUi()
 		end)
 	end)
 	tryButton.Parent = inspectPanel
-	inspectMessage = mkText(inspectPanel, 13, DEEP_PINK)
+	inspectMessage = mkText(inspectPanel, 13, Theme.color.primaryDeep)
 	inspectMessage.Position = UDim2.new(0, 16, 1, -30)
 	inspectMessage.Size = UDim2.new(1, -32, 0, 18)
 	local closeButton = Instance.new("TextButton")
 	closeButton.AnchorPoint = Vector2.new(1, 0)
 	closeButton.Position = UDim2.new(1, -10, 0, 10)
 	closeButton.Size = UDim2.fromOffset(28, 28)
-	closeButton.BackgroundColor3 = HOT_PINK
+	closeButton.BackgroundColor3 = Theme.color.primary
 	closeButton.Font = Enum.Font.FredokaOne
 	closeButton.TextSize = 14
 	closeButton.TextColor3 = Color3.new(1, 1, 1)

@@ -11,20 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local CatalogConfig = require(ReplicatedStorage.Shared.Config.CatalogConfig)
 local ClientData = require(script.Parent.Parent.ClientData)
-
-local HOT_PINK = Color3.fromRGB(255, 92, 168)
-local DEEP_PINK = Color3.fromRGB(214, 66, 143)
-local BLUSH = Color3.fromRGB(255, 227, 240)
-local ROW_WHITE = Color3.fromRGB(255, 245, 250)
-local TEXT_DARK = Color3.fromRGB(96, 56, 78)
-local ERROR_RED = Color3.fromRGB(220, 60, 80)
-
-local RARITY_COLORS: { [string]: Color3 } = {
-	Common = Color3.fromRGB(150, 130, 145),
-	Rare = Color3.fromRGB(90, 140, 235),
-	Epic = Color3.fromRGB(170, 90, 220),
-	Legendary = Color3.fromRGB(235, 160, 50),
-}
+local Theme = require(script.Parent.Parent.UI.Theme)
 
 local ShopController = {}
 
@@ -69,7 +56,7 @@ function ShopController.setOpen(open: boolean)
 end
 
 local function showMessage(text: string, isError: boolean)
-	messageLabel.TextColor3 = if isError then ERROR_RED else DEEP_PINK
+	messageLabel.TextColor3 = if isError then Theme.color.danger else Theme.color.primaryDeep
 	messageLabel.Text = text
 end
 
@@ -125,12 +112,12 @@ local function addCard(kind: string, itemId: string, def: any, order: number)
 	card.Name = itemId
 	card.LayoutOrder = order
 	card.Size = UDim2.fromOffset(136, 126)
-	card.BackgroundColor3 = ROW_WHITE
+	card.BackgroundColor3 = Theme.color.surfaceRaised
 	card.Text = ""
 	card.AutoButtonColor = true
 	round(card, 12)
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = if isEquipped then HOT_PINK else Color3.fromRGB(240, 200, 220)
+	stroke.Color = if isEquipped then Theme.color.primary else Theme.color.border
 	stroke.Thickness = if isEquipped then 3 else 1
 	stroke.Parent = card
 
@@ -138,7 +125,7 @@ local function addCard(kind: string, itemId: string, def: any, order: number)
 	local preview = Instance.new("Frame")
 	preview.Position = UDim2.new(0, 10, 0, 10)
 	preview.Size = UDim2.new(1, -20, 0, 40)
-	preview.BackgroundColor3 = if kind == "skin" then def.slide else BLUSH
+	preview.BackgroundColor3 = if kind == "skin" then def.slide else Theme.color.surface
 	preview.BorderSizePixel = 0
 	round(preview, 8)
 	if kind == "skin" then
@@ -162,22 +149,22 @@ local function addCard(kind: string, itemId: string, def: any, order: number)
 	end
 	preview.Parent = card
 
-	local nameLabel = mkText(card, 15, TEXT_DARK)
+	local nameLabel = mkText(card, 15, Theme.color.text)
 	nameLabel.Position = UDim2.new(0, 6, 0, 54)
 	nameLabel.Size = UDim2.new(1, -12, 0, 18)
 	nameLabel.Text = def.name
 
-	local rarityLabel = mkText(card, 12, RARITY_COLORS[def.rarity] or TEXT_DARK)
+	local rarityLabel = mkText(card, 12, Theme.rarityColor(def.rarity))
 	rarityLabel.Position = UDim2.new(0, 6, 0, 72)
 	rarityLabel.Size = UDim2.new(1, -12, 0, 14)
 	rarityLabel.Text = def.rarity
 
-	local action = mkText(card, 15, DEEP_PINK)
+	local action = mkText(card, 15, Theme.color.primaryDeep)
 	action.Position = UDim2.new(0, 6, 1, -32)
 	action.Size = UDim2.new(1, -12, 0, 24)
 	if isEquipped then
 		action.Text = "Equipped ✓"
-		action.TextColor3 = HOT_PINK
+		action.TextColor3 = Theme.color.primary
 	elseif owned then
 		action.Text = "Equip 🎀"
 	else
@@ -241,7 +228,7 @@ local function buildGui()
 	openButton.AnchorPoint = Vector2.new(0, 1)
 	openButton.Position = UDim2.new(0, 12, 1, -12)
 	openButton.Size = UDim2.fromOffset(140, 42)
-	openButton.BackgroundColor3 = HOT_PINK
+	openButton.BackgroundColor3 = Theme.color.primary
 	openButton.Font = Enum.Font.FredokaOne
 	openButton.TextSize = 18
 	openButton.TextColor3 = Color3.new(1, 1, 1)
@@ -257,15 +244,15 @@ local function buildGui()
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
 	panel.Size = UDim2.fromOffset(620, 460)
-	panel.BackgroundColor3 = BLUSH
+	panel.BackgroundColor3 = Theme.color.surface
 	panel.Visible = false
 	round(panel, 18)
 	local stroke = Instance.new("UIStroke")
-	stroke.Color = HOT_PINK
+	stroke.Color = Theme.color.primary
 	stroke.Thickness = 2
 	stroke.Parent = panel
 
-	local title = mkText(panel, 26, DEEP_PINK)
+	local title = mkText(panel, 26, Theme.color.primaryDeep)
 	title.Position = UDim2.new(0, 0, 0, 12)
 	title.Size = UDim2.new(1, 0, 0, 32)
 	title.Text = "🎀 PINK SHOP 🎀"
@@ -274,7 +261,7 @@ local function buildGui()
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position = UDim2.new(1, -10, 0, 10)
 	close.Size = UDim2.fromOffset(32, 32)
-	close.BackgroundColor3 = HOT_PINK
+	close.BackgroundColor3 = Theme.color.primary
 	close.Font = Enum.Font.FredokaOne
 	close.TextSize = 18
 	close.TextColor3 = Color3.new(1, 1, 1)
@@ -291,7 +278,7 @@ local function buildGui()
 	scroll.BackgroundTransparency = 1
 	scroll.BorderSizePixel = 0
 	scroll.ScrollBarThickness = 6
-	scroll.ScrollBarImageColor3 = HOT_PINK
+	scroll.ScrollBarImageColor3 = Theme.color.primary
 	scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	scroll.CanvasSize = UDim2.new()
 
@@ -308,7 +295,7 @@ local function buildGui()
 	grid.Parent = scroll
 	scroll.Parent = panel
 
-	messageLabel = mkText(panel, 17, DEEP_PINK)
+	messageLabel = mkText(panel, 17, Theme.color.primaryDeep)
 	messageLabel.AnchorPoint = Vector2.new(0.5, 1)
 	messageLabel.Position = UDim2.new(0.5, 0, 1, -12)
 	messageLabel.Size = UDim2.new(1, -32, 0, 24)

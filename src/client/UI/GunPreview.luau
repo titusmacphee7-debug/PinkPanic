@@ -78,7 +78,7 @@ function GunPreview.create(
 	viewport.Size = UDim2.fromScale(1, 1)
 	viewport.BackgroundColor3 = Theme.color.surfaceSunken
 	viewport.BackgroundTransparency = 0.25
-	viewport.Ambient = Color3.fromRGB(220, 210, 218)
+	viewport.Ambient = Theme.color.viewportAmbient
 	viewport.LightColor = Theme.color.surfaceRaised
 	viewport.Parent = parent
 

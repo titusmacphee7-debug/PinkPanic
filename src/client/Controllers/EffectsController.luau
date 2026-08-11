@@ -15,11 +15,10 @@ local TweenService = game:GetService("TweenService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local ClientData = require(script.Parent.Parent.ClientData)
+local Theme = require(script.Parent.Parent.UI.Theme)
 
 local SHOT_SOUND = "rbxasset://sounds/snap.mp3"
 local HIT_SOUND = "rbxasset://sounds/electronicpingshort.wav"
-local TRACER_PINK = Color3.fromRGB(255, 150, 200)
-local SHELL_BRASS = Color3.fromRGB(255, 208, 130)
 
 local MAX_SHELLS = 180 -- oldest brass despawns past this
 local SHELL_SIZE = 0.35 -- longest axis after import normalization, studs
@@ -125,7 +124,7 @@ local function bulletTemplate(): BasePart?
 	local trail = Instance.new("Trail")
 	trail.Attachment0 = above
 	trail.Attachment1 = below
-	trail.Color = ColorSequence.new(TRACER_PINK)
+	trail.Color = ColorSequence.new(Theme.color.primarySoft)
 	trail.Transparency = NumberSequence.new(0.25, 1)
 	trail.Lifetime = 0.07
 	trail.LightEmission = 1
@@ -147,7 +146,7 @@ local function shellTemplate(): BasePart
 		local placeholder = Instance.new("Part")
 		placeholder.Shape = Enum.PartType.Cylinder
 		placeholder.Size = Vector3.new(SHELL_SIZE, 0.13, 0.13)
-		placeholder.Color = SHELL_BRASS
+		placeholder.Color = Theme.color.brass
 		placeholder.Material = Enum.Material.Metal
 		part = prepEffectPart(placeholder, SHELL_SIZE)
 	end
@@ -237,7 +236,7 @@ function EffectsController.drawTracer(origin: Vector3, endpoint: Vector3)
 	tracer.CanTouch = false
 	tracer.CastShadow = false
 	tracer.Material = Enum.Material.Neon
-	tracer.Color = TRACER_PINK
+	tracer.Color = Theme.color.primarySoft
 	tracer.Transparency = 0.15
 	tracer.Size = Vector3.new(0.08, 0.08, distance)
 	tracer.CFrame = CFrame.lookAt(origin, endpoint) * CFrame.new(0, 0, -distance / 2)
@@ -276,7 +275,7 @@ function EffectsController.launchProjectileVisual(
 		streakPart.CanTouch = false
 		streakPart.CastShadow = false
 		streakPart.Material = Enum.Material.Neon
-		streakPart.Color = TRACER_PINK
+		streakPart.Color = Theme.color.primarySoft
 		streakPart.Transparency = 0.1
 		streakPart.Size = Vector3.new(0.06, 0.06, math.clamp(velocity * 0.02, 1.5, 8))
 		part = streakPart
