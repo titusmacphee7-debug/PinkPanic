@@ -606,6 +606,61 @@ Nothing that affects gameplay is ever purchasable. Crates contain cosmetics
 only — no guns, no attachments, no perks. Weapons and attachments unlock through
 play, per §6. That line does not move.
 
+### Pity — the odds improve as you roll
+
+A flat 0.32% Exotic rate means a player can open fifty crates and feel nothing
+happened. Pity fixes that without changing the average much.
+
+Per player, per crate line, we track how many rolls since each **pity tier**
+(Legendary and Exotic) last landed:
+
+- **Soft pity.** Past `softPityStart` rolls, every additional roll adds a small
+  amount to that tier's weight. The climb is gentle and continuous, not a cliff.
+- **Hard pity.** At `hardPity` rolls the tier is guaranteed. This is the promise
+  that makes the whole system feel fair: there is a worst case, and it is known.
+- **Reset on hit**, including when the tier arrives early or from a grant.
+
+Counters live **in the profile, server-side**. The client is told its progress
+so it can show it; it never computes or reports it.
+
+**Pity changes what "published odds" means, and we have to be honest about it.**
+A flat number next to a system that quietly improves it is a false disclosure.
+So the shop shows both:
+
+1. **Base odds**, derived from the same weights the roller uses (§6).
+2. **Your current pity progress** — "12 rolls since Legendary · guaranteed at
+   40" — read from your own profile.
+
+Showing the counter is not just compliance. A visible "3 more until guaranteed"
+is one of the strongest reasons anyone opens the next crate, so the honest
+implementation is also the one that performs.
+
+### Bundles
+
+Themed sets — a camo, a charm, a kill effect, a title and a name tag that all
+belong to one look — sold as one purchase for Robux, at a discount to buying the
+pieces separately.
+
+**This has to be reconciled with the free-to-play rule, and it can be.** Titus's
+rule is that anything purchasable is also obtainable free-to-play. So:
+
+- **Every item in a bundle is independently obtainable** — crate pool, challenge
+  reward or level unlock, same as any other cosmetic.
+- **What the bundle sells is convenience and price**, not access. You are buying
+  five things at once, cheaper, immediately, instead of chasing them.
+- **No bundle-exclusive item, ever.** The moment one exists, the rule is broken
+  and the game has a paywalled cosmetic.
+- **Bundles can be time-limited** (a seasonal set leaving the shop) because that
+  limits the *discount*, not the items.
+
+Boot validation covers this the same way it covers everything else: a bundle
+containing an item with no free acquisition path fails the manifest by name.
+
+Owned-item handling matters more than it sounds. If you already own two of the
+five, the bundle must either **discount by the owned portion or refund it in
+coins** — selling someone something they already have is the fastest way to make
+a store feel dishonest.
+
 ---
 
 ## 7. Scorestreaks
