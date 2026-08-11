@@ -14,8 +14,11 @@
 --   · head stabilization — the head counter-rotates so it stays level
 --     while the body reclines/leans (the #1 thing that sells a pose)
 --
--- Applied via Motor6D C0 offsets (default walk/run animations own
--- Transform, so both compose cleanly). The local player's stance comes
+-- Applied as a rest-pose offset on each joint — Motor6D.C0 on the classic
+-- rig, Attachment0.CFrame on Roblox's newer AnimationConstraint rig. Either
+-- way animations own Transform and we own the base, so keyframed clips
+-- (Moon Animator included) and this layer compose instead of fighting.
+-- The local player's stance comes
 -- straight from MovementController (zero latency); everyone else's arrives
 -- as character attributes set by MovementStateService.
 --
@@ -102,7 +105,25 @@ local RATE = {
 -- Per-character rig state
 -- ---------------------------------------------------------------------------
 
-type JointRef = { joint: Motor6D, c0: CFrame }
+-- Two rig generations, one interface.
+--
+-- Classic R15 hangs a Motor6D off each limb and we offset its C0. Roblox's
+-- newer constraint rig replaces every Motor6D with an AnimationConstraint
+-- driven by a pair of RigAttachments — same joint NAMES, same parents, but
+-- `joint:IsA("Motor6D")` is false, which silently killed this entire system.
+--
+-- The C0 analogue there is Attachment0.CFrame (the parent-side rig
+-- attachment). Measured in Studio on the live rig: identical sign convention
+-- (+0.436 rad in → +0.436 rad out) and translation applies too, despite
+-- MaxForce being 0. The constraint's own `Transform` is NOT usable — the
+-- Animator overwrites it every frame, exactly like Motor6D.Transform, which
+-- is what lets keyframe animations and this layer compose instead of fight.
+type JointRef = {
+	joint: Instance, -- Motor6D or AnimationConstraint; identity + liveness
+	motor: Motor6D?, -- classic rig
+	attachment: Attachment?, -- constraint rig
+	base: CFrame, -- rest pose, captured once
+}
 
 type Rig = {
 	root: JointRef, waist: JointRef, neck: JointRef,
@@ -138,37 +159,71 @@ local JOINT_PATHS: { [string]: { string } } = {
 -- without this a bad rig would warn 60 times a second.
 local reportedRigs: { [Model]: true } = {}
 
--- An R6 character has none of the 11 joints below, so this whole system used
--- to go silently dead: no error, no warning, just a character that never
--- leans, slides or crouches. "Still loading" looks identical to "wrong rig"
--- from inside buildRig, so ask the Humanoid which it is and only complain
--- about the one that will never fix itself.
-local function reportRig(model: Model)
+-- A joint we can't drive and a joint that hasn't streamed in yet look
+-- identical from here, and only one of them will ever fix itself. So: stay
+-- quiet while limbs are still arriving, and say something concrete once a
+-- joint is present but the wrong shape.
+local function reportRig(model: Model, jointName: string, found: Instance?)
 	if reportedRigs[model] then
 		return
 	end
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.RigType == Enum.HumanoidRigType.R15 then
-		return -- still streaming in; it'll build on a later frame
+	if not humanoid then
+		return -- still assembling
 	end
-	reportedRigs[model] = true
-	warn(
-		`[PinkPanic] ⚠️ {model.Name} is {humanoid.RigType.Name}, not R15 — procedural animation `
-			.. `is OFF for this character (no lean, bob, slide, crouch, air or landing pose). `
-			.. `Code cannot fix this: set Home → Game Settings → Avatar → Rig Type → R15.`
-	)
+	if humanoid.RigType ~= Enum.HumanoidRigType.R15 then
+		reportedRigs[model] = true
+		warn(
+			`[PinkPanic] ⚠️ {model.Name} is {humanoid.RigType.Name}, not R15 — procedural animation `
+				.. `is OFF for this character. Set Home → Game Settings → Avatar → Avatar Type → R15.`
+		)
+	elseif found then
+		reportedRigs[model] = true
+		warn(
+			`[PinkPanic] ⚠️ {model.Name}: joint "{jointName}" is a {found.ClassName}, which this `
+				.. `build can't drive — procedural animation is OFF for this character.`
+		)
+	end
+end
+
+-- Resolves one joint on either rig generation, or nil if it isn't drivable.
+local function jointRef(model: Model, limbName: string, jointName: string): JointRef?
+	local limb = model:FindFirstChild(limbName)
+	local joint = limb and limb:FindFirstChild(jointName)
+	if not joint then
+		return nil -- limb still streaming in; caller stays quiet
+	end
+
+	if joint:IsA("Motor6D") then
+		return { joint = joint, motor = joint, attachment = nil, base = joint.C0 }
+	end
+
+	-- Compared by ClassName rather than IsA: AnimationConstraint may not exist
+	-- in the type definitions this file is checked against, and an unknown
+	-- class name in IsA is a --!strict error rather than a runtime miss.
+	if joint.ClassName == "AnimationConstraint" then
+		local parentSide = (joint :: any).Attachment0
+		if typeof(parentSide) == "Instance" and parentSide:IsA("Attachment") then
+			return { joint = joint, motor = nil, attachment = parentSide, base = parentSide.CFrame }
+		end
+		return nil -- constraint present but not wired up yet
+	end
+
+	reportRig(model, jointName, joint)
+	return nil
 end
 
 local function buildRig(model: Model): Rig?
 	local rig = {}
 	for key, path in JOINT_PATHS do
-		local limb = model:FindFirstChild(path[1])
-		local joint = limb and limb:FindFirstChild(path[2])
-		if not joint or not joint:IsA("Motor6D") then
-			reportRig(model)
+		local ref = jointRef(model, path[1], path[2])
+		if not ref then
+			-- Covers R6, where the limb itself is absent so jointRef returns
+			-- before it can report anything.
+			reportRig(model, path[2], nil)
 			return nil
 		end
-		rig[key] = { joint = joint, c0 = joint.C0 }
+		rig[key] = ref
 	end
 	return (rig :: any) :: Rig
 end
@@ -202,7 +257,15 @@ local function approach(current: number, target: number, rate: number, deltaTime
 end
 
 local function apply(ref: JointRef, offset: CFrame)
-	ref.joint.C0 = ref.c0 * offset
+	local motor = ref.motor
+	if motor then
+		motor.C0 = ref.base * offset
+		return
+	end
+	local attachment = ref.attachment
+	if attachment then
+		attachment.CFrame = ref.base * offset
+	end
 end
 
 local function solveCharacter(player: Player, model: Model, deltaTime: number)
@@ -323,8 +386,7 @@ local function solveCharacter(player: Player, model: Model, deltaTime: number)
 	local rig = pose.rig
 	if active < 0.004 then
 		for _, key in { "root", "waist", "neck", "lHip", "rHip", "lKnee", "rKnee", "lShoulder", "rShoulder", "lElbow", "rElbow" } do
-			local ref = (rig :: any)[key] :: JointRef
-			ref.joint.C0 = ref.c0
+			apply((rig :: any)[key] :: JointRef, CFrame.identity)
 		end
 		return
 	end
