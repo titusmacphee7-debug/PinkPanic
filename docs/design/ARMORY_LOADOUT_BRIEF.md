@@ -6,38 +6,52 @@ Hand this file to Claude Design. It pairs with `docs/design/DESIGN_SYSTEM.md` (t
 
 One screen, `src/client/Controllers/LoadoutController.luau`: a grid of all 32 guns where **clicking a gun equips it immediately**, with a camo strip along the bottom. That's wrong. It does too much in one place, buries the stats, and puts camos where they don't belong.
 
-## What to build instead — three screens
+## What to build instead — two full-screen surfaces
 
-> **Assumption to correct if wrong:** Loadout = choosing which of the guns you *already own* you carry. Armory = browsing, inspecting and *buying* the full roster. Detail = one gun, everything about it.
+**Both are FULL-SCREEN, not floating panels.** The current 760×560 centred card is too small for any of this. These should fill the viewport edge to edge, the way a console shooter's loadout menu does. Only small confirmations (buy, trial) stay as dialogs on top.
 
-### 1. Loadout screen — "what am I carrying?"
+### 1. Loadout screen — "my kit"
 
-Fast, small, two slots. No shopping.
+Everything about the gear you already have. Full-screen, three regions:
 
-- Two big slots: **Primary** and **Secondary**, each showing the equipped gun's 3D preview, name, and its equipped camo
-- Tap a slot → a picker of **owned guns for that slot only**
-- No prices, no locked guns, no camo strip
-- Should be usable in a couple of seconds
+**Your character.** A live 3D view of the player's avatar. *There is no outfit system yet* — clone `Players.LocalPlayer.Character` into a `ViewportFrame` and show the real Roblox avatar. Leave obvious room beside it for outfit/skin slots to land later; do not invent controls that don't exist yet.
 
-### 2. Armory screen — "what could I have?"
+**Your two weapon slots.** Primary and Secondary, each showing the equipped gun's 3D preview, name, class and current camo. Tapping a slot swaps to a picker of **owned guns for that slot only** — no prices, no locked guns.
 
-The full roster, browsable. This is the shopping surface, and eventually the UI layer over the physical Candy Armory interior.
+**Stats and camos for the selected gun.** Selecting either slot fills a panel with that gun's full stat block (below) and its camos and colour skins, **buyable inline**. This is the difference from the old design: the loadout is where you tune the guns you own, not just pick them.
+
+### 2. Armory screen — "the store"
+
+The full roster, browsable. Full-screen. This is the shopping surface, and eventually the UI layer over the physical Candy Armory interior.
 
 - All 32 guns, grouped or filterable by **class** (8 classes, listed below)
 - Locked guns visible with price behind the standard `lockedScrim` — aspirational, never hidden
-- **Clicking a gun opens the Detail screen. It must NOT equip.** That is the single biggest change from today.
+- **Clicking a gun opens the Detail view. It must NOT equip.** That is the single biggest change from today.
 - Owned/price sort so the next affordable thing is obvious
-- Player's coin balance always visible
+- Coin balance always visible
 
-### 3. Gun Detail screen — the important one
+### 3. Gun Detail — one gun, everything
 
-One gun, everything about it. Opened from the Armory (and optionally from a Loadout slot).
+Reached from the Armory. Can be a full-screen state or a large region of the Armory — designer's call, as long as it isn't a small popup.
 
-- Large 3D preview, rotatable — the hero of the screen
-- Full stat block (below)
+- Large 3D preview, rotatable — the hero of the view
+- Full stat block
 - Price + **Buy** if unowned; **Equip to Primary/Secondary** if owned
-- **Camos live here**, scoped to this gun — not on any selection grid
+- **Try it** (60s trial) if the range exists — see NOD-97
+- Camos and colour skins for this gun
 - Back to Armory
+
+### Where things live
+
+| | Loadout | Armory |
+|---|---|---|
+| Character + outfit | ✅ | — |
+| Equipped slots | ✅ | — |
+| Pick from owned guns | ✅ | — |
+| Browse all 32 | — | ✅ |
+| Buy guns | — | ✅ |
+| Gun stats | ✅ | ✅ |
+| Camos / skins | ✅ (owned guns) | ✅ (on Detail) |
 
 ---
 
