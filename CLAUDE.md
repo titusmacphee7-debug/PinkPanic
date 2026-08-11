@@ -1,0 +1,144 @@
+# Pink Panic
+
+A cute-pink FFA shooter for Roblox. Built by Titus with Leah. Work is tracked in
+Linear (team **Nodewell**, `NOD-` prefix, projects "Pink Panic — MVP" and
+"Post-MVP").
+
+## Who does what
+
+Claude writes and pushes code. Titus does everything Studio-side — importing
+models, building the lobby and maps, playtesting — and reports how things
+*feel*. When something needs to happen inside Studio, hand him either a Command
+Bar script or precise Explorer steps; don't assume the place file changed.
+
+**The place file is not in git.** Only `src/`, `docs/`, and the Rojo config are.
+Models, maps, the lobby build, and anything in `ReplicatedStorage/GunModels`
+live in Titus's local `.rbxl` and cannot be read or edited from a cloud session.
+
+## Layout
+
+Rojo 7.7 syncs three trees (see `default.project.json`):
+
+| Repo | Studio |
+|---|---|
+| `src/server` | `ServerScriptService/Server` |
+| `src/client` | `StarterPlayerScripts/Client` |
+| `src/shared` | `ReplicatedStorage/Shared` |
+
+Titus runs `.\rojo.exe serve` from the project folder in PowerShell.
+
+- `src/server/Services/*` — one service per concern, each with `init()`, all
+  called from `src/server/init.server.luau`. Order matters.
+- `src/client/Controllers/*` — same pattern, client side.
+- `src/shared/Config/*` — data only, no behavior. `GunCatalog.luau` is the
+  single balance file (32 guns); `CombatStats.luau` is the one resolver both
+  sides use so client prediction and server truth can't drift.
+- `src/shared/Net/Remotes.luau` — **every** remote is declared here, nowhere
+  else. `Guard.luau` does rate limiting and argument validation.
+
+## Rules that aren't negotiable
+
+- `--!strict` everywhere.
+- **Absolute server authority.** The client predicts and animates; the server
+  decides. Damage is computed server-side from server-simulated projectiles —
+  the client never reports a hit.
+- Every remote handler validates through `Guard` and rate-limits.
+- Gun trials must never grant ownership. No glitch path to a free gun.
+- Loadout changes are lobby-only.
+- All purchases and ownership are server-derived from the profile, never from
+  anything the client sends.
+
+## Combat model
+
+Server-side ballistics: per-gun muzzle velocity plus gravity drop, stepped as
+segment raycasts on Heartbeat. Two-point COD-style falloff (`damageNear` /
+`damageFar` over `rangeNear` / `rangeFar`), `travelMax = rangeFar * 1.6`.
+Damage accumulates per victim per frame, so a shotgun lands as one hit event
+rather than eight.
+
+**Recoil has no bloom.** Bloom feels terrible and Titus vetoed it. Spread is a
+fixed per-gun cone that never grows — `spreadDeg` hip, `adsSpreadDeg` aimed —
+and the *camera* climbs instead (`recoilVert` / `recoilHoriz` /
+`recoilRecovery`). `WeaponController.RECOIL_SCALE` is the master volume;
+per-gun ceilings derive from each gun's own stats so a pistol and an LMG don't
+share a cap. Target audience is new players: recoil should be readable and
+learnable, never a fight.
+
+## Render step ordering
+
+Several systems write the camera every frame. They are chained deliberately —
+breaking this order causes jitter that looks like a physics bug:
+
+```
+engine Camera (200)
+  → PinkPanicCamera      +1
+  → PinkPanicAim         +2   (recoil)
+  → PinkPanicSlideRoll   +3
+  → PinkPanicViewmodel   +4
+PinkPanicSkid          Input+1
+PinkPanicMouseUnlock   Last
+```
+
+## Animation
+
+Procedural, not keyframed — Moon Animator was tried and abandoned. 11 Motor6D
+joints, layered pose solver in `MovementAnimator.luau`. Animations own
+`Transform`; we own `C0`. A limb bending the wrong way is a one-number flip in
+the `SIGNS` table, not a rewrite.
+
+Gun models are split into moving parts named `Slide`, `Bolt`, `Pump`,
+`Cylinder`, `Mag` (on top of skin regions `Body` / `Panel` / `Grip` /
+`Hardware` / `Accent`). `ViewmodelController` cycles them: slide blowback,
+pump strokes, cylinder notches, mag drops on reload. Shells eject from the
+real port and settle on the ground, then anchor — zero ongoing physics cost.
+
+## Attribute conventions
+
+Titus tags hand-built content instead of us generating it:
+
+- Lobby pads: `PadName`, `PadAction` (`shop` / `loadout` / `portal`), `PadRadius`
+- `CameraAnchor` part inside `workspace.Lobby`, with `MaxYawDeg` / `MaxPitchDeg`
+- Armory displays: `GunDisplay`, `ArmoryMat`
+- Arena: a Workspace folder named exactly `Arena`, `ArenaOrigin` attribute
+- Runtime stance flags: `PPSliding`, `PPCrouching`
+
+## Hard-won gotchas
+
+**Check `BUILD_TAG` first, always.** `src/server/init.server.luau` prints a
+build tag at boot. If Titus reports "your fix didn't work," get him to read the
+Output window before touching code — he once spent days testing stale scripts
+because his local branch had drifted from origin (`git pull` said "Already up
+to date" while origin had moved). The fix was:
+
+```
+git fetch origin
+git checkout claude/pink-panic-roblox-5g2w56
+git reset --hard origin/claude/pink-panic-roblox-5g2w56
+```
+
+If the tag prints **twice**, there's a duplicate script tree in the place file.
+
+**Never generate lobbies or maps.** Earlier versions built a placeholder plaza
+and arena procedurally; it got baked into saved place files and kept coming
+back after Titus built his own. All generator code was deleted on purpose, and
+legacy folders are destroyed unconditionally at boot. Do not reintroduce it.
+
+**Locked ≠ anchored.** Imported parts that are Locked but not Anchored will
+explode the moment you press Play.
+
+**Studio solo holds in the lobby.** With one player in Studio the round waits
+in `Waiting` until the START GAME button (or a portal pad) fires `EnterPortal`.
+Two or more players, or the published game, run the normal timer. This exists
+so the lobby — fixed camera, free cursor, pads, armory — is testable alone.
+
+## Git
+
+Branch: `claude/pink-panic-roblox-5g2w56`. Push there and nowhere else. Do not
+open a pull request unless Titus explicitly asks.
+
+## Talking to Titus
+
+He's new to Roblox and git, and he's sharp about how things feel. Lead with the
+fix and what it changes in-game; skip the play-by-play. When he says something
+is broken, believe him, but verify which build he's actually running before
+rewriting anything.
