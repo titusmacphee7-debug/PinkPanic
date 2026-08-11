@@ -15,7 +15,7 @@ local ClientData = require(script.Parent.Parent.ClientData)
 local CameraController = require(script.Parent.CameraController)
 local EffectsController = require(script.Parent.EffectsController)
 local ShopController = require(script.Parent.ShopController)
-local SettingsController = require(script.Parent.SettingsController)
+local LoadoutController = require(script.Parent.LoadoutController)
 
 local HOT_PINK = Color3.fromRGB(255, 92, 168)
 local PINK_WHITE = Color3.fromRGB(255, 245, 250)
@@ -188,7 +188,7 @@ local function applyZone(zone: BasePart?)
 	if previousAction == "shop" then
 		ShopController.setOpen(false)
 	elseif previousAction == "loadout" then
-		SettingsController.setOpen(false)
+		LoadoutController.setOpen(false)
 	end
 
 	if zone then
@@ -200,12 +200,11 @@ local function applyZone(zone: BasePart?)
 		if action == "shop" then
 			ShopController.setOpen(true)
 		elseif action == "loadout" then
-			SettingsController.setOpen(true)
+			LoadoutController.setOpen(true)
 		elseif action == "portal" then
-			-- The Panic Portal: asks the server to start the round (Studio
-			-- solo starts on demand; live lobbies run the normal timer).
-			showBanner("Entering the arena... 💗")
-			Remotes.event("EnterPortal"):FireServer()
+			-- Pads no longer start rounds — the START GAME button is the only
+			-- way in, so a round can never begin by walking somewhere.
+			showBanner("Use the START GAME button 💗")
 		end
 	end
 end

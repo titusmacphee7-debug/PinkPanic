@@ -6,7 +6,6 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Guard = require(ReplicatedStorage.Shared.Net.Guard)
@@ -29,10 +28,11 @@ local function now(): number
 	return workspace:GetServerTimeNow()
 end
 
--- Solo Studio playtests still cycle rounds (lobby -> arena -> lobby);
--- real servers keep the configured minimum.
-local function minPlayers(): number
-	return if RunService:IsStudio() then 1 else GameConfig.minPlayers
+-- Rounds NEVER start on their own. Two conditions, everywhere including
+-- Studio: enough players, and someone pressed START GAME. No timer, no pad,
+-- no solo exception — walking somewhere can't drop you into a match.
+local function enoughPlayers(): boolean
+	return #Players:GetPlayers() >= GameConfig.minPlayers
 end
 
 -- Combat gating (WeaponService): real shots only land during a live round.
@@ -108,34 +108,29 @@ local function onDeath(victim: Player, attacker: Player?, _weaponId: string?)
 	Remotes.event("ScoreUpdated"):FireAllClients(serializeScores())
 end
 
--- Studio solo: the round waits for a deliberate start (the START GAME button
--- or a Panic Portal pad) instead of auto-starting, so the lobby — fixed
--- camera, pads, armory — is actually testable alone. With 2+ players, or
--- outside Studio, rounds run on the normal timer.
-local portalRequested = false
-
-local function soloHold(): boolean
-	return RunService:IsStudio() and #Players:GetPlayers() <= 1 and not portalRequested
-end
+-- Set only by the START GAME button (client -> EnterPortal). Cleared as soon
+-- as the round leaves Waiting, so one press buys exactly one round.
+local startRequested = false
 
 local function runLoop()
 	while true do
-		-- Waiting: not enough players for a match (or, solo in Studio, the
-		-- portal hasn't been stepped on yet).
+		-- Waiting: hold here until there are enough players AND someone has
+		-- pressed START GAME. Both, always.
 		state = "Waiting"
 		endsAt = 0
+		startRequested = false
 		broadcast()
-		while #Players:GetPlayers() < minPlayers() or soloHold() do
+		while not (enoughPlayers() and startRequested) do
 			task.wait(1)
 		end
-		portalRequested = false
+		startRequested = false
 
 		-- Intermission: countdown to the round.
 		state = "Intermission"
 		endsAt = now() + GameConfig.intermissionSeconds
 		broadcast()
 		task.wait(GameConfig.intermissionSeconds)
-		if #Players:GetPlayers() < minPlayers() then
+		if not enoughPlayers() then
 			continue -- someone left during the countdown; back to Waiting
 		end
 
@@ -177,12 +172,16 @@ end
 function RoundService.init()
 	CombatService.onDeathConnect(onDeath)
 
-	-- The Panic Portal pad: in Studio solo it starts the round on demand.
+	-- The START GAME button — the only way a round ever begins. Ignored unless
+	-- we're actually waiting, so a press mid-round can't queue the next one.
 	Remotes.event("EnterPortal").OnServerEvent:Connect(function(player)
 		if not Guard.checkRate(player, "EnterPortal", 2, 1) then
 			return
 		end
-		portalRequested = true
+		if state ~= "Waiting" or not enoughPlayers() then
+			return
+		end
+		startRequested = true
 	end)
 
 	Players.PlayerAdded:Connect(function(player)

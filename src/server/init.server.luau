@@ -8,7 +8,7 @@
 -- connected at Play time, or a duplicate script tree in the place file).
 -- If it prints TWICE, there are two copies of the server running.
 
-local BUILD_TAG = "2026-08-10-E · viewmodel-kick-floor-fix · recoil-scale-now-works"
+local BUILD_TAG = "2026-08-10-F · loadout-screen · button-only-start · arena-spawns-neutral"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

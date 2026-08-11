@@ -20,6 +20,7 @@ ClientData.snapshot = nil :: any
 ClientData.changed = changedEvent.Event
 ClientData.shopOpen = false
 ClientData.settingsOpen = false
+ClientData.loadoutOpen = false
 -- True while the Armory dialog/inspection owns the mouse (blocks lobby shooting).
 ClientData.armoryBusy = false
 
@@ -43,7 +44,7 @@ end
 
 -- True while any modal menu should block gameplay input.
 function ClientData.menuOpen(): boolean
-	return ClientData.shopOpen or ClientData.settingsOpen
+	return ClientData.shopOpen or ClientData.settingsOpen or ClientData.loadoutOpen
 end
 
 -- Call after toggling shopOpen/settingsOpen. The first-person camera scripts
