@@ -40,7 +40,7 @@ local poppedTargets: { [BasePart]: boolean } = {}
 --   PadSignScale   — multiplies the plate size    (default 1)
 local SIGN_FORWARD = 6
 local SIGN_HEIGHT = 8
-local SIGN_SIZE = Vector3.new(24, 5.4, 0.2)
+local SIGN_SIZE = Vector3.new(19, 5.4, 0.2)
 local SIGN_MAX_DISTANCE = 500
 
 local function sign(text: string, pad: BasePart, lookAt: Vector3?)
@@ -105,11 +105,14 @@ local function sign(text: string, pad: BasePart, lookAt: Vector3?)
 	stroke.Transparency = 0.15
 	stroke.Parent = plate
 
+	-- Keep vertical padding tight. TextScaled fits the SMALLER constraint, so
+	-- on a wide plate the text is height-limited — generous top/bottom padding
+	-- just shrinks the letters and leaves the plate looking empty.
 	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0.05, 0)
-	padding.PaddingRight = UDim.new(0.05, 0)
-	padding.PaddingTop = UDim.new(0.12, 0)
-	padding.PaddingBottom = UDim.new(0.12, 0)
+	padding.PaddingLeft = UDim.new(0.04, 0)
+	padding.PaddingRight = UDim.new(0.04, 0)
+	padding.PaddingTop = UDim.new(0.04, 0)
+	padding.PaddingBottom = UDim.new(0.04, 0)
 	padding.Parent = plate
 
 	local label = Instance.new("TextLabel")
@@ -117,6 +120,7 @@ local function sign(text: string, pad: BasePart, lookAt: Vector3?)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.FredokaOne
 	label.TextScaled = true
+	label.TextWrapped = false
 	label.TextColor3 = DEEP_PINK
 	label.Text = text
 	label.Parent = plate
