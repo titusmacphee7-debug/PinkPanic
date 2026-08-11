@@ -13,14 +13,14 @@
 --
 -- So we set WalkSpeed = 0 and own the horizontal velocity:
 --
---   · a Source-derived accelerate/friction model on the ground, so speed
---     ramps and bleeds instead of snapping (this replaces the old skid
---     system entirely — there is no "skidding" state any more, letting go
---     of the keys just means wishSpeed is 0 and friction takes over)
---   · a split air model: free, generous STEERING (rotate velocity toward
---     input at no speed cost) plus a hard-capped acceleration term, so
---     new players can always redirect and good players can still strafe-jump
---     for speed
+--   · an accelerate/friction model on the ground, so speed ramps and bleeds
+--     instead of snapping (this replaces the old skid system entirely —
+--     there is no "skidding" state any more, letting go of the keys just
+--     means wishSpeed is 0 and friction takes over)
+--   · a deliberately flat air model: a jump is a committed arc, and the air
+--     can never make you faster than you took off. Call of Duty movement is
+--     fast on the ground and near-passive in the air, and that flatness is
+--     what keeps players trackable enough for an average person to aim at
 --   · steerable slides, coyote time and jump buffering, so you are never
 --     fighting the controller for something you clearly meant to do
 --
@@ -80,6 +80,10 @@ local jumpBufferedAt = -1
 local lastGroundedAt = -1
 local lastLandedAt = -1
 local lastJumpAt = -1
+-- Locked the moment you leave the ground: the air can never make you faster
+-- than you already were. See the air branch in update().
+local wasAirborne = false
+local airSpeedCeiling = 0
 
 local staminaBar: Frame? = nil
 local staminaFill: Frame? = nil
@@ -218,6 +222,11 @@ local function trySlide()
 	if
 		sliding
 		or not sprinting
+		-- No slides in the lobby. The plaza camera is a fixed anchor shot, not
+		-- a follow cam, so a carved slide reads as the character skating out
+		-- from under a camera that isn't tracking them. This is the only
+		-- behavioural fork between lobby and combat.
+		or ClientData.inLobby()
 		or now - lastSlideAt < MovementConfig.slideCooldown
 		or stamina < MovementConfig.slideCost
 		or humanoid.FloorMaterial == Enum.Material.Air
@@ -350,6 +359,18 @@ local function update(deltaTime: number)
 	if not airborne then
 		lastGroundedAt = now
 	end
+
+	-- Lock the air ceiling on takeoff. The floor is walking pace so that a
+	-- standing jump can still be pushed up to a walk mid-air rather than
+	-- leaving you frozen, but a sprint or slide jump carries its own speed
+	-- and nothing anywhere can raise it.
+	if airborne and not wasAirborne then
+		airSpeedCeiling = math.max(
+			flat(root.AssemblyLinearVelocity).Magnitude,
+			MovementConfig.baseWalkSpeed * weaponSpeedMult
+		)
+	end
+	wasAirborne = airborne
 
 	-- MoveDirection keeps reporting real, camera-relative player input at
 	-- WalkSpeed = 0 — and since nothing injects Move() any more, it is pure.
@@ -500,19 +521,16 @@ local function update(deltaTime: number)
 			velocity = slideDirection * slideSpeed
 		end
 	elseif airborne then
-		-- Free steering first: rotate what you already have toward the stick
-		-- at no cost. This is the "always in control" half.
-		if moving and velocity.Magnitude > 1 then
-			local direction = steerToward(
-				velocity.Unit,
-				wishDir,
-				MovementConfig.airTurnRate * deltaTime
-			)
-			velocity = direction * velocity.Magnitude
-		end
-		-- Then the capped strafe term: this is the only way to gain speed in
-		-- the air, and it only pays out when your input is off-axis from your
-		-- velocity — i.e. when you're actually strafing.
+		-- A jump is a committed arc. One weak acceleration term, purely so
+		-- that jumping straight up and then pushing a direction does
+		-- something, and then a hard ceiling at the speed you took off with.
+		--
+		-- The ceiling is what keeps this readable. Without it, `accelerate`
+		-- pays out whenever your input is off-axis from your velocity, which
+		-- is exactly the strafe-jump exploit: perpendicular input reads as
+		-- "no speed in that direction yet", so it keeps adding, and a player
+		-- who knows to swing the mouse while holding a strafe key leaves
+		-- everyone else behind at a speed the game never telegraphs.
 		velocity = accelerate(
 			velocity,
 			wishDir,
@@ -520,9 +538,8 @@ local function update(deltaTime: number)
 			MovementConfig.airAccel,
 			deltaTime
 		)
-		-- Falling trickles into horizontal speed so long drops pay out.
-		if root.AssemblyLinearVelocity.Y < -3 and velocity.Magnitude > 1 then
-			velocity += velocity.Unit * MovementConfig.fallSpeedGain * deltaTime
+		if velocity.Magnitude > airSpeedCeiling then
+			velocity = velocity.Unit * airSpeedCeiling
 		end
 	else
 		-- Grounded. Friction runs every frame EXCEPT during a hop chain —

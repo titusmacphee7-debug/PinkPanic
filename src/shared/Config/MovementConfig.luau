@@ -40,23 +40,28 @@ return {
 	-- so the last few studs/s die cleanly instead of asymptoting
 
 	-- -----------------------------------------------------------------------
-	-- Air control. Two separate terms, deliberately.
+	-- Air control — deliberately minimal. This is the single most important
+	-- decision for whether an average player can aim in this game.
 	--
-	-- `airTurnRate` is steering authority: radians per second that your
-	-- existing velocity can be rotated toward the stick, at NO cost to speed.
-	-- This is what makes you feel in control in the air. 5.2 rad/s is a little
-	-- under a full turn per second — generous, modern, Rivals/Apex-like.
+	-- Call of Duty movement is FAST but FLAT. You are quick and expressive on
+	-- the ground and close to a passenger in the air: a jump is a short,
+	-- committed arc you can neither redirect nor accelerate out of. That
+	-- flatness is the whole point — everyone travels on readable paths at
+	-- speeds the game visibly telegraphs, so leading a shot is learnable
+	-- instead of a reaction test.
 	--
-	-- `airAccel` + `airWishCap` is the classic strafe-jump term: it can only
-	-- chase `airWishCap` studs/s, so holding W in the air does almost nothing,
-	-- but turning the mouse while holding a strafe key keeps the input vector
-	-- just off your velocity and lets this term add speed every frame. That's
-	-- the skill ceiling. Low cap = you must strafe properly to gain.
+	-- Source-style air-strafing and bunny-hopping are the opposite bargain:
+	-- unbounded speed and mid-air direction changes that nobody can lead,
+	-- available only to players who already know the tech. That is why people
+	-- bounce off movement-heavy shooters, and it is NOT what Omnimovement is.
+	-- Omnidirectional means sprinting, sliding and diving in any direction on
+	-- the GROUND. It has nothing to do with air control.
 	--
-	-- Splitting them is the whole trick: steering is free and generous so new
-	-- players never feel stuck, while going FASTER still has to be earned.
+	-- So the air gets one weak acceleration term, enough to get moving from a
+	-- dead stop after jumping straight up and no more. MovementController
+	-- clamps total air speed to whatever you entered the air with, so a jump
+	-- can never manufacture speed.
 	-- -----------------------------------------------------------------------
-	airTurnRate = 5.2,
 	airAccel = 2.4,
 	airWishCap = 7,
 
@@ -105,18 +110,26 @@ return {
 	slideCameraRoll = 0.09, -- radians of camera cant while sliding
 
 	-- -----------------------------------------------------------------------
-	-- Momentum. With a real velocity model, momentum IS velocity — ground
-	-- friction is the only thing that takes it away, so there is no separate
-	-- pool to keep in sync any more. What's left is the stuff friction can't
-	-- express on its own.
+	-- Speed ceiling and ramps. With a real velocity model, momentum IS
+	-- velocity — ground friction is the only thing that takes it away, so
+	-- there is no separate pool to keep in sync.
+	--
+	-- The hard cap exists so that no combination of slide, ramp and gravity
+	-- ever produces a speed the rest of the game isn't tuned for. Nothing
+	-- should reach it in normal play; if it does, something is wrong.
 	-- -----------------------------------------------------------------------
 	momentumHardCap = 62,
 	rampAccel = 34, -- speed gained per second per unit of downhill steepness
 	rampSlideExtend = 0.35, -- sliding downhill keeps extending the slide
-	fallSpeedGain = 2.5, -- horizontal speed gained per second while falling
-	bhopWindow = 0.22, -- jump within this of landing and friction never applies,
-	-- which is what preserves a hop chain
-	bhopRetention = 0.97, -- speed kept per hop (a whisper of tax)
+
+	-- Bunny-hop chaining is OFF (0 disables it). At 0.22 a jump landed inside
+	-- that window skipped ground friction entirely, so a practised player kept
+	-- slide speed indefinitely by never really touching the floor — invisible
+	-- to anyone who doesn't know the tech, and brutal to shoot at. Speed now
+	-- has to be re-earned on the ground each time, which is both learnable and
+	-- readable. Set back to 0.22 to re-enable.
+	bhopWindow = 0,
+	bhopRetention = 0.97, -- speed kept per hop, when the window is non-zero
 
 	staminaMax = 150,
 	sprintDrainPerSecond = 3,
