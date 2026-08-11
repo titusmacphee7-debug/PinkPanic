@@ -8,7 +8,52 @@ and the non-negotiable rules that came out of it — read that first, it explain
 
 ---
 
-## 0. The shape of the thing
+## 0. Creative direction — Leah's brief
+
+Pink Panic is Leah's idea. This section is her answers, and it outranks the rest
+of this document. Where anything below contradicts it, this wins.
+
+> *"A cute pink themed multiplayer shooter, adorable cosmetics."*
+
+**Tone: cute AND competitive.** Not a joke game with pink paint, and not a
+military shooter with a hue shift. A real shooter that is genuinely adorable —
+"cozy but competitive". This is why the systems are CoD-grade underneath: the
+competition has to be real for the cuteness to land as charm rather than excuse.
+
+**Aesthetic:** pink, white, pastels. Bows, hearts, glitter. Cute UI. Reference
+points, in her words: **Hello Kitty, coquette, soft aesthetic, Y2K pink.** Both
+palettes at once — soft pastel *and* candy-saturated, not one or the other.
+
+**Played with friends.** Social first. 5–10 minute matches.
+
+**The hook is the guns.** Asked what would actually make her play it: *"good
+cutesy guns."* Weapon models and camos are not the polish pass, they are the
+retention mechanic. Treat them accordingly.
+
+**Characters:** Roblox avatars, kept — with outfits layered on, **like Arsenal**.
+Players stay themselves. We do not replace the avatar.
+
+**Hit vs kill feedback — a real distinction she drew:** hearts and sparkles on
+every *hit* is a maybe-not. On a **kill**, absolutely. So hitmarkers stay crisp
+and readable for competitive clarity, and the celebration goes on the kill.
+
+**Cosmetic categories she named:** gun skins · knife skins · charms · stickers ·
+kill effects · death effects · emotes · player titles · outfits.
+
+**Economy: crates**, opened with currency earned in game, or bought with gems.
+
+**Everything should feel nice to touch** — cutesy click effects, sparkles, cute
+sounds throughout the UI. Juice is not optional here, it is the product.
+
+**Her maps** (these are her six, and they define the art targets):
+Candy Factory · Pink Mall · Princess Castle · Toy Store · Luxury Mansion ·
+Dream Bedroom.
+
+**Her future list:** trading, inventory, crafting, ranked mode, guilds, emotes.
+
+---
+
+## 0.1 The shape of the thing
 
 CoD is not one system. It is eight systems that agree with each other:
 
@@ -267,8 +312,32 @@ again, and so attachments can mount without per-gun code.
 **Moving parts** (named parts, separate from the body):
 `Slide`, `Bolt`, `Pump`, `Cylinder`, `Mag`, `ChargingHandle`, `Trigger`, `Hammer`
 
-**Skin regions** (for camos, must have clean UVs, shared layout per class):
-`Body`, `Barrel`, `Stock`, `Grip`, `Magazine`, `Accent`
+**Skin regions** (for camos): `Body`, `Barrel`, `Stock`, `Grip`, `Magazine`,
+`Accent`
+
+**THE SHARED UV LAYOUT — the single most important line in this document**
+
+Every gun in the game is UV-unwrapped to the **same normalized layout**. Not
+per-gun. Not even per-class. One layout, all 38 weapons.
+
+Why it decides whether camos are a feature or a graveyard:
+
+|  | per-gun UVs | shared UVs |
+|---|---|---|
+| 100 camos across 38 guns | **3,800 textures** | **100 textures** |
+| adding gun #39 | re-author every camo | works instantly |
+| adding camo #101 | 38 exports | drop in one file |
+
+With a shared layout a camo is one texture that works everywhere, forever. Get
+this wrong and the camo system is dead on arrival regardless of how good the
+art is. **This must be specified to Cowork before a single model is built.**
+
+Requirements:
+- 0–1 UV space, no overlapping shells, consistent texel density across guns
+- The same *region of the texture* corresponds to the same *part of the gun* on
+  every weapon: receiver top-left, barrel along the top strip, stock lower-left,
+  magazine lower-right, grip and accents bottom strip
+- Test asset: a numbered grid texture that must read correctly on all 38 guns
 
 If any required attachment is missing, the loader refuses the model, warns
 naming the gun and the missing tag, and substitutes a placeholder. A broken
@@ -304,6 +373,93 @@ availability so an SMG and an LMG don't share a stock list.
 
 ---
 
+## 4.5 Camos and character skins
+
+Titus is generating a very large number of cutesy-pink camos. The engineering
+requirement is therefore not "make camos work" — it is **make adding the 300th
+camo cost nothing.**
+
+### Convention over configuration
+
+There is no per-camo code and no per-camo config entry. A camo exists because a
+texture exists.
+
+```
+ReplicatedStorage/Assets/Camos/
+  Camo_StrawberryMilk        (Texture asset or a StringValue holding an id)
+  Camo_BubblegumSwirl
+  Camo_HeartCheck
+  Camo_SleepyClouds
+  ...
+```
+
+`CamoRegistry` scans that folder at boot and derives everything:
+
+- **id** — the instance name (`Camo_StrawberryMilk`)
+- **display name** — de-prefixed and de-camel-cased (`Strawberry Milk`)
+- **rarity / price / unlock** — from an *optional* override table. Anything not
+  listed gets sane defaults, so a camo with no config entry still works.
+
+Drop a texture in the folder → it is in the game, in the shop, previewable, and
+equippable. No code change, no restart of the pipeline, no PR.
+
+### Applying it
+
+One texture ID written to the skin-region MeshParts:
+
+```lua
+for _, part in gun:GetDescendants() do
+    if part:IsA("MeshPart") and SKIN_REGIONS[part.Name] then
+        part.TextureID = camo.textureId
+    end
+end
+```
+
+Because of the shared UV layout (§3.4) this is the *entire* application logic
+for every gun in the game. Optional `SurfaceAppearance` support layers on later
+for PBR camos (normal/roughness/metalness) without changing this path.
+
+### Character outfits — Arsenal-style, per Leah
+
+**Players keep their own Roblox avatar.** We do not standardize or replace it.
+Outfits layer on top: clothing texture IDs and accessory models applied over
+whatever character the player brought.
+
+Same registry pattern — `ReplicatedStorage/Assets/Outfits/<OutfitId>`, scanned
+at boot, no per-outfit code.
+
+The cost of keeping avatars is that hitboxes vary with body type. We solve that
+where it actually matters rather than by taking the avatar away: **damage is
+resolved against a normalized hit volume** derived from the rig, not against
+whatever mesh the player is wearing. Fairness comes from the hit resolution, not
+from making everyone look the same.
+
+### The full cosmetic set
+
+Nine categories, all of them Leah's list, all on the same registry pattern:
+
+| Category | Applies to | Notes |
+|---|---|---|
+| Gun camo | skin-region MeshParts | shared UV, one texture fits all guns |
+| Knife skin | melee model | same pipeline |
+| Charm | `Mount_Charm` socket | dangles, small physics |
+| Sticker | decals on gun surfaces | placed per-gun, slot positions in the model |
+| Kill effect | plays on YOUR kill | **hearts and sparkles live here** |
+| Death effect | plays on YOUR death | |
+| Emote | rig animation | wheel |
+| Title | nameplate + scoreboard | text + colour |
+| Outfit | avatar layer | clothing + accessories |
+
+### Rules
+
+- All of it is **cosmetic only**. Never a stat, never a real hitbox change.
+- Ownership is server-derived from the profile. Equipping something unowned is
+  rejected server-side, not hidden client-side.
+- Anything whose asset fails to load warns naming the item and falls back to a
+  default. Nothing ever renders as untextured grey.
+
+---
+
 ## 5. Loadout / Create-A-Class
 
 The CoD structure, exactly:
@@ -336,6 +492,29 @@ Three parallel tracks, because one is not enough to keep anyone playing:
 Score sources (CoD values, scaled): kill 100, assist 50, objective 200-ish,
 headshot bonus, streak bonuses, mode-specific actions. Every value in
 `Config/Progression`, none hardcoded anywhere.
+
+### Currencies and crates — Leah's call
+
+Two currencies and a crate as the primary cosmetic sink:
+
+- **Coins** — earned by playing. Buy crates, buy some items directly.
+- **Gems** — premium, bought with Robux. Buy crates and premium-only items.
+
+**Crates** are the main way cosmetics are acquired. Themed lines per category
+(gun camos, outfits, charms, effects). Non-negotiables:
+
+- **Published odds, always visible in the UI.** This is both the honest thing
+  and what keeps us compliant with Roblox's paid-random-item disclosure rules
+  once gems can buy crates.
+- **Duplicates auto-refund.** Never a dead pull.
+- **Server-authoritative everything** — RNG, grant, dedupe, refund. The client
+  is told the result and animates it. It never rolls anything.
+- **The opening IS the product.** Spinning reel, slowing ticks, rarity glow, a
+  cute sound per tier. This gets real animation time, not a message box.
+
+Nothing that affects gameplay is ever purchasable. Crates contain cosmetics
+only — no guns, no attachments, no perks. Weapons and attachments unlock through
+play, per §6. That line does not move.
 
 ---
 
@@ -387,7 +566,37 @@ never a fork of the round loop.
 
 ---
 
+## 9.1 Match length
+
+**5–10 minutes**, per Leah. That sets the tuning targets:
+
+| Mode | Score limit | Time limit |
+|---|---|---|
+| TDM | 75 | 10 min |
+| FFA | 30 | 10 min |
+| Domination | 200 | 10 min |
+| Kill Confirmed | 65 tags | 10 min |
+| Hardpoint | 250 | 8 min |
+| Search & Destroy | 6 rounds | 1:45 per round |
+
+Every number lives in `Config/Modes` and gets tuned against real matches. A
+match that regularly hits the time limit instead of the score limit means the
+score limit is too high.
+
+---
+
 ## 10. Maps (Titus builds, I provide the framework)
+
+**Leah's six**, in build order — the first is the one everything else is
+validated against:
+
+1. **Pink Mall** — atriums and shopfronts. The natural three-lane, so it goes
+   first and becomes the reference layout.
+2. **Candy Factory** — conveyors and catwalks, verticality.
+3. **Dream Bedroom** — oversized furniture, close quarters, the cosiest one.
+4. **Princess Castle** — courtyards and towers, long sightlines plus tight interiors.
+5. **Toy Store** — dense aisles, chaotic, best for smaller modes.
+6. **Luxury Mansion** — symmetrical wings, the most competitive layout.
 
 A map is a Workspace folder under `Workspace/Maps` with tagged content:
 
@@ -437,6 +646,34 @@ Surfaces: HUD, Loadout/Create-A-Class, Weapon detail + attachment browser,
 Scoreboard, Results, Progression/Challenges, Shop, Settings, Killfeed,
 Scorestreak wheel, After-action report.
 
+### The art direction is not a skin on a military shooter
+
+This is the thing that makes it *Pink Panic* and not "CoD clone #4000". The
+systems are CoD; the surface is unapologetically cute. Leah's original
+intention, kept:
+
+- **The minimap is a heart.** Not a circle, not a rounded square — a heart,
+  masked, with the compass ticks running around its outline. It is the single
+  most-looked-at element on screen and it should announce what game this is
+  within one second of a screenshot.
+- Blush and hot pink over grey and tan. Rounded everything. Chunky friendly
+  type. Hearts, bows and glitter where CoD would use chevrons and stencils.
+  Hello Kitty, coquette, Y2K pink.
+- **Hitmarkers stay crisp and readable** — Leah's call. Competitive clarity
+  matters more than cuteness on the thing you read mid-fight.
+- **Kill effects are where the hearts and sparkles go.** That is the
+  celebration moment and it should be genuinely over the top.
+- Killfeed reads soft, not aggressive.
+- Scorestreaks keep CoD mechanics and lose the military dress entirely: the
+  UAV is a heart-shaped drone, the airstrike drops glitter.
+- **Everything is nice to touch.** Cutesy click effects, sparkle particles on
+  hover and press, a cute sound on every meaningful interaction. Damage
+  numbers, XP popups, unlock cards and crate openings get real animation time.
+  Juice is most of what "expensive" feels like, and Leah asked for it directly.
+
+Cute is the point, not a coat of paint. Any surface that could pass for a
+military shooter with a hue shift has missed it.
+
 **What goes to Claude Design:** the visual direction for each surface once the
 data behind it exists. I'll write the briefs with real field lists so nothing
 gets designed around imaginary content.
@@ -476,8 +713,10 @@ Nothing here is needed yet — this is the heads-up so none of it is a surprise.
 |---|---|---|
 | M0 | Turn on Studio API access | so DataStores work in test |
 | M1 | Nothing — I need one gun and I'll use a placeholder | |
-| M3 | **Gun models, batch 1** (8 ARs) to the §3.4 spec | Cowork |
+| M3 | **Gun models, batch 1** (8 ARs) to the §3.4 spec, **shared UV layout** | Cowork |
 | M4 | Attachment models to the §4 socket spec | Cowork |
+| M4 | **Camo textures** — as many as you like, to the shared UV layout | you / generation |
+| M6 | Outfit sets for the standard R15 rig | Cowork |
 | M9 | First map, three-lane, tagged per §10 | Studio |
 | M11 | Moon Animator clips against my spec | Moon Animator |
 | M12 | Visual direction per surface | Claude Design |
