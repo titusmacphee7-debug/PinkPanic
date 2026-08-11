@@ -7,34 +7,82 @@
 -- doesn't show this exact tag, Studio is running stale scripts (Rojo not
 -- connected at Play time, or a duplicate script tree in the place file).
 -- If it prints TWICE, there are two copies of the server running.
+--
+-- Every module below is loaded and started through Diagnostics, so one broken
+-- system is one DEAD line in the manifest instead of a silently dead server.
+-- The loads are guarded as well as the inits, because a module with a syntax
+-- error throws at require time — before any init function exists to guard.
+-- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-11-M · lobby-only · combat wiped for rebuild"
+local BUILD_TAG = "2026-08-11-N · diagnostics manifest online"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
-local Guard = require(ReplicatedStorage.Shared.Net.Guard)
-local PlayerDataService = require(script.Services.PlayerDataService)
-local EconomyService = require(script.Services.EconomyService)
-local ShopService = require(script.Services.ShopService)
-local SettingsService = require(script.Services.SettingsService)
-local GunShopService = require(script.Services.GunShopService)
-local MapService = require(script.Services.MapService)
-local LobbyService = require(script.Services.LobbyService)
+-- Unguarded on purpose: if Diagnostics itself cannot load there is nothing left
+-- to report the failure with, and a hard error here is the loudest option.
+local Diagnostics = require(ReplicatedStorage.Shared.Diagnostics)
 
-Remotes.init()
-MapService.init()
-LobbyService.init()
-PlayerDataService.init()
-EconomyService.init()
-ShopService.init()
-SettingsService.init()
-GunShopService.init()
+-- Declared up front so a system that never runs at all still shows up as NEVER
+-- REPORTED. Absent looks intentional; pending looks like the bug it is.
+Diagnostics.expect(
+	"Remotes",
+	"Guard",
+	"MapService",
+	"LobbyService",
+	"PlayerDataService",
+	"EconomyService",
+	"ShopService",
+	"SettingsService",
+	"GunShopService"
+)
 
-Players.PlayerRemoving:Connect(function(player)
-	Guard.clearPlayer(player)
-end)
+-- Bootstrap glue is deliberately untyped: the type safety lives inside each
+-- module, and a guarded load cannot return a statically known type.
+local Remotes: any = Diagnostics.load("Remotes", ReplicatedStorage.Shared.Net.Remotes)
+local Guard: any = Diagnostics.load("Guard", ReplicatedStorage.Shared.Net.Guard)
+
+local MapService: any = Diagnostics.load("MapService", script.Services.MapService)
+local LobbyService: any = Diagnostics.load("LobbyService", script.Services.LobbyService)
+local PlayerDataService: any = Diagnostics.load("PlayerDataService", script.Services.PlayerDataService)
+local EconomyService: any = Diagnostics.load("EconomyService", script.Services.EconomyService)
+local ShopService: any = Diagnostics.load("ShopService", script.Services.ShopService)
+local SettingsService: any = Diagnostics.load("SettingsService", script.Services.SettingsService)
+local GunShopService: any = Diagnostics.load("GunShopService", script.Services.GunShopService)
+
+-- Remotes must come up before anything else. If it didn't, say so plainly —
+-- every client will otherwise sit in WaitForChild forever with no explanation.
+if Remotes then
+	Diagnostics.start("Remotes", Remotes.init)
+end
+
+local BOOT_ORDER: { { name: string, module: any } } = {
+	{ name = "MapService", module = MapService },
+	{ name = "LobbyService", module = LobbyService },
+	{ name = "PlayerDataService", module = PlayerDataService },
+	{ name = "EconomyService", module = EconomyService },
+	{ name = "ShopService", module = ShopService },
+	{ name = "SettingsService", module = SettingsService },
+	{ name = "GunShopService", module = GunShopService },
+}
+
+for _, service in BOOT_ORDER do
+	-- A nil module was already marked DEAD by load(); don't overwrite that
+	-- reason with a less useful one.
+	if service.module then
+		Diagnostics.start(service.name, service.module.init)
+	end
+end
+
+-- Guard has no init() of its own; it is alive if it loaded. Leaking a player's
+-- rate-limit state on every leave would be a slow memory climb nobody notices,
+-- so say so if it isn't there rather than skipping the cleanup quietly.
+if Guard then
+	Diagnostics.ok("Guard", "rate limiting active")
+	Players.PlayerRemoving:Connect(function(player)
+		Guard.clearPlayer(player)
+	end)
+end
 
 -- Duplicate-script detector: a second copy of this bootstrap (a stale Rojo
 -- sync target, or scripts pasted into the place) would run everything twice
@@ -53,4 +101,4 @@ else
 	marker.Parent = ServerScriptService
 end
 
-print(`[PinkPanic] Server booted 🎀  build: {BUILD_TAG}`)
+Diagnostics.report(BUILD_TAG)

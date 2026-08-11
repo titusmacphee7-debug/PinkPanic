@@ -5,54 +5,68 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local Diagnostics = require(ReplicatedStorage.Shared.Diagnostics)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-11-M · lobby-only · combat wiped for rebuild"
+local CLIENT_BUILD_TAG = "2026-08-11-N · diagnostics manifest online"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false
+
+Diagnostics.expect(
+	"Remotes",
+	"ClientData",
+	"EffectsController",
+	"EconomyController",
+	"ShopController",
+	"SettingsController",
+	"LoadoutController",
+	"CameraController",
+	"LobbyController",
+	"ArmoryController"
+)
+
+local Remotes: any = Diagnostics.load("Remotes", ReplicatedStorage.Shared.Net.Remotes)
 
 -- Touching any remote here blocks until the server has finished Remotes.init,
 -- so everything after this line can assume the remote surface exists. This
 -- was RoundStateChanged until the round loop was deleted; DataChanged is the
 -- barrier now because the economy is the one system guaranteed to exist.
-Remotes.event("DataChanged")
+if Remotes then
+	Diagnostics.start("Remotes", function()
+		Remotes.event("DataChanged")
+	end)
+end
 
-local ClientData = require(script.ClientData)
-local EffectsController = require(script.Controllers.EffectsController)
-local EconomyController = require(script.Controllers.EconomyController)
-local ShopController = require(script.Controllers.ShopController)
-local SettingsController = require(script.Controllers.SettingsController)
-local LoadoutController = require(script.Controllers.LoadoutController)
-local CameraController = require(script.Controllers.CameraController)
-local LobbyController = require(script.Controllers.LobbyController)
-local ArmoryController = require(script.Controllers.ArmoryController)
+-- Loaded through Diagnostics so a controller with a syntax error is one DEAD
+-- line rather than a client that boots to a black screen. The previous version
+-- guarded init() but not require(), which left the worse half unguarded: a
+-- module that fails to compile never reaches its init at all.
+local controllers: { { name: string, module: any } } = {
+	{ name = "ClientData", module = Diagnostics.load("ClientData", script.ClientData) },
+	{ name = "EffectsController", module = Diagnostics.load("EffectsController", script.Controllers.EffectsController) },
+	{ name = "EconomyController", module = Diagnostics.load("EconomyController", script.Controllers.EconomyController) },
+	{ name = "ShopController", module = Diagnostics.load("ShopController", script.Controllers.ShopController) },
+	{
+		name = "SettingsController",
+		module = Diagnostics.load("SettingsController", script.Controllers.SettingsController),
+	},
+	{ name = "LoadoutController", module = Diagnostics.load("LoadoutController", script.Controllers.LoadoutController) },
+	{ name = "CameraController", module = Diagnostics.load("CameraController", script.Controllers.CameraController) },
+	{ name = "LobbyController", module = Diagnostics.load("LobbyController", script.Controllers.LobbyController) },
+	{ name = "ArmoryController", module = Diagnostics.load("ArmoryController", script.Controllers.ArmoryController) },
+}
 
 -- Each init() is isolated. Previously these ran bare and in order, so a throw
 -- in any one of them silently skipped EVERY controller after it — a failure in
 -- SettingsController took out the loadout screen, the camera, the pads and the
 -- START GAME button, which is indistinguishable from "the whole game is
 -- broken" and points debugging at entirely the wrong place.
-local function boot(name: string, init: () -> ())
-	local ok, err = pcall(init)
-	if not ok then
-		warn(`[PinkPanic] ⚠️ {name}.init() FAILED — that system is dead, the rest still ran. {err}`)
+for _, controller in controllers do
+	if controller.module then
+		Diagnostics.start(controller.name, controller.module.init)
 	end
 end
 
-boot("ClientData", ClientData.init)
-boot("EffectsController", EffectsController.init)
-boot("EconomyController", EconomyController.init)
-boot("ShopController", ShopController.init)
-boot("SettingsController", SettingsController.init)
-boot("LoadoutController", LoadoutController.init)
-boot("CameraController", CameraController.init)
-boot("LobbyController", LobbyController.init)
-boot("ArmoryController", ArmoryController.init)
-
--- The client half of the BUILD_TAG check. The server has always printed its
--- tag; the client printed nothing versioned, so "is the client stale?" had no
--- answer. Keep this in step with BUILD_TAG in src/server/init.server.luau.
-print(`[PinkPanic] Client booted 🎀  build: {CLIENT_BUILD_TAG}`)
+Diagnostics.report(CLIENT_BUILD_TAG)
