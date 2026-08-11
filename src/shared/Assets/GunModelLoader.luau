@@ -57,18 +57,23 @@ local function normalize(model: Model)
 
 	local primary = model.PrimaryPart
 
-	local body = model:FindFirstChild("Body")
-	local largest: BasePart? = if body and body:IsA("BasePart") then body else nil
-	if not largest then
-		local largestVolume = 0
-		for _, part in model:GetDescendants() do
-			if part:IsA("BasePart") then
-				local size = part.Size
-				local volume = size.X * size.Y * size.Z
-				if volume > largestVolume then
-					largestVolume = volume
-					largest = part
-				end
+	-- Pick the physically biggest part, NOT the one named "Body".
+	--
+	-- "Body" is a SKIN REGION (Body / Panel / Grip / Hardware / Accent are
+	-- paint zones, per CLAUDE.md), not the gun's structure — on Pistol_1 it is
+	-- 0.1 x 0.4 x 0.3 studs while the Slide is 3.2 long, and on AssaultRifle_2
+	-- it is a sliver next to a 6.4-stud Hardware. Pivoting the whole weapon
+	-- around that fragment is why guns sat wrong in the hand: the pivot's
+	-- orientation had nothing to do with the barrel.
+	local largest: BasePart? = nil
+	local largestVolume = 0
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			local size = part.Size
+			local volume = size.X * size.Y * size.Z
+			if volume > largestVolume then
+				largestVolume = volume
+				largest = part
 			end
 		end
 	end
@@ -105,25 +110,40 @@ local function normalize(model: Model)
 	-- model is reversed and gets spun 180° about its own bounding-box centre.
 	-- Runtime-only — templates live in ReplicatedStorage and this never
 	-- touches the saved place file.
+	-- Which way does this model actually point?
+	--
+	-- Do NOT try to fix this by rotating the model: PivotTo moves the geometry
+	-- AND the pivot together, so the grip's position in the model's own object
+	-- space is unchanged and every consumer orients by that same pivot. It
+	-- rotates the world and the ruler at once and changes nothing.
+	--
+	-- Instead record it. The grip always sits behind the barrel, so a grip
+	-- measuring forward of centre means the barrel runs +Z rather than the -Z
+	-- everything assumes, and callers add a 180° yaw.
+	local flipped = false
 	local grip = model:FindFirstChild("Grip", true) or model:FindFirstChild("Mag", true)
 	if grip and grip:IsA("BasePart") then
-		local bounds = model:GetBoundingBox()
-		local gripZ = bounds:PointToObjectSpace(grip.Position).Z
-		if gripZ < -0.05 then
-			local spin = CFrame.new(bounds.Position)
-				* CFrame.Angles(0, math.pi, 0)
-				* CFrame.new(-bounds.Position)
-			model:PivotTo(spin * model:GetPivot())
-		end
+		flipped = model:GetBoundingBox():PointToObjectSpace(grip.Position).Z < -0.05
 	end
+	model:SetAttribute("PPFlipped", flipped)
 
 	local boundsCF, boundsSize = model:GetBoundingBox()
 	local muzzle = Instance.new("Attachment")
 	muzzle.Name = "Muzzle"
-	muzzle.WorldCFrame = boundsCF * CFrame.new(0, 0, -boundsSize.Z / 2)
+	-- Parent FIRST. Attachment.WorldCFrame is relative to its parent, so
+	-- assigning it while unparented stores a local CFrame that then gets
+	-- multiplied by the part's own CFrame — which is how Pistol_1 ended up
+	-- with its muzzle 36 studs away on a model 3.2 studs deep.
 	muzzle.Parent = largest
+	local halfDepth = if flipped then boundsSize.Z / 2 else -boundsSize.Z / 2
+	muzzle.WorldCFrame = boundsCF * CFrame.new(0, 0, halfDepth)
 
 	model:SetAttribute("PPNormalized", NORMALIZE_VERSION)
+end
+
+-- The extra yaw a caller must apply to point this model's barrel forward.
+function GunModelLoader.forwardOffset(model: Model): CFrame
+	return if model:GetAttribute("PPFlipped") then CFrame.Angles(0, math.pi, 0) else CFrame.identity
 end
 
 -- Normalizes every imported template (call once from the server at boot;

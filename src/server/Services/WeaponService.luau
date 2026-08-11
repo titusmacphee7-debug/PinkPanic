@@ -137,7 +137,12 @@ local function attachWorldGun(player: Player, character: Model)
 
 		local gun = GunModelLoader.build(gunId, cosmeticsFor(player, gunId))
 		gun.Name = "WorldGun"
-		local grip = CFrame.lookAlong(hand.Position, root.CFrame.LookVector) * CFrame.new(0, -0.1, -0.45)
+		-- Most imported models run their barrel along +Z rather than the -Z
+		-- CFrame.lookAlong produces, so add the recorded yaw or the gun points
+		-- back at its owner.
+		local grip = CFrame.lookAlong(hand.Position, root.CFrame.LookVector)
+			* GunModelLoader.forwardOffset(gun)
+			* CFrame.new(0, -0.1, -0.45)
 		gun:PivotTo(grip)
 		local primary = gun.PrimaryPart
 		if primary then
