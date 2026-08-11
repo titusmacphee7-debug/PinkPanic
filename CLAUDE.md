@@ -164,6 +164,16 @@ round-trip **double-encodes every non-ASCII character** (`—` becomes `â€”
 is immediate and spread across the file. Use the Edit/Write tools, which handle
 UTF-8 correctly. PowerShell is for git and processes, not for source.
 
+**`execute_luau` has its OWN require cache.** A module you `require` from an
+MCP script is a *different instance* from the one the game's scripts are
+running — its `init()` never ran, so nothing it connected to `Heartbeat`,
+`PlayerAdded` or a remote exists. The proof is one line:
+`Diagnostics.snapshot()` from an MCP script returns the systems *that script*
+touched, not the fourteen in the manifest. This looks exactly like "the system
+is dead" and is not. Test a system by calling its functions directly and
+driving its step function by hand — which is also why `Ballistics.step(dt)` is
+public rather than only reachable through `Heartbeat`.
+
 **Rojo syncs into the Edit DataModel, not a running Play session.** If a fix
 "didn't work," check whether Studio was in Play mode when the file changed —
 Play holds a snapshot from when it started. Stop, let Rojo sync, Play again.

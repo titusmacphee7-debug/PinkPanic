@@ -45,6 +45,12 @@ export type RemoteDef = {
 -- Deleted: FireWeapon, ReloadWeapon, SelectWeapon, AmmoChanged, DamageDealt,
 -- Killfeed, RoundStateChanged, ScoreUpdated, EnterPortal, MovementState.
 local Definitions: { [string]: RemoteDef } = {
+	-- Combat. FireWeapon carries INTENT only — where the muzzle is and where
+	-- it points. No target, no hit, no damage: everything the server would
+	-- have to take the client's word for is absent by design, which is why
+	-- there is nothing here for a modified client to lie about.
+	FireWeapon = { kind = "Event", dir = "ClientToServer", note = "fire intent: origin + unit direction" },
+
 	-- Lobby
 	LobbyShot = { kind = "Event", dir = "ClientToServer", note = "cosmetic lobby shot (target pops)" },
 	TargetPopped = { kind = "Event", dir = "ServerToClient", note = "a lobby target burst" },

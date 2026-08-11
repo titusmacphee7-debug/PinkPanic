@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-11-V · lobby census (NOD-162)"
+local BUILD_TAG = "2026-08-11-W · server ballistics (NOD-133)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -33,6 +33,7 @@ Diagnostics.expect(
 	"ContentAudit",
 	"CombatStats",
 	"AssetRegistry",
+	"Ballistics",
 	"MapService",
 	"LobbyService",
 	"PlayerDataService",
@@ -52,6 +53,8 @@ local AssetTree: any = Diagnostics.load("AssetTree", ReplicatedStorage.Shared.Sy
 local ContentAudit: any = Diagnostics.load("ContentAudit", ReplicatedStorage.Shared.Systems.ContentAudit)
 local CombatStats: any = Diagnostics.load("CombatStats", ReplicatedStorage.Shared.Systems.CombatStats)
 local AssetRegistry: any = Diagnostics.load("AssetRegistry", ReplicatedStorage.Shared.Systems.AssetRegistry)
+
+local Ballistics: any = Diagnostics.load("Ballistics", script.Systems.Ballistics)
 
 local MapService: any = Diagnostics.load("MapService", script.Services.MapService)
 local LobbyService: any = Diagnostics.load("LobbyService", script.Services.LobbyService)
@@ -93,7 +96,28 @@ if AssetRegistry then
 	Diagnostics.start("AssetRegistry", AssetRegistry.load)
 end
 
+-- The weapon a shot is fired with comes from the SERVER's copy of the player's
+-- loadout, never from the request. Injected here rather than required inside
+-- Ballistics so the dependency runs Service → System and not back the other
+-- way: ballistics has no business knowing that profiles exist.
+if Ballistics and PlayerDataService then
+	Ballistics.setWeaponResolver(function(player: Player): string?
+		local profile = PlayerDataService.get(player)
+		if not profile then
+			return nil
+		end
+		local class = profile.classes and profile.classes[profile.activeClass]
+		if class then
+			return class.primary and class.primary.gunId or class.secondary and class.secondary.gunId
+		end
+		return profile.loadout and (profile.loadout.primary or profile.loadout.secondary)
+	end)
+end
+
 local BOOT_ORDER: { { name: string, module: any } } = {
+	-- Ballistics before the services that will feed it, so the remote handler
+	-- exists before any client can reach it.
+	{ name = "Ballistics", module = Ballistics },
 	{ name = "MapService", module = MapService },
 	{ name = "LobbyService", module = LobbyService },
 	{ name = "PlayerDataService", module = PlayerDataService },
