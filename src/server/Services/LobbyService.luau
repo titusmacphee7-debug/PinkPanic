@@ -119,8 +119,9 @@ local function sign(text: string, pad: BasePart, lookAt: Vector3?)
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.FredokaOne
+	-- Do NOT set TextWrapped alongside TextScaled. TextScaled manages wrapping
+	-- itself, and forcing it off collapses the layout to blank plates.
 	label.TextScaled = true
-	label.TextWrapped = false
 	label.TextColor3 = DEEP_PINK
 	label.Text = text
 	label.Parent = plate
