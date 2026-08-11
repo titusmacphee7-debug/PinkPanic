@@ -77,6 +77,29 @@ local function normalize(model: Model)
 		end
 	end
 
+	-- Every consumer (world gun, viewmodel, muzzle flash, shell ejection,
+	-- viewport previews) assumes the barrel points along -Z. The imported
+	-- models don't agree: measured across the roster, 19 of 25 point +Z. That
+	-- is why guns were held backwards and why the "Muzzle" attachment landed
+	-- on the stock.
+	--
+	-- Rather than special-case each model, normalise the geometry: the grip
+	-- always sits BEHIND the barrel, so if it measures forward of centre the
+	-- model is reversed and gets spun 180° about its own bounding-box centre.
+	-- Runtime-only — templates live in ReplicatedStorage and this never
+	-- touches the saved place file.
+	local grip = model:FindFirstChild("Grip", true) or model:FindFirstChild("Mag", true)
+	if grip and grip:IsA("BasePart") then
+		local bounds = model:GetBoundingBox()
+		local gripZ = bounds:PointToObjectSpace(grip.Position).Z
+		if gripZ < -0.05 then
+			local spin = CFrame.new(bounds.Position)
+				* CFrame.Angles(0, math.pi, 0)
+				* CFrame.new(-bounds.Position)
+			model:PivotTo(spin * model:GetPivot())
+		end
+	end
+
 	local boundsCF, boundsSize = model:GetBoundingBox()
 	local muzzle = Instance.new("Attachment")
 	muzzle.Name = "Muzzle"

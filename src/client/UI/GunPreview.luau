@@ -164,68 +164,46 @@ function GunPreview.makeDraggable(handle: Handle)
 	end)
 end
 
--- The player's own avatar, for the Loadout character column. There is no
--- outfit system yet — this is deliberately the real Roblox character.
-function GunPreview.createCharacter(parent: GuiObject): ViewportFrame?
-	local character = Players.LocalPlayer.Character
-	if not character then
-		return nil
-	end
+-- The player's own avatar, for the Loadout character column.
+--
+-- This is an avatar THUMBNAIL, not a ViewportFrame clone, and that is
+-- deliberate: a ViewportFrame does not composite Shirt/Pants onto R15 body
+-- parts, so a cloned character renders naked with only its accessories
+-- (hair, wings) showing — they're separate meshes. The thumbnail is the
+-- avatar as Roblox actually draws it, clothes included.
+--
+-- There is no in-game outfit system yet; this shows the player's real
+-- Roblox avatar.
+function GunPreview.createCharacter(parent: GuiObject): GuiObject?
+	local player = Players.LocalPlayer
 
-	local viewport = Instance.new("ViewportFrame")
-	viewport.Size = UDim2.fromScale(1, 1)
-	viewport.BackgroundColor3 = Theme.color.surfaceSunken
-	viewport.BackgroundTransparency = 0.25
-	viewport.Ambient = Color3.fromRGB(225, 215, 222)
-	viewport.LightColor = Theme.color.surfaceRaised
-	viewport.Parent = parent
+	local image = Instance.new("ImageLabel")
+	image.Size = UDim2.fromScale(1, 1)
+	image.BackgroundColor3 = Theme.color.surfaceSunken
+	image.BackgroundTransparency = 0.25
+	image.ScaleType = Enum.ScaleType.Fit
+	image.Image = ""
+	image.Parent = parent
 
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, Theme.radius.card)
-	corner.Parent = viewport
+	corner.Parent = image
 
-	-- Roblox sets Archivable = false on player characters, so :Clone() returns
-	-- nil unless we flip it first. Restore it immediately either way.
-	local wasArchivable = character.Archivable
-	character.Archivable = true
-	local clone = character:Clone()
-	character.Archivable = wasArchivable
-	if not clone then
-		return nil
-	end
-
-	for _, part in clone:GetDescendants() do
-		if part:IsA("BasePart") then
-			part.Anchored = true
+	-- GetUserThumbnailAsync yields, so never block the caller's rebuild on it.
+	task.spawn(function()
+		local ok, content = pcall(function()
+			return Players:GetUserThumbnailAsync(
+				player.UserId,
+				Enum.ThumbnailType.AvatarThumbnail,
+				Enum.ThumbnailSize.Size420x420
+			)
+		end)
+		if ok and content and image.Parent then
+			image.Image = content
 		end
-	end
-	-- A live Humanoid inside a ViewportFrame will try to simulate and can
-	-- collapse the clone; it has no job here.
-	local humanoid = clone:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid:Destroy()
-	end
+	end)
 
-	local camera = Instance.new("Camera")
-	camera.Parent = viewport
-	viewport.CurrentCamera = camera
-	clone.Parent = viewport
-
-	local bounds, size = clone:GetBoundingBox()
-	local centre = bounds.Position
-	local distance = math.max(size.Y * 1.5, 6)
-
-	-- Stand the camera along the character's OWN facing, not world +Z, or you
-	-- get the back of their head whichever way they happened to be turned.
-	local root = clone:FindFirstChild("HumanoidRootPart")
-	local facing = if root and root:IsA("BasePart") then root.CFrame.LookVector else Vector3.zAxis
-	local flat = Vector3.new(facing.X, 0, facing.Z)
-	facing = if flat.Magnitude > 0.05 then flat.Unit else Vector3.zAxis
-
-	camera.CFrame =
-		CFrame.lookAt(centre + facing * distance + Vector3.new(0, size.Y * 0.12, 0), centre)
-
-	return viewport
+	return image
 end
 
 return GunPreview
