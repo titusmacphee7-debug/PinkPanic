@@ -134,13 +134,39 @@ local JOINT_PATHS: { [string]: { string } } = {
 	rElbow = { "RightLowerArm", "RightElbow" },
 }
 
+-- Rigs already reported. stateFor runs every frame for every character, so
+-- without this a bad rig would warn 60 times a second.
+local reportedRigs: { [Model]: true } = {}
+
+-- An R6 character has none of the 11 joints below, so this whole system used
+-- to go silently dead: no error, no warning, just a character that never
+-- leans, slides or crouches. "Still loading" looks identical to "wrong rig"
+-- from inside buildRig, so ask the Humanoid which it is and only complain
+-- about the one that will never fix itself.
+local function reportRig(model: Model)
+	if reportedRigs[model] then
+		return
+	end
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.RigType == Enum.HumanoidRigType.R15 then
+		return -- still streaming in; it'll build on a later frame
+	end
+	reportedRigs[model] = true
+	warn(
+		`[PinkPanic] ⚠️ {model.Name} is {humanoid.RigType.Name}, not R15 — procedural animation `
+			.. `is OFF for this character (no lean, bob, slide, crouch, air or landing pose). `
+			.. `Code cannot fix this: set Home → Game Settings → Avatar → Rig Type → R15.`
+	)
+end
+
 local function buildRig(model: Model): Rig?
 	local rig = {}
 	for key, path in JOINT_PATHS do
 		local limb = model:FindFirstChild(path[1])
 		local joint = limb and limb:FindFirstChild(path[2])
 		if not joint or not joint:IsA("Motor6D") then
-			return nil -- R6 or still loading; skip quietly
+			reportRig(model)
+			return nil
 		end
 		rig[key] = { joint = joint, c0 = joint.C0 }
 	end
@@ -326,6 +352,11 @@ local function update(deltaTime: number)
 	for model in states do
 		if not model.Parent then
 			states[model] = nil
+		end
+	end
+	for model in reportedRigs do
+		if not model.Parent then
+			reportedRigs[model] = nil
 		end
 	end
 end
