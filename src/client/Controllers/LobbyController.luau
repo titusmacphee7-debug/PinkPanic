@@ -39,19 +39,44 @@ end
 
 -- Titus's hand-built lobby: pads are attribute-tagged parts (PadAction /
 -- PadName / optional PadRadius) anywhere under workspace.Lobby.
+-- The scan is cached, but an *empty* result never is: the client's first
+-- Heartbeat can easily beat workspace.Lobby replicating, and caching {} there
+-- would kill every pad for the rest of the session. We also drop the cache
+-- when the lobby's contents change, so pads added after boot still register.
 local cachedPads: { BasePart }? = nil
+local padWatch: Instance? = nil
+local padWatchConns: { RBXScriptConnection } = {}
+
 local function customPads(custom: Instance): { BasePart }
+	if padWatch ~= custom then
+		for _, conn in padWatchConns do
+			conn:Disconnect()
+		end
+		table.clear(padWatchConns)
+		padWatch = custom
+		cachedPads = nil
+		local invalidate = function()
+			cachedPads = nil
+		end
+		table.insert(padWatchConns, custom.DescendantAdded:Connect(invalidate))
+		table.insert(padWatchConns, custom.DescendantRemoving:Connect(invalidate))
+	end
+
 	local cached = cachedPads
 	if cached then
 		return cached
 	end
+
 	local list: { BasePart } = {}
 	for _, descendant in custom:GetDescendants() do
 		if descendant:IsA("BasePart") and descendant:GetAttribute("PadAction") then
 			table.insert(list, descendant)
 		end
 	end
-	cachedPads = list
+	-- An empty list means "lobby not replicated yet" — rescan next frame.
+	if #list > 0 then
+		cachedPads = list
+	end
 	return list
 end
 
