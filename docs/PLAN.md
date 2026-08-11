@@ -493,6 +493,39 @@ Score sources (CoD values, scaled): kill 100, assist 50, objective 200-ish,
 headshot bonus, streak bonuses, mode-specific actions. Every value in
 `Config/Progression`, none hardcoded anywhere.
 
+### Rarity tiers
+
+Six tiers on the scarcity ladder, plus two that are categorical rather than
+rarer. That distinction matters mechanically: a tier on the ladder needs a
+probability, and a categorical tier needs an *availability rule* instead.
+
+**The ladder** — these appear in crates and carry odds:
+
+| Tier | Colour | Crate odds (baseline) |
+|---|---|---|
+| Common | pale blush | 40% |
+| Uncommon | mint | 27% |
+| Rare | periwinkle | 17% |
+| Super Rare | lavender | 10% |
+| Legendary | hot pink — the brand colour sits at the top | 5% |
+| Exotic | gold, iridescent | 1% |
+
+**Outside the ladder** — these never roll from a standard crate:
+
+| Tier | Colour | How you get it |
+|---|---|---|
+| Special | teal, holographic | Achievement, challenge, event reward. Earned, never bought. |
+| Limited | animated rainbow foil | Time-gated. Available in a window, then gone for good. |
+
+Odds are per-crate-line and configurable; the table above is the default.
+Published in the UI, always.
+
+**Presentation scales with tier**, and per Leah rares are loud: card frame,
+glow intensity, particle density, unlock sound and reveal length all escalate.
+Exotic, Special and Limited get bespoke treatment — an Exotic pull should stop
+the room. Limited items keep a visible "no longer obtainable" marker forever,
+because that is most of what makes them worth having.
+
 ### Currencies and crates — Leah's call
 
 Two currencies and a crate as the primary cosmetic sink:
