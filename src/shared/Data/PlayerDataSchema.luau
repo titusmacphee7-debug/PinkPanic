@@ -1,6 +1,15 @@
 --!strict
--- PlayerDataSchema — the single source of truth for what a player profile looks like (NOD-7).
--- Every system that touches persistent player state reads/writes this shape and nothing else.
+-- PlayerDataSchema — the single source of truth for what a player profile looks
+-- like (NOD-132). Every system that touches persistent player state reads and
+-- writes this shape and nothing else.
+--
+-- v3 is deliberately sized for the WHOLE feature list rather than for what
+-- exists today. Empty tables cost nothing; a migration per milestone costs a
+-- migration per milestone, and every one of them is a chance to destroy
+-- somebody's collection. Classes, weapon levels, challenges, crates, pity
+-- counters and all eight cosmetic categories have their home here now, even
+-- though most of them will sit empty until M5–M8.
+--
 -- Bump VERSION and add a Migrations[n] entry whenever the shape changes.
 
 export type EquippedLoadout = {
@@ -20,6 +29,10 @@ export type LifetimeStats = {
 	deaths: number,
 	roundsPlayed: number,
 	roundsWon: number,
+	-- v3
+	headshots: number,
+	assists: number,
+	timePlayed: number,
 }
 
 export type GunCosmetics = {
@@ -27,21 +40,109 @@ export type GunCosmetics = {
 	camoId: string?,
 }
 
+-- ---------------------------------------------------------------------------
+-- v3 shapes
+-- ---------------------------------------------------------------------------
+
+export type WeaponSlot = {
+	gunId: string?,
+	attachments: { string },
+}
+
+-- Create-A-Class (M5). Named by the player, five slots to start.
+export type ClassLoadout = {
+	name: string,
+	primary: WeaponSlot,
+	secondary: WeaponSlot,
+	perks: { string }, -- up to 3, slot order
+	lethal: string?,
+	tactical: string?,
+	fieldUpgrade: string?,
+	scorestreaks: { string }, -- up to 3
+}
+
+-- Per-gun progression (M6). Weapon level is what drives attachment chase.
+export type WeaponProgress = {
+	xp: number,
+	level: number,
+	kills: number,
+	unlockedAttachments: { string },
+}
+
+-- Ownership, one list per cosmetic category. All eight launch categories plus
+-- the three deferred ones, so adding knife skins later is not a migration.
+export type Owned = {
+	guns: { string },
+	gunSkins: { string },
+	attachments: { string },
+
+	camos: { string },
+	outfits: { string },
+	charms: { string },
+	killEffects: { string },
+	tracers: { string },
+	emotes: { string },
+	titles: { string },
+	nameTags: { string },
+
+	-- Deferred categories (§4.5). Present so they cost no migration.
+	knifeSkins: { string },
+	stickers: { string },
+	deathEffects: { string },
+}
+
+export type EquippedCosmetics = {
+	outfit: string?,
+	title: string?,
+	nameTag: string?,
+	killEffect: string?,
+	deathEffect: string?,
+	tracer: string?,
+	emoteWheel: { string }, -- 8 slots
+	perGun: { [string]: GunCosmetics },
+}
+
+-- Crate history and pity (NOD-147, NOD-165). Pity counters are per crate line
+-- per tier: how many rolls since that tier last landed.
+export type CrateState = {
+	owned: { [string]: number }, -- crateId -> count
+	opened: { [string]: number }, -- crateId -> lifetime opens
+	pity: { [string]: { [string]: number } }, -- crateId -> tier -> rolls since
+}
+
 export type PlayerData = {
 	version: number,
 	coins: number,
+	gems: number,
 	xp: number,
 	level: number,
+
+	-- Legacy four-weapon era. Kept because live profiles still carry it; no new
+	-- system should read these.
 	ownedWeapons: { string },
 	ownedSkins: { string },
 	ownedCharms: { string },
 	equipped: EquippedLoadout,
-	-- Gun roster era (schema v2, docs/GUNS_HANDOFF.md §4.2):
+
+	-- Gun roster era (v2).
 	ownedGuns: { string },
 	ownedGunSkins: { string },
 	ownedCamos: { string },
 	loadout: { primary: string?, secondary: string },
 	gunCosmetics: { [string]: GunCosmetics },
+
+	-- v3.
+	classes: { ClassLoadout },
+	activeClass: number,
+	weaponProgress: { [string]: WeaponProgress },
+	owned: Owned,
+	equippedCosmetics: EquippedCosmetics,
+	challenges: { [string]: number },
+	crates: CrateState,
+	-- Limited-tier provenance: when a Limited item was granted, so an event
+	-- re-run can tell "earned it the first time" from "earned it again".
+	limitedGrants: { [string]: number },
+
 	settings: PlayerSettings,
 	stats: LifetimeStats,
 	firstJoinedAt: number,
@@ -50,27 +151,83 @@ export type PlayerData = {
 
 local PlayerDataSchema = {}
 
-PlayerDataSchema.VERSION = 2
+PlayerDataSchema.VERSION = 3
+
+local STARTER_GUN = "Pistol_1"
+
+local function emptyClass(name: string): ClassLoadout
+	return {
+		name = name,
+		primary = { gunId = nil, attachments = {} },
+		secondary = { gunId = STARTER_GUN, attachments = {} },
+		perks = {},
+		lethal = nil,
+		tactical = nil,
+		fieldUpgrade = nil,
+		scorestreaks = {},
+	}
+end
 
 function PlayerDataSchema.default(): PlayerData
 	return {
 		version = PlayerDataSchema.VERSION,
 		coins = 0,
+		gems = 0,
 		xp = 0,
 		level = 1,
+
 		ownedWeapons = { "Pistol" },
 		ownedSkins = {},
 		ownedCharms = {},
-		ownedGuns = { "Pistol_1" },
-		ownedGunSkins = {},
-		ownedCamos = {},
-		loadout = { primary = nil, secondary = "Pistol_1" },
-		gunCosmetics = {},
 		equipped = {
 			weapon = "Pistol",
 			skins = {},
 			charms = {},
 		},
+
+		ownedGuns = { STARTER_GUN },
+		ownedGunSkins = {},
+		ownedCamos = {},
+		loadout = { primary = nil, secondary = STARTER_GUN },
+		gunCosmetics = {},
+
+		classes = { emptyClass("Class 1") },
+		activeClass = 1,
+		weaponProgress = {},
+		owned = {
+			guns = { STARTER_GUN },
+			gunSkins = {},
+			attachments = {},
+			camos = {},
+			outfits = {},
+			charms = {},
+			killEffects = {},
+			tracers = {},
+			emotes = {},
+			titles = {},
+			nameTags = {},
+			knifeSkins = {},
+			stickers = {},
+			deathEffects = {},
+		},
+		equippedCosmetics = {
+			outfit = nil,
+			title = nil,
+			nameTag = nil,
+			killEffect = nil,
+			deathEffect = nil,
+			tracer = nil,
+			emoteWheel = {},
+			perGun = {},
+		},
+		challenges = {},
+		crates = {
+			owned = {},
+			opened = {},
+			pity = {},
+		},
+		limitedGrants = {},
+
 		settings = {
 			sensitivity = 1,
 			volume = 1,
@@ -80,6 +237,9 @@ function PlayerDataSchema.default(): PlayerData
 			deaths = 0,
 			roundsPlayed = 0,
 			roundsWon = 0,
+			headshots = 0,
+			assists = 0,
+			timePlayed = 0,
 		},
 		firstJoinedAt = os.time(),
 		onboarded = false,
@@ -89,9 +249,7 @@ end
 -- Migrations[n] upgrades a profile from version n to n + 1.
 local Migrations: { [number]: (any) -> () } = {}
 
--- v1 -> v2: the gun roster era (docs/GUNS_HANDOFF.md §4.2). Everyone gets
--- the free starter and empty collections; the legacy four-weapon fields
--- remain untouched until Phase C retires them.
+-- v1 -> v2: the gun roster era.
 --
 -- BACKFILL ONLY — never assign unconditionally here. A genuine v1 profile has
 -- none of these fields, so `or` is free; but a v2 profile that arrives with a
@@ -101,7 +259,7 @@ local Migrations: { [number]: (any) -> () } = {}
 -- 60s later and the loss would be permanent.
 Migrations[1] = function(data)
 	if type(data.ownedGuns) ~= "table" then
-		data.ownedGuns = { "Pistol_1" }
+		data.ownedGuns = { STARTER_GUN }
 	end
 	if type(data.ownedGunSkins) ~= "table" then
 		data.ownedGunSkins = {}
@@ -110,10 +268,97 @@ Migrations[1] = function(data)
 		data.ownedCamos = {}
 	end
 	if type(data.loadout) ~= "table" then
-		data.loadout = { primary = nil, secondary = "Pistol_1" }
+		data.loadout = { primary = nil, secondary = STARTER_GUN }
 	end
 	if type(data.gunCosmetics) ~= "table" then
 		data.gunCosmetics = {}
+	end
+end
+
+-- v2 -> v3: classes, weapon progression, the eight cosmetic categories,
+-- challenges, crates and pity.
+--
+-- Same rule as above, and it matters more here because v2 profiles are LIVE:
+-- backfill only, never overwrite. The one piece of real translation is folding
+-- the v2 flat ownership lists into `owned`, and even that copies rather than
+-- moves — the v2 fields stay put so a rollback cannot orphan a collection.
+Migrations[2] = function(data)
+	if type(data.gems) ~= "number" then
+		data.gems = 0
+	end
+
+	if type(data.owned) ~= "table" then
+		data.owned = {}
+	end
+	local owned = data.owned
+
+	-- Copy, do not move. If v3 turns out to be wrong we can roll back to a
+	-- build that reads the v2 fields and nobody loses anything.
+	local function seed(key: string, from: any)
+		if type(owned[key]) ~= "table" then
+			owned[key] = if type(from) == "table" then table.clone(from) else {}
+		end
+	end
+	seed("guns", data.ownedGuns)
+	seed("gunSkins", data.ownedGunSkins)
+	seed("camos", data.ownedCamos)
+	seed("charms", data.ownedCharms)
+	for _, key in { "attachments", "outfits", "killEffects", "tracers", "emotes", "titles", "nameTags", "knifeSkins", "stickers", "deathEffects" } do
+		seed(key, nil)
+	end
+
+	if type(data.classes) ~= "table" or #data.classes == 0 then
+		-- Carry the v2 loadout into Class 1 so a returning player spawns with
+		-- what they had, not with a default.
+		local class = emptyClass("Class 1")
+		if type(data.loadout) == "table" then
+			class.primary.gunId = data.loadout.primary
+			class.secondary.gunId = data.loadout.secondary or STARTER_GUN
+		end
+		data.classes = { class }
+	end
+	if type(data.activeClass) ~= "number" then
+		data.activeClass = 1
+	end
+
+	-- Deliberately created EMPTY. Seeding it with `{ emoteWheel = {}, perGun = {} }`
+	-- here makes the checks below see tables that already exist, so the
+	-- carry-across from v2 never runs and every player silently loses the camo
+	-- and skin they had equipped on each gun.
+	if type(data.equippedCosmetics) ~= "table" then
+		data.equippedCosmetics = {}
+	end
+	if type(data.equippedCosmetics.perGun) ~= "table" then
+		-- v2 stored per-gun cosmetics separately; carry them across.
+		data.equippedCosmetics.perGun = if type(data.gunCosmetics) == "table"
+			then table.clone(data.gunCosmetics)
+			else {}
+	end
+	if type(data.equippedCosmetics.emoteWheel) ~= "table" then
+		data.equippedCosmetics.emoteWheel = {}
+	end
+
+	for _, key in { "weaponProgress", "challenges", "limitedGrants" } do
+		if type(data[key]) ~= "table" then
+			data[key] = {}
+		end
+	end
+
+	if type(data.crates) ~= "table" then
+		data.crates = { owned = {}, opened = {}, pity = {} }
+	end
+	for _, key in { "owned", "opened", "pity" } do
+		if type(data.crates[key]) ~= "table" then
+			data.crates[key] = {}
+		end
+	end
+
+	if type(data.stats) == "table" then
+		for _, key in { "headshots", "assists", "timePlayed" } do
+			if type(data.stats[key]) ~= "number" then
+				data.stats[key] = 0
+			end
+		end
 	end
 end
 
@@ -136,6 +381,26 @@ local function reconcile(data: any, template: any)
 	end
 end
 
+-- Tables the rest of the codebase indexes without guards. reconcile() only
+-- fills keys that are nil, so a field present with the WRONG type survives it
+-- untouched — and a corrupt scalar here throws on the player's first spawn,
+-- every spawn.
+local MUST_BE_TABLE = {
+	"ownedGuns",
+	"ownedGunSkins",
+	"ownedCamos",
+	"ownedSkins",
+	"ownedCharms",
+	"gunCosmetics",
+	"classes",
+	"owned",
+	"equippedCosmetics",
+	"weaponProgress",
+	"challenges",
+	"crates",
+	"limitedGrants",
+}
+
 -- Takes whatever came out of the DataStore and returns a valid, current-version profile.
 function PlayerDataSchema.migrate(data: any): PlayerData
 	if type(data) ~= "table" then
@@ -153,21 +418,16 @@ function PlayerDataSchema.migrate(data: any): PlayerData
 	end
 	data.version = PlayerDataSchema.VERSION
 
-	-- reconcile() only fills keys that are nil, so a field present with the
-	-- WRONG type survives untouched. The server indexes these without guards
-	-- (WeaponService.resolveLoadout, every table.find in GunShopService), so a
-	-- corrupt scalar here throws on the player's first spawn, every spawn.
-	-- Coerce the shapes the rest of the codebase is entitled to assume.
-	for _, key in { "ownedGuns", "ownedGunSkins", "ownedCamos", "ownedSkins", "ownedCharms" } do
+	for _, key in MUST_BE_TABLE do
 		if type(data[key]) ~= "table" then
 			data[key] = {}
 		end
 	end
 	if type(data.loadout) ~= "table" then
-		data.loadout = { primary = nil, secondary = "Pistol_1" }
+		data.loadout = { primary = nil, secondary = STARTER_GUN }
 	end
-	if type(data.gunCosmetics) ~= "table" then
-		data.gunCosmetics = {}
+	if type(data.activeClass) ~= "number" then
+		data.activeClass = 1
 	end
 
 	reconcile(data, PlayerDataSchema.default())

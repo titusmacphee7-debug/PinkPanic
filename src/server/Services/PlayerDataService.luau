@@ -12,11 +12,26 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local PlayerDataSchema = require(ReplicatedStorage.Shared.Data.PlayerDataSchema)
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 type PlayerData = PlayerDataSchema.PlayerData
 
+local SYSTEM = "PlayerDataService"
+
 local STORE_NAME = "PlayerData_v1"
-local AUTOSAVE_INTERVAL = 60
-local LOCK_TIMEOUT = 90 -- a lock older than this is presumed dead and stolen
+
+-- Every autosave refreshes the lock, so the ratio between these two IS the
+-- safety margin. It used to be 60 against 90, leaving room for exactly one
+-- missed save before another server could decide the session was dead and
+-- steal it — while the player was still playing. Retries alone can eat several
+-- seconds, so that margin was routinely thinner than it looked.
+--
+-- 45 against 300 gives six missed autosaves of slack. The cost is that a
+-- genuinely crashed server holds a profile for up to five minutes before
+-- anyone can rejoin on it, which is a far better failure than two servers
+-- writing the same profile and duping items.
+local AUTOSAVE_INTERVAL = 45
+local LOCK_TIMEOUT = 300
+
 local LOAD_RETRIES = 3
 local SAVE_RETRIES = 3
 
@@ -32,6 +47,9 @@ type Profile = {
 	-- Studio fallback profile: playable but never written to the DataStore,
 	-- so it can't clobber real data or fight another session's lock.
 	ephemeral: boolean?,
+	-- Set once the final save has released the lock. An autosave that was
+	-- already in flight at that moment must not write the lock back.
+	released: boolean?,
 }
 
 local PlayerDataService = {}
@@ -78,7 +96,23 @@ local function loadProfile(player: Player): Profile?
 	local ok = withRetries(LOAD_RETRIES, function()
 		dataStore:UpdateAsync(keyFor(player), function(record: Record?)
 			local now = os.time()
-			if record and record.lock and now - record.lock.timestamp < LOCK_TIMEOUT then
+
+			-- `record.lock.id ~= lockId` is the whole fix. Without it, this
+			-- check could not tell someone else's lock from OUR OWN.
+			--
+			-- withRetries wraps the UpdateAsync call, not the transform. So if
+			-- attempt 1 successfully wrote our lock and then failed on the way
+			-- out — a transient DataStore error, a throttle — attempt 2 would
+			-- run this transform again, find a fresh lock that we placed, and
+			-- conclude another server owned the profile. It then set
+			-- acquired = false and the player was kicked off their own data by
+			-- their own retry.
+			if
+				record
+				and record.lock
+				and record.lock.id ~= lockId
+				and now - record.lock.timestamp < LOCK_TIMEOUT
+			then
 				-- Someone else (a live server) owns this profile; do not touch it.
 				acquired = false
 				return nil
@@ -108,6 +142,17 @@ local function saveProfile(player: Player, profile: Profile, releaseLock: boolea
 	local dataStore = store
 	if not dataStore then
 		return true
+	end
+
+	-- An autosave that was already in flight when the player left would
+	-- otherwise land AFTER the leave-save and write the lock straight back —
+	-- locking the player out of their own profile for the full timeout on the
+	-- very next join. Once released, only a release may write again.
+	if profile.released and not releaseLock then
+		return true
+	end
+	if releaseLock then
+		profile.released = true
 	end
 
 	local ok = withRetries(SAVE_RETRIES, function()
@@ -191,8 +236,47 @@ function PlayerDataService.init()
 	end)
 	if ok then
 		store = result
+	end
+
+	-- Getting the handle is NOT proof that saving works. With Studio API access
+	-- off, GetDataStore succeeds and every write fails — so a handle-only check
+	-- reports a healthy OK while nothing at all is persisting, which is exactly
+	-- the "looks like it saved" failure this service is supposed to make
+	-- impossible. Probe an actual write, on a throwaway key, and report what
+	-- really happened.
+	local writable = false
+	local probeError: any = result
+	if store then
+		local dataStore = store :: DataStore
+		writable = pcall(function()
+			dataStore:UpdateAsync("__writeprobe", function()
+				return os.time()
+			end)
+		end)
+		if not writable then
+			local _, err = pcall(function()
+				dataStore:UpdateAsync("__writeprobe", function()
+					return os.time()
+				end)
+			end)
+			probeError = err
+		end
+	end
+
+	if writable then
+		Diagnostics.ok(SYSTEM, `schema v{PlayerDataSchema.VERSION} · autosave {AUTOSAVE_INTERVAL}s · lock {LOCK_TIMEOUT}s`)
 	else
-		warn("[PlayerDataService] DataStores unavailable — running without persistence. " .. tostring(result))
+		-- Deliberately WARN, not ok. A session with no persistence behaves
+		-- exactly like a working one right up until you rejoin and everything
+		-- you earned is gone — so it has to be visible in the manifest every
+		-- single boot, not in one warning that scrolls away.
+		store = nil
+		Diagnostics.warn(
+			SYSTEM,
+			`NOTHING IS SAVING — DataStore writes are failing. `
+				.. `In Studio: Game Settings → Security → Enable Studio Access to API Services. `
+				.. `({probeError})`
+		)
 	end
 
 	Players.PlayerAdded:Connect(function(player)
