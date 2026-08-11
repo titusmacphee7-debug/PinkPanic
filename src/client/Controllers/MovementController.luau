@@ -1,10 +1,37 @@
 --!strict
--- MovementController (NOD-100) — sprint, ice slides, and a Source-style
--- momentum system: slides build speed, ramps feed it (slide downhill = keep
--- accelerating), falling trickles into it, the air carries it at full
--- steering authority (air strafing), and bunny hops preserve it. Grounded
--- without hopping, momentum drains back to normal. Stamina only exists to
--- cap degenerate spam.
+-- MovementController (NOD-100) — a full custom velocity controller.
+--
+-- WHY THIS DOESN'T USE HUMANOID MOVEMENT
+--
+-- Humanoid.WalkSpeed is a target, not a model. The engine's mover has no
+-- acceleration curve, no friction and no separate air behaviour: input
+-- direction becomes velocity direction the same frame, releasing the keys
+-- brakes instantly, and "air control" is just the ground mover still running
+-- while you're off the floor. That is the exact signature of a clunky Roblox
+-- shooter, and no amount of tuning on top of it fixes the feel, because the
+-- thing that feels bad is the instant snap itself.
+--
+-- So we set WalkSpeed = 0 and own the horizontal velocity:
+--
+--   · a Source-derived accelerate/friction model on the ground, so speed
+--     ramps and bleeds instead of snapping (this replaces the old skid
+--     system entirely — there is no "skidding" state any more, letting go
+--     of the keys just means wishSpeed is 0 and friction takes over)
+--   · a split air model: free, generous STEERING (rotate velocity toward
+--     input at no speed cost) plus a hard-capped acceleration term, so
+--     new players can always redirect and good players can still strafe-jump
+--     for speed
+--   · steerable slides, coyote time and jump buffering, so you are never
+--     fighting the controller for something you clearly meant to do
+--
+-- Applied through a LinearVelocity constraint in Plane mode on X/Z. The Y
+-- axis is deliberately untouched: gravity, jump arcs, ragdolls and the
+-- anti-gravity float force all stay stock.
+--
+-- Input still comes from Humanoid.MoveDirection, which keeps working with
+-- WalkSpeed = 0 (verified live) and is already camera-relative and
+-- device-agnostic, so keyboard, gamepad and touch all feed the same vector
+-- with no PlayerModule dependency.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -45,19 +72,14 @@ local adsZoom = 0
 local sentSliding = false
 local sentCrouching = false
 local lastStanceSentAt = 0
--- Momentum: extra speed above the normal ladder, carried across states.
-local momentumSpeed = 0
-local lastLandedAt = 0
--- Skid: releasing the keys glides you to a stop instead of instant brakes.
-local skidding = false
-local skidSpeed = 0
-local lastMoveDirection = Vector3.zAxis
-local lastMovingSpeed = 0
--- The engine control module, for reading REAL player input: the skid's own
--- injected Humanoid:Move would otherwise read back as "the player is
--- steering" and cancel the skid every other frame. Loaded async in init;
--- skids only arm once it's available.
-local controls: any = nil
+-- Jump: we own it, so it can be forgiving. Coyote time is measured from the
+-- last grounded frame; the buffer is measured from the last press.
+local jumpHeld = false
+local jumpWasDown = false
+local jumpBufferedAt = -1
+local lastGroundedAt = -1
+local lastLandedAt = -1
+local lastJumpAt = -1
 
 local staminaBar: Frame? = nil
 local staminaFill: Frame? = nil
@@ -72,9 +94,60 @@ local function character(): (Model?, Humanoid?, BasePart?)
 	return nil, nil, nil
 end
 
+local function flat(vector: Vector3): Vector3
+	return Vector3.new(vector.X, 0, vector.Z)
+end
+
 local function horizontalSpeed(root: BasePart): number
-	local velocity = root.AssemblyLinearVelocity
-	return Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+	return flat(root.AssemblyLinearVelocity).Magnitude
+end
+
+-- ---------------------------------------------------------------------------
+-- The velocity model
+-- ---------------------------------------------------------------------------
+
+-- Source's friction curve. Above `stopSpeed` the drop is proportional to how
+-- fast you're going, so high speeds bleed off quickly and then ease; below it
+-- the drop is constant, so the last few studs/s actually reach zero instead of
+-- asymptoting toward it and leaving you creeping.
+local function applyFriction(velocity: Vector3, deltaTime: number): Vector3
+	local speed = velocity.Magnitude
+	if speed < 0.05 then
+		return Vector3.zero
+	end
+	local control = math.max(speed, MovementConfig.stopSpeed)
+	local newSpeed = math.max(speed - control * MovementConfig.groundFriction * deltaTime, 0)
+	return velocity * (newSpeed / speed)
+end
+
+-- Source's accelerate. The critical detail is that it only ever adds along
+-- `wishDir`, and only up to the part of `wishSpeed` you haven't already got in
+-- that direction. Moving perpendicular to your velocity therefore costs you
+-- nothing, which is what makes air-strafing gain speed rather than trade it.
+local function accelerate(
+	velocity: Vector3,
+	wishDir: Vector3,
+	wishSpeed: number,
+	accel: number,
+	deltaTime: number
+): Vector3
+	local projected = velocity:Dot(wishDir)
+	local addSpeed = wishSpeed - projected
+	if addSpeed <= 0 then
+		return velocity
+	end
+	return velocity + wishDir * math.min(accel * wishSpeed * deltaTime, addSpeed)
+end
+
+-- Rotate `current` toward `target` by at most `maxRadians`, magnitude
+-- untouched. Used for both air steering and slide carving: turning is free,
+-- going faster is not.
+local function steerToward(current: Vector3, target: Vector3, maxRadians: number): Vector3
+	local angle = math.acos(math.clamp(current:Dot(target), -1, 1))
+	if angle < 1e-4 then
+		return target
+	end
+	return current:Lerp(target, math.min(maxRadians / angle, 1)).Unit
 end
 
 -- ---------------------------------------------------------------------------
@@ -129,14 +202,11 @@ end
 -- Slide
 -- ---------------------------------------------------------------------------
 
-local function endSlide(humanoid: Humanoid?)
-	if not sliding then
-		return
-	end
+local function endSlide()
 	sliding = false
-	-- The speed you built carries into momentum (glide-out, air, bhops).
-	momentumSpeed = math.max(momentumSpeed, slideSpeed)
-	-- HipHeight is owned by the per-frame profile logic (slide/crouch/stand).
+	-- Speed carries: the velocity model picks it straight up from the root,
+	-- so there is nothing to hand over. HipHeight is owned by the per-frame
+	-- profile logic (slide/crouch/stand).
 end
 
 local function trySlide()
@@ -145,7 +215,8 @@ local function trySlide()
 		return
 	end
 	local now = os.clock()
-	if sliding
+	if
+		sliding
 		or not sprinting
 		or now - lastSlideAt < MovementConfig.slideCooldown
 		or stamina < MovementConfig.slideCost
@@ -162,26 +233,14 @@ local function trySlide()
 	-- from the first frame of the slide.
 	sprinting = false
 	slideEndsAt = now + MovementConfig.slideDuration
-	-- Momentum-fed entry: a bhop chain slides in FASTER than a fresh slide.
-	slideSpeed = math.max(MovementConfig.slideInitialSpeed * weaponSpeedMult, horizontalSpeed(root), momentumSpeed)
-	slideSpeed = math.min(slideSpeed, MovementConfig.momentumHardCap)
+	-- Momentum-fed entry: arriving fast slides in faster than a standing start.
+	slideSpeed = math.min(
+		math.max(MovementConfig.slideInitialSpeed * weaponSpeedMult, horizontalSpeed(root)),
+		MovementConfig.momentumHardCap
+	)
 
-	local flat = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
-	slideDirection = if flat.Magnitude > 2
-		then flat.Unit
-		else Vector3.new(root.CFrame.LookVector.X, 0, root.CFrame.LookVector.Z).Unit
-end
-
-local function onJumping()
-	local now = os.clock()
-	if sliding then
-		local _, humanoid = character()
-		endSlide(humanoid)
-	end
-	-- Bunny hop: jumping right after landing keeps momentum (tiny tax).
-	if now - lastLandedAt <= MovementConfig.bhopWindow and momentumSpeed > 0 then
-		momentumSpeed *= MovementConfig.bhopRetention
-	end
+	local moving = flat(root.AssemblyLinearVelocity)
+	slideDirection = if moving.Magnitude > 2 then moving.Unit else flat(root.CFrame.LookVector).Unit
 end
 
 -- ---------------------------------------------------------------------------
@@ -221,8 +280,31 @@ local function buildStaminaBar()
 end
 
 -- ---------------------------------------------------------------------------
--- Main loop
+-- Actuators
 -- ---------------------------------------------------------------------------
+
+-- Plane mode on world X/Z: we command horizontal velocity outright and never
+-- touch Y, so gravity, the jump arc and the float force below all still apply.
+local function ensureActuator(root: BasePart): LinearVelocity
+	local existing = root:FindFirstChild("PinkPanicDrive")
+	if existing and existing:IsA("LinearVelocity") then
+		return existing
+	end
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "PinkPanicDriveAttachment"
+	attachment.Parent = root
+	local drive = Instance.new("LinearVelocity")
+	drive.Name = "PinkPanicDrive"
+	drive.Attachment0 = attachment
+	drive.RelativeTo = Enum.ActuatorRelativeTo.World
+	drive.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
+	drive.PrimaryTangentAxis = Vector3.xAxis
+	drive.SecondaryTangentAxis = Vector3.zAxis
+	drive.MaxForce = math.huge
+	drive.PlaneVelocity = Vector2.zero
+	drive.Parent = root
+	return drive
+end
 
 -- Anti-gravity assist while airborne: jumps hang longer and falls float a
 -- touch, without touching global gravity (shells and ragdolls keep theirs).
@@ -244,6 +326,10 @@ local function ensureFloatForce(root: BasePart): VectorForce
 	return force
 end
 
+-- ---------------------------------------------------------------------------
+-- Main loop
+-- ---------------------------------------------------------------------------
+
 local function update(deltaTime: number)
 	local model, humanoid, root = character()
 	local now = os.clock()
@@ -251,32 +337,25 @@ local function update(deltaTime: number)
 	if not model or not humanoid or not root then
 		sprinting = false
 		sliding = false
-		skidding = false
 		crouching = false
-		momentumSpeed = 0
 		return
 	end
 
-	local airborne = humanoid.FloorMaterial == Enum.Material.Air
+	local drive = ensureActuator(root)
 
-	-- Real input beats MoveDirection: the latter includes our own skid
-	-- injection, the former is only what the player is pressing.
-	local realInput: Vector3? = nil
-	if controls then
-		local ok, vector = pcall(function()
-			return controls:GetMoveVector()
-		end)
-		if ok and typeof(vector) == "Vector3" then
-			realInput = vector
-		end
+	-- The Humanoid is a sensor and a state machine now, not a mover.
+	humanoid.WalkSpeed = 0
+
+	local airborne = humanoid.FloorMaterial == Enum.Material.Air
+	if not airborne then
+		lastGroundedAt = now
 	end
-	local moving = if realInput
-		then realInput.Magnitude > 0.05
-		else humanoid.MoveDirection.Magnitude > 0.1
-	if moving and not skidding then
-		lastMoveDirection = humanoid.MoveDirection
-		lastMovingSpeed = horizontalSpeed(root)
-	end
+
+	-- MoveDirection keeps reporting real, camera-relative player input at
+	-- WalkSpeed = 0 — and since nothing injects Move() any more, it is pure.
+	local wish = flat(humanoid.MoveDirection)
+	local wishDir = if wish.Magnitude > 0.05 then wish.Unit else Vector3.zero
+	local moving = wishDir.Magnitude > 0
 
 	local float = ensureFloatForce(root)
 	float.Force = Vector3.new(
@@ -286,66 +365,55 @@ local function update(deltaTime: number)
 	)
 	float.Enabled = airborne
 
-	-- Slide physics: ice glide with gravity feeding it on slopes.
-	if sliding then
-		if now >= slideEndsAt then
-			endSlide(humanoid)
-		else
-			-- Slope sensing: project gravity onto the floor plane; sliding
-			-- downhill accelerates you (and keeps the slide alive), uphill
-			-- bleeds you out.
-			local params = RaycastParams.new()
-			params.FilterType = Enum.RaycastFilterType.Exclude
-			params.FilterDescendantsInstances = { model }
-			local floor = workspace:Raycast(root.Position, Vector3.new(0, -6, 0), params)
-			local rampAccel = 0
-			if floor then
-				local normal = floor.Normal
-				local surfaceDown = Vector3.new(0, -1, 0) - normal * normal:Dot(Vector3.new(0, -1, 0))
-				local steepness = surfaceDown.Magnitude
-				if steepness > 0.02 then
-					rampAccel = MovementConfig.rampAccel * steepness * slideDirection:Dot(surfaceDown.Unit)
-				end
-			end
+	-- -----------------------------------------------------------------------
+	-- Jump: coyote + buffer. Both windows are generous on purpose — every
+	-- frame spent refusing a jump the player clearly asked for reads as the
+	-- game being unresponsive, and neither window can be exploited for height.
+	-- -----------------------------------------------------------------------
+	-- Edge-detected across every input device at once: gamepad and touch
+	-- arrive as Humanoid.Jump, the keyboard as our own Space listener. The
+	-- engine re-asserts that flag every frame the button is held, so buffering
+	-- off its level rather than its edge would silently become auto-bhop.
+	local jumpDown = humanoid.Jump or jumpHeld
+	humanoid.Jump = false
+	if jumpDown and not jumpWasDown then
+		jumpBufferedAt = now
+	end
+	jumpWasDown = jumpDown
 
-			if rampAccel > 0.5 then
-				-- Downhill: accelerate and extend the ride.
-				slideSpeed += rampAccel * deltaTime
-				slideEndsAt = math.max(slideEndsAt, now + MovementConfig.rampSlideExtend)
-			else
-				-- Flat/uphill: exponential ice decay (plus uphill bleed).
-				slideSpeed = MovementConfig.slideEndSpeed
-					+ (slideSpeed - MovementConfig.slideEndSpeed)
-						* math.exp(-MovementConfig.slideDecayRate * deltaTime)
-				slideSpeed += math.min(rampAccel, 0) * deltaTime
-			end
-			slideSpeed = math.min(slideSpeed, MovementConfig.momentumHardCap)
-			if slideSpeed < MovementConfig.slideEndSpeed * 0.8 then
-				endSlide(humanoid) -- uphill killed it
-			else
-				local vertical = root.AssemblyLinearVelocity.Y
-				root.AssemblyLinearVelocity = slideDirection * slideSpeed + Vector3.new(0, vertical, 0)
-				momentumSpeed = math.max(momentumSpeed, slideSpeed)
-			end
+	local jumped = false
+	if
+		now - jumpBufferedAt <= MovementConfig.jumpBuffer
+		and now - lastGroundedAt <= MovementConfig.coyoteTime
+		and now - lastJumpAt > 0.15
+	then
+		jumped = true
+		jumpBufferedAt = -1
+		lastJumpAt = now
+		if sliding then
+			endSlide()
+		end
+		local gravity = workspace.Gravity * MovementConfig.jumpGravityScale
+		local launch = math.sqrt(2 * gravity * MovementConfig.jumpApex)
+		root.AssemblyLinearVelocity = Vector3.new(
+			root.AssemblyLinearVelocity.X,
+			launch,
+			root.AssemblyLinearVelocity.Z
+		)
+		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		-- Bunny hop tax: chaining hops keeps nearly everything you built.
+		if now - lastLandedAt <= MovementConfig.bhopWindow then
+			local carried = flat(root.AssemblyLinearVelocity) * MovementConfig.bhopRetention
+			root.AssemblyLinearVelocity =
+				Vector3.new(carried.X, root.AssemblyLinearVelocity.Y, carried.Z)
 		end
 	end
 
-	-- Momentum bookkeeping outside slides.
-	if not sliding then
-		if airborne then
-			-- The air carries momentum; falling feeds it a little.
-			momentumSpeed = math.max(momentumSpeed, horizontalSpeed(root))
-			if root.AssemblyLinearVelocity.Y < -3 then
-				momentumSpeed += MovementConfig.fallSpeedGain * deltaTime
-			end
-		elseif now - lastLandedAt > MovementConfig.bhopWindow then
-			-- Grounded past the hop window: drain back to the normal ladder.
-			momentumSpeed = math.max(0, momentumSpeed - MovementConfig.groundMomentumDecay * deltaTime)
-		end
-		momentumSpeed = math.min(momentumSpeed, MovementConfig.momentumHardCap)
-	end
+	-- -----------------------------------------------------------------------
+	-- States
+	-- -----------------------------------------------------------------------
 
-	-- Sprint state: held + moving + stamina, never while sliding or aimed in.
+	-- Sprint: held + moving + stamina, never while sliding or aimed in.
 	if sprinting then
 		sprinting = sprintHeld and moving and stamina > 1 and not sliding and adsAlpha < 0.2
 	else
@@ -369,7 +437,113 @@ local function update(deltaTime: number)
 		Remotes.event("MovementState"):FireServer(sliding, crouching)
 	end
 
-	-- Profile: slide, crouch, or standing — one place owns hip and camera.
+	-- -----------------------------------------------------------------------
+	-- Velocity solve — one place decides how fast you are going and why.
+	-- -----------------------------------------------------------------------
+
+	-- The speed the model chases. Airborne this is only a reference for the
+	-- capped strafe term; steering authority is separate and always full.
+	local wishSpeed = (if sprinting then MovementConfig.sprintWalkSpeed else MovementConfig.baseWalkSpeed)
+		* weaponSpeedMult
+	if crouching then
+		wishSpeed *= MovementConfig.crouchSpeedMult
+	end
+	wishSpeed *= 1 - (1 - MovementConfig.adsWalkMult) * adsAlpha
+
+	local velocity = flat(root.AssemblyLinearVelocity)
+
+	if sliding and now >= slideEndsAt then
+		endSlide()
+	end
+
+	if sliding then
+		-- Slope sensing: project gravity onto the floor plane. Sliding
+		-- downhill accelerates you (and keeps the slide alive), uphill bleeds
+		-- you out.
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { model }
+		local floor = workspace:Raycast(root.Position, Vector3.new(0, -6, 0), params)
+		local rampAccel = 0
+		if floor then
+			local down = Vector3.new(0, -1, 0)
+			local surfaceDown = down - floor.Normal * floor.Normal:Dot(down)
+			local steepness = surfaceDown.Magnitude
+			if steepness > 0.02 then
+				rampAccel = MovementConfig.rampAccel * steepness * slideDirection:Dot(surfaceDown.Unit)
+			end
+		end
+
+		if rampAccel > 0.5 then
+			slideSpeed += rampAccel * deltaTime
+			slideEndsAt = math.max(slideEndsAt, now + MovementConfig.rampSlideExtend)
+		else
+			slideSpeed = MovementConfig.slideEndSpeed
+				+ (slideSpeed - MovementConfig.slideEndSpeed)
+					* math.exp(-MovementConfig.slideDecayRate * deltaTime)
+			slideSpeed += math.min(rampAccel, 0) * deltaTime
+		end
+		slideSpeed = math.min(slideSpeed, MovementConfig.momentumHardCap)
+
+		if slideSpeed < MovementConfig.slideEndSpeed * 0.8 then
+			endSlide() -- uphill killed it
+			velocity = slideDirection * slideSpeed
+		else
+			-- Carve. Turn authority falls off with speed, so a fast slide
+			-- draws a wide arc and a slow one pivots tight — the slide stays
+			-- a move you drive rather than a direction you committed to.
+			if moving then
+				local authority = MovementConfig.slideTurnRate
+					* (MovementConfig.slideTurnRefSpeed / math.max(slideSpeed, 1))
+				slideDirection = steerToward(slideDirection, wishDir, authority * deltaTime)
+			end
+			velocity = slideDirection * slideSpeed
+		end
+	elseif airborne then
+		-- Free steering first: rotate what you already have toward the stick
+		-- at no cost. This is the "always in control" half.
+		if moving and velocity.Magnitude > 1 then
+			local direction = steerToward(
+				velocity.Unit,
+				wishDir,
+				MovementConfig.airTurnRate * deltaTime
+			)
+			velocity = direction * velocity.Magnitude
+		end
+		-- Then the capped strafe term: this is the only way to gain speed in
+		-- the air, and it only pays out when your input is off-axis from your
+		-- velocity — i.e. when you're actually strafing.
+		velocity = accelerate(
+			velocity,
+			wishDir,
+			math.min(wishSpeed, MovementConfig.airWishCap),
+			MovementConfig.airAccel,
+			deltaTime
+		)
+		-- Falling trickles into horizontal speed so long drops pay out.
+		if root.AssemblyLinearVelocity.Y < -3 and velocity.Magnitude > 1 then
+			velocity += velocity.Unit * MovementConfig.fallSpeedGain * deltaTime
+		end
+	else
+		-- Grounded. Friction runs every frame EXCEPT during a hop chain —
+		-- skipping it for the couple of frames you're touching the floor
+		-- mid-bhop is what lets momentum survive the landing.
+		local chaining = jumped or (jumpHeld and now - lastLandedAt <= MovementConfig.bhopWindow)
+		if not chaining then
+			velocity = applyFriction(velocity, deltaTime)
+		end
+		velocity = accelerate(velocity, wishDir, wishSpeed, MovementConfig.groundAccel, deltaTime)
+	end
+
+	if velocity.Magnitude > MovementConfig.momentumHardCap then
+		velocity = velocity.Unit * MovementConfig.momentumHardCap
+	end
+	drive.PlaneVelocity = Vector2.new(velocity.X, velocity.Z)
+
+	-- -----------------------------------------------------------------------
+	-- Stance profile, stamina, camera
+	-- -----------------------------------------------------------------------
+
 	if not originalHipHeight then
 		originalHipHeight = humanoid.HipHeight
 	end
@@ -389,30 +563,6 @@ local function update(deltaTime: number)
 		0
 	)
 
-	-- Friction: no input at speed = skid along the last direction, bleeding
-	-- speed gradually instead of the engine's instant brake.
-	if skidding then
-		skidSpeed -= MovementConfig.skidFriction * deltaTime
-		momentumSpeed = math.min(momentumSpeed, math.max(skidSpeed, 0))
-		if
-			moving
-			or airborne
-			or sliding
-			or ClientData.inLobby()
-			or skidSpeed <= MovementConfig.skidStopSpeed
-		then
-			skidding = false
-		end
-	elseif realInput and not moving and not sliding and not airborne and not ClientData.inLobby() then
-		local speed = math.max(horizontalSpeed(root), lastMovingSpeed)
-		if speed > MovementConfig.skidMinSpeed then
-			skidding = true
-			skidSpeed = speed
-		end
-		lastMovingSpeed = 0
-	end
-
-	-- Stamina drain/regen.
 	if sprinting then
 		stamina = math.max(0, stamina - MovementConfig.sprintDrainPerSecond * deltaTime)
 		regenPausedUntil = math.max(regenPausedUntil, now)
@@ -420,33 +570,18 @@ local function update(deltaTime: number)
 		stamina = math.min(MovementConfig.staminaMax, stamina + MovementConfig.regenPerSecond * deltaTime)
 	end
 
-	-- WalkSpeed: the normal ladder, or carried momentum — whichever is
-	-- faster. Airborne this doubles as air-strafe authority: full steering
-	-- at your carried speed.
-	local ladder = (if sprinting then MovementConfig.sprintWalkSpeed else MovementConfig.baseWalkSpeed)
-		* weaponSpeedMult
-	if crouching then
-		ladder *= MovementConfig.crouchSpeedMult
-	end
-	-- Aiming in slows the walk toward adsWalkMult.
-	ladder *= 1 - (1 - MovementConfig.adsWalkMult) * adsAlpha
-	if sliding then
-		humanoid.WalkSpeed = MovementConfig.slideEndSpeed
-	elseif skidding then
-		humanoid.WalkSpeed = math.max(skidSpeed, 0)
-	else
-		humanoid.WalkSpeed = math.max(ladder, momentumSpeed)
-	end
-
-	-- FOV feel, combat only; momentum widens it so speed reads visually.
+	-- FOV feel, combat only; carried speed widens it so pace reads visually.
 	local camera = workspace.CurrentCamera
 	if camera and not ClientData.inLobby() then
 		local target = if sliding
 			then MovementConfig.fovSlide
 			elseif sprinting then MovementConfig.fovSprint
 			else MovementConfig.fovBase
-		local momentumStretch = math.clamp((momentumSpeed - MovementConfig.sprintWalkSpeed) / 30, 0, 1) * 6
-		target += momentumStretch
+		target += math.clamp(
+			(velocity.Magnitude - MovementConfig.sprintWalkSpeed) / 30,
+			0,
+			1
+		) * 6
 		target -= adsZoom * adsAlpha -- aiming in zooms
 		camera.FieldOfView += (target - camera.FieldOfView) * math.min(deltaTime * 8, 1)
 	end
@@ -463,22 +598,15 @@ end
 function MovementController.init()
 	buildStaminaBar()
 
-	task.spawn(function()
-		local ok, result = pcall(function()
-			local playerScripts = Players.LocalPlayer:WaitForChild("PlayerScripts")
-			return (require(playerScripts:WaitForChild("PlayerModule")) :: any):GetControls()
-		end)
-		if ok and result then
-			controls = result
-		end
-	end)
-
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		if gameProcessed then
 			return
 		end
 		if input.KeyCode == Enum.KeyCode.LeftShift then
 			sprintHeld = true
+		elseif input.KeyCode == Enum.KeyCode.Space then
+			jumpHeld = true
+			jumpBufferedAt = os.clock()
 		elseif input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.LeftControl then
 			-- Sprinting: this starts a slide. Otherwise: hold to crouch.
 			-- Keeping it held through a slide melts the slide into a crouch.
@@ -489,6 +617,8 @@ function MovementController.init()
 	UserInputService.InputEnded:Connect(function(input)
 		if input.KeyCode == Enum.KeyCode.LeftShift then
 			sprintHeld = false
+		elseif input.KeyCode == Enum.KeyCode.Space then
+			jumpHeld = false
 		elseif input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.LeftControl then
 			crouchHeld = false
 		end
@@ -498,13 +628,10 @@ function MovementController.init()
 		local humanoid = model:WaitForChild("Humanoid", 5)
 		if humanoid and humanoid:IsA("Humanoid") then
 			originalHipHeight = nil
+			-- We apply the launch impulse ourselves so coyote jumps work; the
+			-- engine must contribute nothing on top of it.
 			humanoid.UseJumpPower = false
-			humanoid.JumpHeight = MovementConfig.jumpHeight
-			humanoid.Jumping:Connect(function(active)
-				if active then
-					onJumping()
-				end
-			end)
+			humanoid.JumpHeight = 0
 			humanoid.StateChanged:Connect(function(_, newState)
 				if newState == Enum.HumanoidStateType.Landed then
 					lastLandedAt = os.clock()
@@ -519,26 +646,15 @@ function MovementController.init()
 	Players.LocalPlayer.CharacterAdded:Connect(function(model)
 		sliding = false
 		sprinting = false
-		skidding = false
 		crouching = false
-		momentumSpeed = 0
 		stamina = MovementConfig.staminaMax
+		jumpBufferedAt = -1
+		lastJumpAt = -1
+		actuator = nil
 		task.spawn(hookCharacter, model)
 	end)
 
 	RunService.Heartbeat:Connect(update)
-
-	-- Skid steering: keep the character drifting along its last direction
-	-- after the player's own control module has run (last Move call wins).
-	RunService:BindToRenderStep("PinkPanicSkid", Enum.RenderPriority.Input.Value + 1, function()
-		if not skidding then
-			return
-		end
-		local _, humanoid = character()
-		if humanoid then
-			humanoid:Move(lastMoveDirection, false)
-		end
-	end)
 
 	-- Camera cant while sliding: applied after the engine camera each frame,
 	-- combat only (the lobby camera composes its own shot).

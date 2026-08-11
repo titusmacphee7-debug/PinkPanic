@@ -26,8 +26,10 @@
 -- playtest, flip exactly one number here and nothing else moves.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local MovementConfig = require(ReplicatedStorage.Shared.Config.MovementConfig)
 local MovementController = require(script.Parent.MovementController)
 
 local MovementAnimator = {}
@@ -42,8 +44,12 @@ local SIGNS = {
 	armOut = 1, -- shoulder roll away from the body
 }
 
-local SPRINT_SPEED = 26 -- velocity layer fades in above walking pace
-local WALK_SPEED = 8
+-- The velocity layer fades in across the real speed ladder. These were
+-- hardcoded to 8/26 while the actual ladder is 20/30, so a standing start was
+-- already two thirds of the way to full sprint lean and sprinting itself added
+-- almost nothing — the layer had no range left to express.
+local WALK_SPEED = MovementConfig.baseWalkSpeed
+local SPRINT_SPEED = MovementConfig.sprintWalkSpeed
 
 -- Pose magnitudes (radians / studs). Crafted, not random: every value has
 -- a counter-value somewhere else so silhouettes stay balanced.
