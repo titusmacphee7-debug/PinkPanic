@@ -9,8 +9,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local EconomyConfig = require(ReplicatedStorage.Shared.Config.EconomyConfig)
 local PlayerDataService = require(script.Parent.PlayerDataService)
-local CombatService = require(script.Parent.CombatService)
-local RoundService = require(script.Parent.RoundService)
 
 local EconomyService = {}
 
@@ -54,7 +52,14 @@ local function grant(player: Player, coins: number, xp: number)
 	end
 end
 
-local function onDeath(victim: Player, attacker: Player?, _weaponId: string?)
+-- Payout seams for the rebuilt game loop.
+--
+-- These used to be wired straight into CombatService.onDeathConnect and
+-- RoundService.onRoundEnd. Both of those were deleted with the combat rewrite,
+-- so the hooks are public now and the new loop calls them directly. The rules
+-- themselves (coins, XP, level-ups, K/D, rounds played/won) are unchanged and
+-- still the ONLY way currency is minted — the client cannot request it.
+function EconomyService.awardKill(victim: Player, attacker: Player?, _weaponId: string?)
 	PlayerDataService.update(victim, function(data)
 		data.stats.deaths += 1
 	end)
@@ -66,7 +71,7 @@ local function onDeath(victim: Player, attacker: Player?, _weaponId: string?)
 	end
 end
 
-local function onRoundEnd(finalScores: { any }, winnerName: string?)
+function EconomyService.awardRoundEnd(finalScores: { any }, winnerName: string?)
 	for _, row in finalScores do
 		local player = Players:GetPlayerByUserId(row.userId)
 		if not player then
@@ -113,9 +118,6 @@ local function pushWhenLoaded(player: Player)
 end
 
 function EconomyService.init()
-	CombatService.onDeathConnect(onDeath)
-	RoundService.onRoundEnd = onRoundEnd
-
 	Players.PlayerAdded:Connect(pushWhenLoaded)
 	for _, player in Players:GetPlayers() do
 		pushWhenLoaded(player)

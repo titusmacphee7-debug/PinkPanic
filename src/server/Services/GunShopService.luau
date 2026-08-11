@@ -14,8 +14,13 @@ local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local GunSkinCatalog = require(ReplicatedStorage.Shared.Config.GunSkinCatalog)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local EconomyService = require(script.Parent.EconomyService)
-local RoundService = require(script.Parent.RoundService)
-local WeaponService = require(script.Parent.WeaponService)
+-- RoundService and WeaponService were deleted with the combat rewrite. Three
+-- things here depended on them and are marked REBUILD below: the two
+-- lobby-only guards (loadout and trials are lobby activities), the live
+-- refresh of a held weapon after an equip, and gun trials themselves.
+--
+-- Purchases, ownership and equip state are untouched and still fully
+-- server-derived from the profile.
 
 local GunShopService = {}
 
@@ -114,11 +119,10 @@ local function onEquipLoadout(player: Player, primary: any, secondary: any): Res
 	if not Guard.checkRate(player, "EquipLoadout", 10, 2) then
 		return fail("Too fast!")
 	end
-	-- Loadout changes are a lobby activity — mid-round swaps would refill
-	-- ammo and dodge the commitment of a pick.
-	if RoundService.getState() == "Active" then
-		return fail("Change loadout between rounds!")
-	end
+	-- REBUILD: loadout changes are a lobby activity — mid-round swaps would
+	-- refill ammo and dodge the commitment of a pick. Restore this guard when
+	-- the round loop exists again. Everything is lobby right now, so there is
+	-- no mid-round to protect against.
 	if primary ~= nil and not Guard.isString(primary, 50) then
 		return fail("Invalid primary.")
 	end
@@ -152,7 +156,7 @@ local function onEquipLoadout(player: Player, primary: any, secondary: any): Res
 		profile.loadout.secondary = secondary
 	end)
 	EconomyService.push(player)
-	WeaponService.refreshLoadout(player)
+	-- REBUILD: push the new loadout to the player's held weapon.
 	return { ok = true }
 end
 
@@ -202,16 +206,17 @@ local function onEquipGunCosmetics(player: Player, gunId: any, skinId: any, camo
 		profile.gunCosmetics[gunId] = { skinId = skinId, camoId = camoId }
 	end)
 	EconomyService.push(player)
-	WeaponService.refreshCosmetics(player)
+	-- REBUILD: repaint the player's held weapon with the new cosmetics.
 	return { ok = true }
 end
 
+-- REBUILD: gun trials hand the player a real weapon to hold, which needs the
+-- weapon system. Validation is kept intact so the remote stays rate-limited
+-- and argument-checked rather than becoming an unguarded hole, and it fails
+-- closed — a trial has never granted ownership and must never start doing so.
 local function onTryGun(player: Player, gunId: any): Result
 	if not Guard.checkRate(player, "TryGun", 3, 10) then
 		return fail("One trial at a time, cutie!")
-	end
-	if RoundService.getState() == "Active" then
-		return fail("Trials are a lobby thing!")
 	end
 	if not Guard.isString(gunId, 50) then
 		return fail("Invalid gun.")
@@ -219,10 +224,7 @@ local function onTryGun(player: Player, gunId: any): Result
 	if not GunCatalog.get(gunId) then
 		return fail("Unknown gun.")
 	end
-	if not WeaponService.tryGun(player, gunId) then
-		return fail("Try again in a moment.")
-	end
-	return { ok = true }
+	return fail("Trials are being rebuilt!")
 end
 
 function GunShopService.init()

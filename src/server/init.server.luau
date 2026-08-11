@@ -8,7 +8,7 @@
 -- connected at Play time, or a duplicate script tree in the place file).
 -- If it prints TWICE, there are two copies of the server running.
 
-local BUILD_TAG = "2026-08-11-L · flat-readable-air"
+local BUILD_TAG = "2026-08-11-M · lobby-only · combat wiped for rebuild"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,29 +16,21 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Guard = require(ReplicatedStorage.Shared.Net.Guard)
 local PlayerDataService = require(script.Services.PlayerDataService)
-local CombatService = require(script.Services.CombatService)
-local WeaponService = require(script.Services.WeaponService)
-local RoundService = require(script.Services.RoundService)
 local EconomyService = require(script.Services.EconomyService)
 local ShopService = require(script.Services.ShopService)
 local SettingsService = require(script.Services.SettingsService)
 local GunShopService = require(script.Services.GunShopService)
 local MapService = require(script.Services.MapService)
 local LobbyService = require(script.Services.LobbyService)
-local MovementStateService = require(script.Services.MovementStateService)
 
 Remotes.init()
 MapService.init()
 LobbyService.init()
 PlayerDataService.init()
-CombatService.init()
-WeaponService.init()
-RoundService.init()
 EconomyService.init()
 ShopService.init()
 SettingsService.init()
 GunShopService.init()
-MovementStateService.init()
 
 Players.PlayerRemoving:Connect(function(player)
 	Guard.clearPlayer(player)

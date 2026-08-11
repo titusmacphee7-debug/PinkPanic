@@ -125,17 +125,12 @@ local function buildBanner()
 	stroke.Transparency = 0.25
 	stroke.Parent = button
 	button.Activated:Connect(function()
-		-- RoundService drops the press unless there are enough players, and
-		-- EnterPortal is a fire-and-forget Event with no reply — so claiming
-		-- "Starting the round" unconditionally means the UI confirms a start
-		-- that will never happen, and the only symptom is "nothing happened".
-		-- Check the same condition the server checks.
-		if #Players:GetPlayers() < GameConfig.minPlayers then
-			showBanner(`Need {GameConfig.minPlayers} players to start 💗`)
-			return
-		end
-		Remotes.event("EnterPortal"):FireServer()
-		showBanner("Starting the round... 💗")
+		-- REBUILD: the round loop was deleted with combat, so there is nothing
+		-- to start yet. Say that plainly rather than firing a remote nobody
+		-- handles and banner-ing "Starting the round..." — a UI that confirms
+		-- something which never happens is worse than a button that admits it,
+		-- and it is the exact failure this rebuild is meant to end.
+		showBanner("Match mode is being rebuilt 💗")
 	end)
 	button.Parent = screen
 	startButton = button

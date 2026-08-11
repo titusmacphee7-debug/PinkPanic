@@ -9,32 +9,25 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-11-L · flat-readable-air"
+local CLIENT_BUILD_TAG = "2026-08-11-M · lobby-only · combat wiped for rebuild"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false
 
 -- Touching any remote here blocks until the server has finished Remotes.init,
--- so everything after this line can assume the remote surface exists.
-Remotes.event("RoundStateChanged")
+-- so everything after this line can assume the remote surface exists. This
+-- was RoundStateChanged until the round loop was deleted; DataChanged is the
+-- barrier now because the economy is the one system guaranteed to exist.
+Remotes.event("DataChanged")
 
 local ClientData = require(script.ClientData)
 local EffectsController = require(script.Controllers.EffectsController)
-local ViewmodelController = require(script.Controllers.ViewmodelController)
-local WeaponController = require(script.Controllers.WeaponController)
-local HitFeedbackController = require(script.Controllers.HitFeedbackController)
-local RoundController = require(script.Controllers.RoundController)
 local EconomyController = require(script.Controllers.EconomyController)
 local ShopController = require(script.Controllers.ShopController)
-local HudController = require(script.Controllers.HudController)
 local SettingsController = require(script.Controllers.SettingsController)
 local LoadoutController = require(script.Controllers.LoadoutController)
 local CameraController = require(script.Controllers.CameraController)
 local LobbyController = require(script.Controllers.LobbyController)
-
-local MovementController = require(script.Controllers.MovementController)
-local MovementAnimator = require(script.Controllers.MovementAnimator)
-
 local ArmoryController = require(script.Controllers.ArmoryController)
 
 -- Each init() is isolated. Previously these ran bare and in order, so a throw
@@ -51,15 +44,8 @@ end
 
 boot("ClientData", ClientData.init)
 boot("EffectsController", EffectsController.init)
-boot("MovementController", MovementController.init)
-boot("MovementAnimator", MovementAnimator.init)
-boot("ViewmodelController", ViewmodelController.init)
-boot("WeaponController", WeaponController.init)
-boot("HitFeedbackController", HitFeedbackController.init)
-boot("RoundController", RoundController.init)
 boot("EconomyController", EconomyController.init)
 boot("ShopController", ShopController.init)
-boot("HudController", HudController.init)
 boot("SettingsController", SettingsController.init)
 boot("LoadoutController", LoadoutController.init)
 boot("CameraController", CameraController.init)

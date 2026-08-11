@@ -11,27 +11,22 @@ local FOLDER_NAME = "Remotes"
 export type RemoteKind = "Event" | "Function"
 
 -- The full remote surface of the game. Add entries here as systems come online.
+-- Combat, round-loop and movement remotes were REMOVED with the rewrite, not
+-- left declared-but-unhandled. A declared remote with no server handler is a
+-- silent hole: the client fires it, nothing happens, and there is no error to
+-- explain why — which is precisely the failure mode this rebuild exists to
+-- get rid of. The new systems re-declare exactly what they use.
+--
+-- Deleted: FireWeapon, ReloadWeapon, SelectWeapon, AmmoChanged, DamageDealt,
+-- Killfeed, RoundStateChanged, ScoreUpdated, EnterPortal, MovementState.
+--
+-- ShotFired SURVIVES: it is how the lobby's own balloon shooting draws tracers
+-- for other players, so it belongs to the lobby as much as to combat.
 local Definitions: { [string]: RemoteKind } = {
-	-- Combat (M1)
-	FireWeapon = "Event", -- client -> server: report a shot for validation
-	ReloadWeapon = "Event", -- client -> server: request reload
-	SelectWeapon = "Event", -- client -> server: switch carried weapon
-	AmmoChanged = "Event", -- server -> client: ammo/reload state for the HUD
-	ShotFired = "Event", -- server -> clients: a validated shot happened (tracers/sound)
-	DamageDealt = "Event", -- server -> client: hitmarker / damage number feedback
-	Killfeed = "Event", -- server -> clients: someone died
-
-	-- Round loop (M2)
-	RoundStateChanged = "Event", -- server -> clients: state machine transitions
-	ScoreUpdated = "Event", -- server -> clients: live standings
-	EnterPortal = "Event", -- client -> server: Panic Portal pad (starts Studio-solo rounds)
-
 	-- Lobby (M6)
 	LobbyShot = "Event", -- client -> server: cosmetic lobby shot (target pops)
 	TargetPopped = "Event", -- server -> clients: a lobby target burst
-
-	-- Movement (NOD-100/NOD-105)
-	MovementState = "Event", -- client -> server: stance (slide/crouch) for pose replication
+	ShotFired = "Event", -- server -> clients: a shot happened (tracers/sound)
 
 	-- Economy (M4)
 	PurchaseItem = "Function", -- client -> server: buy from catalog, returns result

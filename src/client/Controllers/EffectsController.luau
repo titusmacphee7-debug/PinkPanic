@@ -322,12 +322,10 @@ end
 function EffectsController.init()
 	RunService.Heartbeat:Connect(stepStreaks)
 
-	-- Fresh round, fresh floor.
-	Remotes.event("RoundStateChanged").OnClientEvent:Connect(function(data)
-		if type(data) == "table" and data.state == "Active" then
-			EffectsController.clearShells()
-		end
-	end)
+	-- REBUILD: settled shells used to be swept on every round start ("fresh
+	-- round, fresh floor") via RoundStateChanged. That remote went with the
+	-- round loop, so nothing clears them now — call EffectsController.clearShells()
+	-- from the new loop's round-start transition.
 
 	Remotes.event("ShotFired").OnClientEvent:Connect(function(shooter, origin, direction, velocity, drop, travelMax, pellets)
 		-- The local player already drew their own effects at fire time.

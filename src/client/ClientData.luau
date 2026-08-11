@@ -24,8 +24,12 @@ ClientData.loadoutOpen = false
 -- True while the Armory dialog/inspection owns the mouse (blocks lobby shooting).
 ClientData.armoryBusy = false
 
--- Round state mirror (fed by RoundController). Lobby life happens in every
--- state except Active.
+-- Round state mirror. Lobby life happens in every state except Active.
+--
+-- Nothing writes this right now: the round loop was deleted along with combat
+-- for the rebuild, so this stays "Waiting" and inLobby() is permanently true,
+-- which is what keeps the lobby camera, cursor and pads alive. The new game
+-- loop should call setRoundState and this all works again unchanged.
 ClientData.roundState = "Waiting"
 ClientData.roundStateChanged = stateEvent.Event
 

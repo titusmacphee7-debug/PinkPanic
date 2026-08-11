@@ -19,7 +19,6 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local GunSkinCatalog = require(ReplicatedStorage.Shared.Config.GunSkinCatalog)
 local CombatStats = require(ReplicatedStorage.Shared.Config.CombatStats)
-local MovementConfig = require(ReplicatedStorage.Shared.Config.MovementConfig)
 local GunModelLoader = require(ReplicatedStorage.Shared.Assets.GunModelLoader)
 local ClientData = require(script.Parent.Parent.ClientData)
 
@@ -288,10 +287,11 @@ local function populateInspect(gunId: string)
 	local damageText = if stats.pellets > 1
 		then `{stats.damageNear}x{stats.pellets} → {stats.damageFar}x{stats.pellets}`
 		else `{stats.damageNear} → {stats.damageFar}`
-	-- Movement while holding this gun, in real studs/s (weight applied).
-	local function spd(base: number): number
-		return math.floor(base * stats.moveSpeedMult + 0.5)
-	end
+	-- How much this gun slows you down. Shown as a percentage of base pace
+	-- rather than absolute studs/s: the old row multiplied MovementConfig's
+	-- walk/sprint/slide numbers, which meant it changed every time movement
+	-- was retuned and printed the same values for every gun anyway.
+	local weightPct = math.floor(stats.moveSpeedMult * 100 + 0.5)
 	-- Recoil in plain words; the number is degrees of climb per shot.
 	local recoilWord = if stats.recoilVert < 0.8
 		then "Low"
@@ -308,10 +308,7 @@ local function populateInspect(gunId: string)
 		{ "Recoil", `{recoilWord} ({stats.recoilVert}°/shot)` },
 		{ "Spread", `{stats.spreadDeg}° hip · {stats.adsSpreadDeg}° ADS` },
 		{ "Headshot", `x{stats.headshotMult}` },
-		{
-			"Speed",
-			`{spd(MovementConfig.baseWalkSpeed)} walk · {spd(MovementConfig.sprintWalkSpeed)} sprint · {spd(MovementConfig.slideInitialSpeed)} slide`,
-		},
+		{ "Mobility", `{weightPct}% move speed` },
 		{ "Pull-out / ADS", `{stats.equipTime}s / {stats.adsTime}s` },
 	}
 	for index, row in rows do
