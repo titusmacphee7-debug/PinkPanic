@@ -126,7 +126,11 @@ end
 -- Measures the hand-built lobby: the floor level and the horizontal extent
 -- of everything in it, so generated pieces land on the ground and frame the
 -- whole town instead of guessing at coordinates.
-local function lobbyBounds(lobby: Instance): (Vector3, Vector3)?
+-- Returns (min, max), or (nil, nil) when the lobby has no parts. Note the
+-- return type is a pair of optionals: Luau has no way to mark a whole type
+-- pack optional, and writing `(Vector3, Vector3)?` is a syntax error that
+-- takes the entire server bootstrap down with it.
+local function lobbyBounds(lobby: Instance): (Vector3?, Vector3?)
 	local min: Vector3? = nil
 	local max: Vector3? = nil
 	for _, child in lobby:GetDescendants() do
@@ -139,7 +143,7 @@ local function lobbyBounds(lobby: Instance): (Vector3, Vector3)?
 		end
 	end
 	if not min or not max then
-		return nil
+		return nil, nil
 	end
 	return min, max
 end
