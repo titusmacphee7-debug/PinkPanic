@@ -585,6 +585,61 @@ score limit is too high.
 
 ---
 
+## 9.2 Spawning
+
+Per Leah: **no spawning on the enemy, and spawns can switch.** Those are the
+same system, and getting it right is most of the difference between a shooter
+that feels fair and one people quit.
+
+The naive approach — pick a random spawn from your team's list — produces
+exactly the two failures she named: you materialize in front of someone, or you
+get spawn-trapped because your side never changes.
+
+### Scored spawn selection
+
+Every spawn point is scored at the moment of each request. Highest score wins,
+with a little randomization among the top few so it is not deterministic.
+
+| Factor | Effect on score |
+|---|---|
+| Nearest enemy closer than `dangerRadius` | heavy negative, scaling with closeness |
+| An enemy currently **looking at** the spawn (dot product + clear line) | disqualifying |
+| Enemy could reach it within ~2s | strong negative |
+| Teammate nearby | positive — spawn with your team, not alone |
+| Someone died here in the last few seconds | negative, decaying |
+| Distance to the live objective | mode-dependent, usually mild positive |
+| Enemy spawn-side pressure | negative |
+
+If every spawn scores below a floor, we pick the least-bad and grant a slightly
+longer spawn protection rather than dumping the player into a firefight.
+
+### Spawn zones that flip
+
+Spawns are grouped into **zones** (tagged `SpawnGroup` in the map). A zone is
+owned by whichever team currently has presence there. When map control shifts —
+a team pushes across — ownership flips and both teams start spawning from
+different ends. That is the "spawns can switch" she asked for, and it is what
+prevents a spawn trap from being permanent.
+
+Zone ownership recomputes on a timer, with hysteresis so it does not thrash
+back and forth while a fight is contested on a boundary.
+
+### Timing and protection
+
+- **Respawn delay: 5s default**, per mode in `Config/Modes`. Search & Destroy
+  has none — you are out for the round.
+- **Spawn protection:** brief invulnerability that **breaks the moment you fire
+  or aim**, so it can never be used offensively.
+- Wave respawns for objective modes are a per-mode option, not a global.
+
+### Debugging it
+
+A spawn debug overlay (Studio only) draws every spawn point coloured by its
+current score and prints the winning factors for the last selection. Spawn bugs
+are otherwise almost impossible to reproduce and diagnose from a report.
+
+---
+
 ## 10. Maps (Titus builds, I provide the framework)
 
 **Leah's six**, in build order — the first is the one everything else is
@@ -664,6 +719,9 @@ intention, kept:
 - **Kill effects are where the hearts and sparkles go.** That is the
   celebration moment and it should be genuinely over the top.
 - Killfeed reads soft, not aggressive.
+- **Rares are loud** — Leah's call. A Legendary camo should be obvious from
+  across the map: glow, particles, an animated card frame in the menus, its own
+  sound on unlock. If someone has something rare, everyone should know.
 - Scorestreaks keep CoD mechanics and lose the military dress entirely: the
   UAV is a heart-shaped drone, the airstrike drops glitter.
 - **Everything is nice to touch.** Cutesy click effects, sparkle particles on
