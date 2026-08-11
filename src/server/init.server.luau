@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-11-O · net layer: every remote has an owner"
+local BUILD_TAG = "2026-08-11-Q · asset tree: a place for everything"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,6 +28,8 @@ local Diagnostics = require(ReplicatedStorage.Shared.Diagnostics)
 Diagnostics.expect(
 	"Remotes",
 	"Guard",
+	"Rarity",
+	"AssetTree",
 	"MapService",
 	"LobbyService",
 	"PlayerDataService",
@@ -42,6 +44,9 @@ Diagnostics.expect(
 local Remotes: any = Diagnostics.load("Remotes", ReplicatedStorage.Shared.Net.Remotes)
 local Guard: any = Diagnostics.load("Guard", ReplicatedStorage.Shared.Net.Guard)
 
+local RarityConfig: any = Diagnostics.load("Rarity", ReplicatedStorage.Shared.Config.Rarity)
+local AssetTree: any = Diagnostics.load("AssetTree", ReplicatedStorage.Shared.AssetTree)
+
 local MapService: any = Diagnostics.load("MapService", script.Services.MapService)
 local LobbyService: any = Diagnostics.load("LobbyService", script.Services.LobbyService)
 local PlayerDataService: any = Diagnostics.load("PlayerDataService", script.Services.PlayerDataService)
@@ -54,6 +59,16 @@ local GunShopService: any = Diagnostics.load("GunShopService", script.Services.G
 -- every client will otherwise sit in WaitForChild forever with no explanation.
 if Remotes then
 	Diagnostics.start("Remotes", Remotes.init)
+end
+
+if RarityConfig then
+	Diagnostics.start("Rarity", RarityConfig.validate)
+end
+
+-- Runs before the services so every folder a service might look for already
+-- exists. Creates only; never deletes, never moves.
+if AssetTree then
+	Diagnostics.start("AssetTree", AssetTree.init)
 end
 
 local BOOT_ORDER: { { name: string, module: any } } = {

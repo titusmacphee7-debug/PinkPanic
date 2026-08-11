@@ -21,7 +21,9 @@
 
 export type GunClass = "Pistol" | "Revolver" | "SMG" | "Shotgun" | "Rifle" | "Carbine" | "Bullpup" | "Sniper"
 export type GunSlot = "Primary" | "Secondary"
-export type Rarity = "Common" | "Rare" | "Epic" | "Legendary"
+local RarityConfig = require(script.Parent.Rarity)
+
+export type Rarity = RarityConfig.Tier
 
 export type GunStats = {
 	damageNear: number,
@@ -99,7 +101,7 @@ GunCatalog.guns = {
 		equipTime = 0.28, sprintToFire = 0.16, adsTime = 0.2,
 	}),
 	-- Pixie: AUTO — the only full-auto secondary; falls off a cliff past 30m.
-	Pistol_5 = gun("Pixie", "Pistol", "Secondary", "Epic", 4000, {
+	Pistol_5 = gun("Pixie", "Pistol", "Secondary", "SuperRare", 4000, {
 		damageNear = 17, damageFar = 11, rangeNear = 40, rangeFar = 100,
 		headshotMult = 1.4, rpm = 650, auto = true, magSize = 18, reloadSeconds = 1.9,
 		spreadDeg = 1.6, adsSpreadDeg = 0.35,
@@ -107,7 +109,7 @@ GunCatalog.guns = {
 		equipTime = 0.2, sprintToFire = 0.1, adsTime = 0.15,
 	}),
 	-- Jawbreaker: BURST — the deagle. Pays for it in speed everywhere.
-	Pistol_4 = gun("Jawbreaker", "Pistol", "Secondary", "Epic", 4500, {
+	Pistol_4 = gun("Jawbreaker", "Pistol", "Secondary", "SuperRare", 4500, {
 		damageNear = 48, damageFar = 30, rangeNear = 60, rangeFar = 150,
 		headshotMult = 1.9, rpm = 150, auto = false, magSize = 7, reloadSeconds = 2.3,
 		spreadDeg = 1.3, adsSpreadDeg = 0.3,
@@ -133,7 +135,7 @@ GunCatalog.guns = {
 		equipTime = 0.3, sprintToFire = 0.18, adsTime = 0.22,
 	}),
 	-- Longing: PRECISION — laser velocity and reach; slowest cylinder.
-	Revolver_3 = gun("Longing", "Revolver", "Secondary", "Epic", 4400, {
+	Revolver_3 = gun("Longing", "Revolver", "Secondary", "SuperRare", 4400, {
 		damageNear = 46, damageFar = 34, rangeNear = 90, rangeFar = 230,
 		headshotMult = 2.0, rpm = 150, auto = false, magSize = 6, reloadSeconds = 2.5,
 		spreadDeg = 0.8, adsSpreadDeg = 0.15,
@@ -141,7 +143,7 @@ GunCatalog.guns = {
 		equipTime = 0.34, sprintToFire = 0.2, adsTime = 0.26,
 	}),
 	-- Drama Queen: ONE-TAP HEAD up close (55 x 1.85 = 102); pays everywhere else.
-	Revolver_5 = gun("Drama Queen", "Revolver", "Secondary", "Epic", 4200, {
+	Revolver_5 = gun("Drama Queen", "Revolver", "Secondary", "SuperRare", 4200, {
 		damageNear = 55, damageFar = 34, rangeNear = 55, rangeFar = 140,
 		headshotMult = 1.85, rpm = 125, auto = false, magSize = 5, reloadSeconds = 2.8,
 		spreadDeg = 1.3, adsSpreadDeg = 0.25,
@@ -175,7 +177,7 @@ GunCatalog.guns = {
 		equipTime = 0.28, sprintToFire = 0.13, adsTime = 0.19,
 	}),
 	-- Jitterbug: SUSTAIN — 42 rounds of commitment; sluggish handling.
-	SubmachineGun_4 = gun("Jitterbug", "SMG", "Primary", "Epic", 5200, {
+	SubmachineGun_4 = gun("Jitterbug", "SMG", "Primary", "SuperRare", 5200, {
 		damageNear = 16, damageFar = 11, rangeNear = 50, rangeFar = 120,
 		headshotMult = 1.3, rpm = 880, auto = true, magSize = 42, reloadSeconds = 2.4,
 		spreadDeg = 1.25, adsSpreadDeg = 0.35,
@@ -212,7 +214,7 @@ GunCatalog.guns = {
 		equipTime = 0.25, sprintToFire = 0.15, adsTime = 0.2,
 	}),
 	-- Double Trouble: TWO FAST SHOTS — the duelist's double barrel.
-	Shotgun_4 = gun("Double Trouble", "Shotgun", "Primary", "Epic", 4000, {
+	Shotgun_4 = gun("Double Trouble", "Shotgun", "Primary", "SuperRare", 4000, {
 		damageNear = 10, damageFar = 2, rangeNear = 30, rangeFar = 75, pellets = 9,
 		headshotMult = 1.25, rpm = 140, auto = false, magSize = 2, reloadSeconds = 2.4,
 		spreadDeg = 5.8, adsSpreadDeg = 0.55,
@@ -220,7 +222,7 @@ GunCatalog.guns = {
 		equipTime = 0.36, sprintToFire = 0.2, adsTime = 0.26,
 	}),
 	-- Homemaker: CHOKE — tightest pattern, real reach for a shotgun, slow.
-	Shotgun_3 = gun("Homemaker", "Shotgun", "Primary", "Epic", 6000, {
+	Shotgun_3 = gun("Homemaker", "Shotgun", "Primary", "SuperRare", 6000, {
 		damageNear = 10, damageFar = 3, rangeNear = 40, rangeFar = 95, pellets = 8,
 		headshotMult = 1.3, rpm = 65, auto = false, magSize = 7,
 		reloadSeconds = 4.2, shellReload = 0.6,
@@ -239,7 +241,7 @@ GunCatalog.guns = {
 		equipTime = 0.42, sprintToFire = 0.24, adsTime = 0.28,
 	}),
 	-- Cherry Bomb: DAMAGE — hits harder, kicks wider, handles slower.
-	AssaultRifle_3 = gun("Cherry Bomb", "Rifle", "Primary", "Epic", 5000, {
+	AssaultRifle_3 = gun("Cherry Bomb", "Rifle", "Primary", "SuperRare", 5000, {
 		damageNear = 28, damageFar = 19, rangeNear = 65, rangeFar = 170,
 		headshotMult = 1.45, rpm = 520, auto = true, magSize = 30, reloadSeconds = 2.5,
 		spreadDeg = 2.1, adsSpreadDeg = 0.25,
@@ -247,7 +249,7 @@ GunCatalog.guns = {
 		equipTime = 0.46, sprintToFire = 0.27, adsTime = 0.32,
 	}),
 	-- Picnic Punch: HANDLING AK — folding stock, moves and swaps like a carbine.
-	AssaultRifle_4 = gun("Picnic Punch", "Rifle", "Primary", "Epic", 6000, {
+	AssaultRifle_4 = gun("Picnic Punch", "Rifle", "Primary", "SuperRare", 6000, {
 		damageNear = 24, damageFar = 17, rangeNear = 65, rangeFar = 170,
 		headshotMult = 1.4, rpm = 590, auto = true, magSize = 30, reloadSeconds = 2.0,
 		spreadDeg = 2, adsSpreadDeg = 0.2,
@@ -255,7 +257,7 @@ GunCatalog.guns = {
 		equipTime = 0.32, sprintToFire = 0.18, adsTime = 0.24,
 	}),
 	-- Grump: REACH — the moody DMR-ish AK; slow tap-fire, rifle-sniper hybrid.
-	AssaultRifle_1 = gun("Grump", "Rifle", "Primary", "Epic", 6800, {
+	AssaultRifle_1 = gun("Grump", "Rifle", "Primary", "SuperRare", 6800, {
 		damageNear = 32, damageFar = 26, rangeNear = 100, rangeFar = 260,
 		headshotMult = 1.55, rpm = 420, auto = true, magSize = 25, reloadSeconds = 2.6,
 		spreadDeg = 2.4, adsSpreadDeg = 0.15,
@@ -265,7 +267,7 @@ GunCatalog.guns = {
 
 	-- ============ PRIMARIES — CARBINES + BULLPUPS ============
 	-- Sweet Talker: ADS ACCURACY — smooth, precise, quick to the eye.
-	AssaultRifle2_1 = gun("Sweet Talker", "Carbine", "Primary", "Epic", 5500, {
+	AssaultRifle2_1 = gun("Sweet Talker", "Carbine", "Primary", "SuperRare", 5500, {
 		damageNear = 22, damageFar = 15, rangeNear = 75, rangeFar = 190,
 		headshotMult = 1.4, rpm = 680, auto = true, magSize = 30, reloadSeconds = 2.1,
 		spreadDeg = 1.8, adsSpreadDeg = 0.2,
@@ -297,7 +299,7 @@ GunCatalog.guns = {
 		equipTime = 0.38, sprintToFire = 0.22, adsTime = 0.26,
 	}),
 	-- Toastie: the spicy sibling — damage-range hybrid, handling tax.
-	Bullpup_2 = gun("Toastie", "Bullpup", "Primary", "Epic", 4800, {
+	Bullpup_2 = gun("Toastie", "Bullpup", "Primary", "SuperRare", 4800, {
 		damageNear = 23, damageFar = 17, rangeNear = 75, rangeFar = 190,
 		headshotMult = 1.5, rpm = 600, auto = true, magSize = 36, reloadSeconds = 2.55,
 		spreadDeg = 1.8, adsSpreadDeg = 0.2,
@@ -316,7 +318,7 @@ GunCatalog.guns = {
 		equipTime = 0.45, sprintToFire = 0.3, adsTime = 0.32,
 	}),
 	-- Scout's Honor: CYCLE — quickest follow-up shot, lightest body hit.
-	SniperRifle_3 = gun("Scout's Honor", "Sniper", "Primary", "Epic", 5800, {
+	SniperRifle_3 = gun("Scout's Honor", "Sniper", "Primary", "SuperRare", 5800, {
 		damageNear = 62, damageFar = 50, rangeNear = 110, rangeFar = 300,
 		headshotMult = 1.65, rpm = 80, auto = false, magSize = 6, reloadSeconds = 2.5,
 		spreadDeg = 4, adsSpreadDeg = 0.1,
@@ -324,7 +326,7 @@ GunCatalog.guns = {
 		equipTime = 0.42, sprintToFire = 0.28, adsTime = 0.28,
 	}),
 	-- Long Kiss: VELOCITY — 1400 studs/s, least lead, least drop. The classic.
-	SniperRifle_2 = gun("Long Kiss", "Sniper", "Primary", "Epic", 6500, {
+	SniperRifle_2 = gun("Long Kiss", "Sniper", "Primary", "SuperRare", 6500, {
 		damageNear = 88, damageFar = 70, rangeNear = 150, rangeFar = 400,
 		headshotMult = 1.3, rpm = 45, auto = false, magSize = 5, reloadSeconds = 3.1,
 		spreadDeg = 5.5, adsSpreadDeg = 0.06,

@@ -3,7 +3,11 @@
 -- price and rarity. Prices are tuned against EconomyConfig earn rates
 -- (a decent round nets ~75–200 coins).
 
-export type Rarity = "Common" | "Rare" | "Epic" | "Legendary"
+local RarityConfig = require(script.Parent.Rarity)
+
+-- Re-exported so existing call sites keep working, but there is now exactly one
+-- definition of the ladder and it lives in Rarity.luau.
+export type Rarity = RarityConfig.Tier
 
 export type SkinDef = {
 	name: string,
@@ -60,7 +64,7 @@ CatalogConfig.skins = {
 	SkinMidnight = {
 		name = "Midnight Cutie",
 		price = 300,
-		rarity = "Epic",
+		rarity = "SuperRare",
 		slide = Color3.fromRGB(70, 55, 80),
 		grip = Color3.fromRGB(255, 92, 168),
 		accent = Color3.fromRGB(255, 92, 168),
@@ -93,7 +97,7 @@ CatalogConfig.charms = {
 	CharmStar = {
 		name = "Star Charm",
 		price = 250,
-		rarity = "Epic",
+		rarity = "SuperRare",
 		color = Color3.fromRGB(255, 214, 120),
 		shape = "Star",
 	},

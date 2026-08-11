@@ -9,7 +9,7 @@ local Diagnostics = require(ReplicatedStorage.Shared.Diagnostics)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-11-O · net layer: every remote has an owner"
+local CLIENT_BUILD_TAG = "2026-08-11-Q · asset tree: a place for everything"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false

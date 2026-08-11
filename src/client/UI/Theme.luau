@@ -9,6 +9,9 @@
 --
 -- Data only, no behaviour: builders live in Components.luau.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RarityConfig = require(ReplicatedStorage.Shared.Config.Rarity)
+
 local Theme = {}
 
 -- ---------------------------------------------------------------------------
@@ -45,19 +48,19 @@ Theme.color = {
 	viewportBackdrop = Color3.fromRGB(66, 40, 58),
 }
 
--- Rarity drives border colour on gun cards and the rarity line.
--- Annotated with a string indexer: without it, indexing this sealed literal
--- with a `string` variable is a --!strict analysis error, and standing red
--- squiggles are how the next real type bug gets missed.
-Theme.rarity = {
-	Common = Color3.fromRGB(168, 150, 162),
-	Rare = Color3.fromRGB(96, 168, 236),
-	Epic = Color3.fromRGB(186, 108, 240),
-	Legendary = Color3.fromRGB(240, 172, 60),
-} :: { [string]: Color3 }
-
+-- Rarity is NOT defined here. It lives in shared/Config/Rarity.luau because it
+-- is game data before it is presentation — the crate roller weights by it and
+-- refunds scale with it, and the server needs all of that. A second copy of the
+-- palette here is how a Legendary ends up gold in the shop and orange in the
+-- killfeed.
 function Theme.rarityColor(name: string?): Color3
-	return (name and Theme.rarity[name]) or Theme.color.textMuted
+	return RarityConfig.color(name)
+end
+
+-- Full tier definition, for anything that wants the loudness too: glow,
+-- particles, frame treatment, reveal sound.
+function Theme.rarity(name: string?): RarityConfig.TierDef
+	return RarityConfig.get(name)
 end
 
 -- ---------------------------------------------------------------------------
