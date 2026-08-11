@@ -19,12 +19,25 @@ local SYSTEM = "LobbyService"
 local LEGACY_LOBBY_NAME = "PinkPanicLobby" -- retired generated plaza
 local ARENA_NAMES = { "PinkPanicMap", "Arena" }
 
--- The pad actions LobbyController actually dispatches on. Anything else is a
--- pad that looks tagged and does nothing — usually a capitalisation slip.
-local KNOWN_PAD_ACTIONS: { [string]: boolean } = {
+-- The pad actions LobbyController actually dispatches on today.
+local LIVE_PAD_ACTIONS: { [string]: boolean } = {
 	shop = true,
 	loadout = true,
 	portal = true,
+}
+
+-- Pads Titus has placed for interiors that are not built yet. They do nothing,
+-- and that is correct — the building isn't there.
+--
+-- They are listed rather than lumped in with typos because a warning that
+-- fires every boot about something deliberate is worse than no warning: it
+-- trains you to skim the line, and the next thing to appear in it is a real
+-- mistake you will skim right past. A reserved action is reported as waiting,
+-- a genuinely unknown one is still a warning.
+local RESERVED_PAD_ACTIONS: { [string]: string } = {
+	closet = "outfit closet",
+	range = "Heartbreaker Range (balloon shooting)",
+	cafe = "cafe interior",
 }
 
 -- Mirrors Theme.color primary / primaryDeep / surfaceRaised. Theme lives in
@@ -336,7 +349,9 @@ end
 
 export type Census = {
 	pads: number,
+	livePads: number,
 	padActions: { [string]: number },
+	reserved: { string },
 	badActions: { string },
 	unnamedPads: number,
 	spawns: number,
@@ -350,7 +365,9 @@ export type Census = {
 function LobbyService.census(lobby: Instance): Census
 	local census: Census = {
 		pads = 0,
+		livePads = 0,
 		padActions = {},
+		reserved = {},
 		badActions = {},
 		unnamedPads = 0,
 		spawns = 0,
@@ -373,7 +390,12 @@ function LobbyService.census(lobby: Instance): Census
 		if type(action) == "string" then
 			census.pads += 1
 			census.padActions[action] = (census.padActions[action] or 0) + 1
-			if not KNOWN_PAD_ACTIONS[action] then
+			local waitingFor = RESERVED_PAD_ACTIONS[action]
+			if LIVE_PAD_ACTIONS[action] then
+				census.livePads += 1
+			elseif waitingFor then
+				table.insert(census.reserved, `{action} ({waitingFor})`)
+			else
 				table.insert(census.badActions, `{child.Name} has PadAction "{action}"`)
 			end
 			if type(child:GetAttribute("PadName")) ~= "string" then
@@ -415,12 +437,24 @@ end
 -- OK or a WARN. A lobby with no pads is not an error — it is a lobby being
 -- built — but it must never read as healthy.
 local function reportCensus(census: Census, planted: boolean, placedAnchor: boolean)
+	-- Only the live actions are broken down. Listing every action and then
+	-- listing the reserved ones again says each pad twice and buries the two
+	-- that actually work.
 	local actions: { string } = {}
 	for action, count in census.padActions do
-		table.insert(actions, `{action} {count}`)
+		if LIVE_PAD_ACTIONS[action] then
+			table.insert(actions, `{action} {count}`)
+		end
 	end
 	table.sort(actions)
 	local padDetail = if #actions > 0 then ` ({table.concat(actions, ", ")})` else ""
+
+	-- Said plainly in the OK line rather than buried in a warning, because
+	-- "3 pads are waiting on interiors you haven't built" is status, not a fault.
+	if #census.reserved > 0 then
+		table.sort(census.reserved)
+		padDetail ..= `, {#census.reserved} awaiting content: {table.concat(census.reserved, ", ")}`
+	end
 
 	local summary = `{census.pads} pad(s){padDetail} · {census.spawns} spawn(s) · `
 		.. `{census.displays} display(s) · {census.mats} mat(s) · {census.targets} target(s) · `
@@ -430,10 +464,14 @@ local function reportCensus(census: Census, planted: boolean, placedAnchor: bool
 	if census.pads == 0 then
 		table.insert(problems, "no pads tagged — add a PadAction attribute to a part under workspace.Lobby")
 	end
+	if census.livePads == 0 and census.pads > 0 then
+		table.insert(problems, "every pad is awaiting unbuilt content — nothing in the lobby is reachable")
+	end
 	if #census.badActions > 0 then
 		table.insert(
 			problems,
-			`unknown PadAction (expected shop/loadout/portal, lowercase): {table.concat(census.badActions, ", ")}`
+			`unrecognised PadAction (live: shop/loadout/portal · reserved: closet/range/cafe · lowercase): `
+				.. table.concat(census.badActions, ", ")
 		)
 	end
 	if census.unnamedPads > 0 then
