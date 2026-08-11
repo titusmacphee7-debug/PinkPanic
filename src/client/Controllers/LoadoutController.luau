@@ -667,9 +667,13 @@ function refreshLoadout()
 			child:Destroy()
 		end
 	end
-	if not GunPreview.createCharacter(well) then
+	-- Isolated: this column is the least important of the three, and a throw
+	-- here used to abort refreshLoadout before the weapons and stats columns
+	-- were built at all — one dead column blanked the entire screen.
+	local charOk, charView = pcall(GunPreview.createCharacter, well)
+	if not charOk or not charView then
 		Components.text(well, {
-			text = "Spawning…",
+			text = "Character unavailable",
 			size = Theme.text.label,
 			color = Theme.color.textMuted,
 			align = Enum.TextXAlignment.Center,

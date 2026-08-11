@@ -184,7 +184,16 @@ function GunPreview.createCharacter(parent: GuiObject): ViewportFrame?
 	corner.CornerRadius = UDim.new(0, Theme.radius.card)
 	corner.Parent = viewport
 
+	-- Roblox sets Archivable = false on player characters, so :Clone() returns
+	-- nil unless we flip it first. Restore it immediately either way.
+	local wasArchivable = character.Archivable
+	character.Archivable = true
 	local clone = character:Clone()
+	character.Archivable = wasArchivable
+	if not clone then
+		return nil
+	end
+
 	for _, part in clone:GetDescendants() do
 		if part:IsA("BasePart") then
 			part.Anchored = true
