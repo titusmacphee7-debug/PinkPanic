@@ -776,9 +776,43 @@ base.** This is not either/or, and it is why the rig work matters.
 Rig note carried forward: the character uses `AnimationConstraint`, not
 `Motor6D`. The C0 analogue is `Attachment0.CFrame`. Measured and verified.
 
-**What Titus provides here:** Moon Animator clips against a spec I'll write
-(frame counts, timing, which joints, export naming). That spec is its own issue
-and lands before any clip work starts.
+### No Moon Animator. Pose tracks in code instead.
+
+**Titus does not animate, so nothing here depends on him.** Moon Animator was
+only ever a GUI for authoring pose-over-time data; the same data is a Luau table,
+and I can write it.
+
+```lua
+-- A "clip" is a list of poses with timings and easing. This IS a keyframe
+-- track — it just lives in git instead of in a plugin's save file.
+RELOAD_TACTICAL = {
+    { t = 0.00, RightHand = ..., LeftHand = ...,  ease = "quad" },
+    { t = 0.22, LeftHand  = ...,                  ease = "back" },  -- reach for mag
+    { t = 0.55, LeftHand  = ...,                  ease = "quad" },  -- seat it
+    { t = 0.90, LeftHand  = ...,                  ease = "quart" }, -- back to grip
+}
+```
+
+Real advantages over the plugin route, not just a consolation:
+
+- Tunable by number. "The reload feels floaty" is a decimal change, not a
+  re-export.
+- Diffable and reviewable in git, like everything else.
+- No export/import cycle, no `.rbxm` drift, nothing living outside the repo —
+  which matters doubly here, since the place file is not in git.
+
+**The honest cost:** hand-authored poses read slightly stiffer than a skilled
+animator's work, and iteration is change-a-number-and-look rather than scrubbing
+a timeline. For this game that is an acceptable trade.
+
+Two things make it much cheaper than it sounds:
+
+1. **Reloads are seen in first person.** That is arms and gun only. Third person
+   gets one generic "working the weapon" pose per class and nobody looks closely.
+2. **Half the read of a reload is already procedural.** The mag drop, the bolt
+   rack, the slide, the pump and the cylinder are moving parts driven by code
+   (§11 viewmodel). The arms are the other half, and that is the half being
+   authored here.
 
 ### Emotes
 
@@ -798,8 +832,27 @@ that needs an input surface, replication, and a camera decision.
 - **Lobby and in-match.** Both. The lobby is where they get used most, but the
   in-match risk is what makes them funny.
 
-The emote clip list goes in the same Moon Animator spec as everything else, so
-Titus produces them in one pass rather than two.
+**Emotes are the one place code-authored poses genuinely fall down.** A reload is
+four hand positions and reads fine; a dance is fifty, and a hand-authored dance
+looks exactly as bad as it sounds. So emotes split by kind:
+
+| Kind | Source | Examples |
+|---|---|---|
+| **Poses and gestures** | Authored in code, like every other clip | heart hands, blow a kiss, curtsy, wave, shrug, point, sit down |
+| **Dances and full-body** | Roblox catalog animation assets, loaded by id | anything with rhythm |
+
+The catalog route is not a compromise for dances — those animations are
+professionally made, free, already R15-rigged, and players recognise them, which
+is half of why an emote is fun. The registry (§4.5) does not care where a clip
+came from: an emote is `{ id, source = "catalog" | "authored", assetId | track }`
+and the wheel plays either.
+
+The cutesy-pink identity comes from the **pose** emotes, which is exactly the set
+that is cheap to author. Heart hands and a blown kiss are four poses each and are
+more on-brand for Pink Panic than any dance would be.
+
+If custom dances are wanted later they are a commission, not a blocker — the
+system plays them the day they arrive.
 
 ---
 
