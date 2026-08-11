@@ -9,7 +9,7 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-10-I · review-fixes"
+local CLIENT_BUILD_TAG = "2026-08-10-J · fixed-pad-signs"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false

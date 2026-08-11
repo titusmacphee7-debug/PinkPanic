@@ -22,22 +22,59 @@ local LobbyService = {}
 
 local poppedTargets: { [BasePart]: boolean } = {}
 
-local function sign(text: string, position: Vector3, parent: Instance)
+-- Pad signs are FIXED, not billboards.
+--
+-- A BillboardGui always turns to face the live camera, so every sign swivelled
+-- as the lobby camera panned. These are SurfaceGuis on a part aimed once at
+-- the CameraAnchor: they read straight-on from the lobby shot and never
+-- rotate. The part is pushed toward the anchor so the text floats in FRONT of
+-- the pad instead of sitting on top of it.
+--
+-- Per-pad tuning without touching code (the usual attribute convention):
+--   PadSignForward — studs toward the camera  (default SIGN_FORWARD)
+--   PadSignHeight  — studs above the pad      (default SIGN_HEIGHT)
+local SIGN_FORWARD = 6
+local SIGN_HEIGHT = 7
+local SIGN_SIZE = Vector3.new(13, 2.6, 0.2)
+
+local function sign(text: string, pad: BasePart, lookAt: Vector3?)
+	local forward = pad:GetAttribute("PadSignForward")
+	local height = pad:GetAttribute("PadSignHeight")
+	local push = if type(forward) == "number" then forward else SIGN_FORWARD
+	local rise = if type(height) == "number" then height else SIGN_HEIGHT
+
+	local base = pad.Position + Vector3.new(0, rise, 0)
+	local cframe = CFrame.new(base)
+	if lookAt then
+		-- Flatten the aim to the horizontal plane so signs stay upright rather
+		-- than tipping back toward a camera anchor mounted above them.
+		local flat = Vector3.new(lookAt.X - base.X, 0, lookAt.Z - base.Z)
+		local direction = if flat.Magnitude > 0.1 then flat.Unit else Vector3.zAxis
+		local position = base + direction * push
+		cframe = CFrame.lookAt(position, position + direction)
+	end
+
 	local anchor = Instance.new("Part")
 	anchor.Name = "SignAnchor"
-	anchor.Size = Vector3.new(0.5, 0.5, 0.5)
-	anchor.CFrame = CFrame.new(position)
-	anchor.Color = PINK_WHITE
+	anchor.Size = SIGN_SIZE
+	anchor.CFrame = cframe
 	anchor.Anchored = true
 	anchor.CanCollide = false
 	anchor.CanQuery = false
 	anchor.CanTouch = false
+	anchor.CastShadow = false
 	anchor.Transparency = 1
 
-	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.fromOffset(340, 56)
-	billboard.AlwaysOnTop = false
-	billboard.MaxDistance = 220
+	-- Front is -Z, which is exactly where CFrame.lookAt points, so the text
+	-- faces the anchor. Two-sided would show a mirrored copy from behind.
+	local surface = Instance.new("SurfaceGui")
+	surface.Face = Enum.NormalId.Front
+	surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	surface.PixelsPerStud = 64
+	surface.AlwaysOnTop = false
+	surface.MaxDistance = 220
+	surface.LightInfluence = 0
+
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
@@ -47,10 +84,10 @@ local function sign(text: string, position: Vector3, parent: Instance)
 	label.TextStrokeColor3 = PINK_WHITE
 	label.TextStrokeTransparency = 0.3
 	label.Text = text
-	label.Parent = billboard
-	billboard.Parent = anchor
+	label.Parent = surface
+	surface.Parent = anchor
 
-	anchor.Parent = parent
+	anchor.Parent = pad
 end
 
 -- Round flow: arena spawns live only while a round is Active. Works with the
@@ -237,25 +274,35 @@ function LobbyService.init()
 		warn("[PinkPanic] Deleted leftover generated plaza (PinkPanicLobby).")
 	end
 
+	-- These two must run whether or not a lobby exists. They used to sit below
+	-- the guard, so a missing workspace.Lobby left arena spawns Enabled at boot
+	-- (players spawning straight into the arena outside a round) and left
+	-- LobbyShot with no server listener at all.
+	LobbyService.setArenaActive(false)
+	Remotes.event("LobbyShot").OnServerEvent:Connect(onLobbyShot)
+
 	local lobby = workspace:FindFirstChild("Lobby")
 	if not lobby then
 		warn("[PinkPanic] No workspace.Lobby found — build your town inside a folder named exactly 'Lobby'.")
 		return
 	end
 
+	ensureLobbySpawns(lobby)
+	ensureCameraAnchor(lobby)
+
+	-- Signs are aimed at the CameraAnchor, so they're built AFTER the anchor is
+	-- guaranteed to exist — otherwise the first boot of a fresh lobby would
+	-- place every sign unaimed.
+	local cameraAnchor = lobby:FindFirstChild("CameraAnchor", true)
+	local lookAt = if cameraAnchor and cameraAnchor:IsA("BasePart") then cameraAnchor.Position else nil
 	for _, pad in lobby:GetDescendants() do
 		if pad:IsA("BasePart") and pad:GetAttribute("PadAction") then
 			local name = pad:GetAttribute("PadName")
 			if type(name) == "string" and not pad:FindFirstChild("SignAnchor", true) then
-				sign(name, pad.Position + Vector3.new(0, 7, 0), pad)
+				sign(name, pad, lookAt)
 			end
 		end
 	end
-
-	ensureLobbySpawns(lobby)
-	ensureCameraAnchor(lobby)
-	LobbyService.setArenaActive(false)
-	Remotes.event("LobbyShot").OnServerEvent:Connect(onLobbyShot)
 end
 
 return LobbyService
