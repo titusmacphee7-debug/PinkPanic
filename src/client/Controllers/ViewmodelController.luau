@@ -28,8 +28,8 @@ local CLASS_OFFSET: { [string]: CFrame } = {
 	Sniper = CFrame.new(0.1, -0.05, -0.4),
 }
 local SWAY_LIMIT = 0.06
-local KICK_PER_SHOT = 0.075 -- multiplied by the gun's recoilVert
-local KICK_MAX = 0.3
+local KICK_PER_SHOT = 0.075 -- multiplied by the gun's scaled recoilVert
+local KICK_MAX = 0.14 -- radians (~8°) of viewmodel pitch at full climb
 
 local ViewmodelController = {}
 
@@ -276,7 +276,11 @@ end
 -- Also drives the gun cycle: slide/bolt blowback, pump stroke, cylinder
 -- advance — one notch per shot.
 function ViewmodelController.kick(recoilVert: number?)
-	local strength = math.max(recoilVert or 1, 0.4)
+	-- The caller passes recoilVert ALREADY multiplied by RECOIL_SCALE. The old
+	-- floor here was 0.4, which sat above the scaled value for every gun under
+	-- recoilVert 0.8 — i.e. most of the roster — so the master volume silently
+	-- did nothing to the kick you actually see. The floor now only guards nil.
+	local strength = math.max(recoilVert or 1, 0.05)
 	recoil = math.min(recoil + KICK_PER_SHOT * strength, KICK_MAX)
 	lastCycleAt = os.clock()
 	if movingParts.Cylinder then
