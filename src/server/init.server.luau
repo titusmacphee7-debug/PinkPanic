@@ -8,7 +8,7 @@
 -- connected at Play time, or a duplicate script tree in the place file).
 -- If it prints TWICE, there are two copies of the server running.
 
-local BUILD_TAG = "2026-08-11-G · gun-pivot-and-muzzle"
+local BUILD_TAG = "2026-08-11-H · no-gun-in-lobby"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

@@ -119,15 +119,25 @@ local function cosmeticsFor(player: Player, gunId: string): GunModelLoader.Cosme
 end
 
 -- Welds the current weapon to the character's hand so other players see it.
+--
+-- Nobody holds a weapon in the lobby. The plaza is the social space — shop,
+-- armory, loadout, standing around — and a drawn gun reads as "match in
+-- progress". Every entry into a round respawns the whole roster (RoundService
+-- sets state = "Active" BEFORE respawnAll, and back off it before the RoundEnd
+-- respawn), so CharacterAdded re-runs this at exactly the right moments and no
+-- separate hand-out step is needed.
 local function attachWorldGun(player: Player, character: Model)
 	task.spawn(function()
-		local state = states[player]
-		local gunId = if state then currentGunId(state) else "Pistol_1"
-
 		local existing = character:FindFirstChild("WorldGun")
 		if existing then
 			existing:Destroy()
 		end
+		if RoundService.getState() ~= "Active" then
+			return
+		end
+
+		local state = states[player]
+		local gunId = if state then currentGunId(state) else "Pistol_1"
 
 		local hand = character:WaitForChild("RightHand", 5) or character:FindFirstChild("Right Arm")
 		local root = character:FindFirstChild("HumanoidRootPart")
