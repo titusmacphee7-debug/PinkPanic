@@ -104,9 +104,22 @@ Titus tags hand-built content instead of us generating it:
 
 ## Hard-won gotchas
 
+**Read Studio's console before anything else.** With the Studio MCP connected,
+`get_console_output` is the first call of the session — not a fallback. On
+2026-08-10 a single parse error in `LobbyService` (`(Vector3, Vector3)?`, which
+Luau does not allow) had kept the *entire server dead* since commit `a09307c`:
+no round loop, no combat, no lobby camera, no cursor release, no pads. Every
+"separate bug" reported for days was that one dead server. The console said so
+in one line.
+
+**Reading `BUILD_TAG` out of the source does NOT prove the build is running.**
+`script_grep` finding the current tag only proves Rojo synced the file. If the
+module doesn't compile, the `print` never executes and Output still shows the
+*previous* build. Verify the tag in the **console**, never in the source.
+
 **Check `BUILD_TAG` first, always.** `src/server/init.server.luau` prints a
-build tag at boot. If Titus reports "your fix didn't work," get him to read the
-Output window before touching code — he once spent days testing stale scripts
+build tag at boot. If Titus reports "your fix didn't work," check the Output
+window before touching code — he once spent days testing stale scripts
 because his local branch had drifted from origin (`git pull` said "Already up
 to date" while origin had moved). The fix was:
 
