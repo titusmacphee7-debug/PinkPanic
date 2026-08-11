@@ -12,7 +12,7 @@
 -- over the screen for a moment.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Diagnostics = require(ReplicatedStorage.Shared.Diagnostics)
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 local SYSTEM = "Rarity"
 

@@ -14,14 +14,14 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-11-Q · asset tree: a place for everything"
+local BUILD_TAG = "2026-08-11-R · structure + conventions (NOD-128)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Unguarded on purpose: if Diagnostics itself cannot load there is nothing left
 -- to report the failure with, and a hard error here is the loudest option.
-local Diagnostics = require(ReplicatedStorage.Shared.Diagnostics)
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 -- Declared up front so a system that never runs at all still shows up as NEVER
 -- REPORTED. Absent looks intentional; pending looks like the bug it is.
@@ -30,6 +30,7 @@ Diagnostics.expect(
 	"Guard",
 	"Rarity",
 	"AssetTree",
+	"ContentAudit",
 	"MapService",
 	"LobbyService",
 	"PlayerDataService",
@@ -45,7 +46,8 @@ local Remotes: any = Diagnostics.load("Remotes", ReplicatedStorage.Shared.Net.Re
 local Guard: any = Diagnostics.load("Guard", ReplicatedStorage.Shared.Net.Guard)
 
 local RarityConfig: any = Diagnostics.load("Rarity", ReplicatedStorage.Shared.Config.Rarity)
-local AssetTree: any = Diagnostics.load("AssetTree", ReplicatedStorage.Shared.AssetTree)
+local AssetTree: any = Diagnostics.load("AssetTree", ReplicatedStorage.Shared.Systems.AssetTree)
+local ContentAudit: any = Diagnostics.load("ContentAudit", ReplicatedStorage.Shared.Systems.ContentAudit)
 
 local MapService: any = Diagnostics.load("MapService", script.Services.MapService)
 local LobbyService: any = Diagnostics.load("LobbyService", script.Services.LobbyService)
@@ -69,6 +71,11 @@ end
 -- exists. Creates only; never deletes, never moves.
 if AssetTree then
 	Diagnostics.start("AssetTree", AssetTree.init)
+end
+
+-- After AssetTree, so the folders it looks in are guaranteed to exist.
+if ContentAudit then
+	Diagnostics.start("ContentAudit", ContentAudit.run)
 end
 
 local BOOT_ORDER: { { name: string, module: any } } = {

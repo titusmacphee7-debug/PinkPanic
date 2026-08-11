@@ -23,7 +23,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
-local Diagnostics = require(ReplicatedStorage.Shared.Diagnostics)
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 local SYSTEM = "AssetTree"
 
@@ -42,8 +42,9 @@ local TREE: { Node } = {
 	-- ---------------------------------------------------------------------
 	-- ReplicatedStorage/Assets — content the CLIENT needs to see.
 	--
-	-- Note the deliberate split from ReplicatedStorage/Shared/Assets, which
-	-- holds the loader CODE. Content here, code there.
+	-- Content here; the code that loads it lives in Shared/Loaders. That folder
+	-- used to be called Shared/Assets, which meant ReplicatedStorage had two
+	-- things called Assets meaning opposite halves of the same feature.
 	-- ---------------------------------------------------------------------
 	{ path = "ReplicatedStorage/Assets", note = "Game content the client renders. Code lives in Shared." },
 

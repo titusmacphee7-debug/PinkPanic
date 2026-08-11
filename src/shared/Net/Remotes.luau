@@ -21,7 +21,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local Diagnostics = require(ReplicatedStorage.Shared.Diagnostics)
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 local FOLDER_NAME = "Remotes"
 local SYSTEM = "Remotes"

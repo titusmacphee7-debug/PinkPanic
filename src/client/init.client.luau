@@ -5,11 +5,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local Diagnostics = require(ReplicatedStorage.Shared.Diagnostics)
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-11-Q · asset tree: a place for everything"
+local CLIENT_BUILD_TAG = "2026-08-11-R · structure + conventions (NOD-128)"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false

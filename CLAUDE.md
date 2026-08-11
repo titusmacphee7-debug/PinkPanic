@@ -30,11 +30,54 @@ Titus runs `.\rojo.exe serve` from the project folder in PowerShell.
 - `src/server/Services/*` — one service per concern, each with `init()`, all
   called from `src/server/init.server.luau`. Order matters.
 - `src/client/Controllers/*` — same pattern, client side.
-- `src/shared/Config/*` — data only, no behavior. `GunCatalog.luau` is the
-  single balance file (32 guns); `CombatStats.luau` is the one resolver both
-  sides use so client prediction and server truth can't drift.
+- `src/client/UI/*` — `Theme.luau` holds every colour, font, radius and spacing
+  value. Nothing else calls `Color3.fromRGB` for chrome.
+- `src/shared/Config/*` — **data only, no behavior.** A config file containing
+  an `if` is in the wrong folder. `GunCatalog.luau` is the single balance file;
+  `Rarity.luau` is the one definition of the eight tiers.
+- `src/shared/Systems/*` — deterministic logic both sides run, plus the
+  infrastructure that keeps the project honest: `Diagnostics` (boot manifest),
+  `AssetTree` (Studio folders), `ContentAudit` (config vs content).
+- `src/shared/Loaders/*` — code that pulls content out of the place file.
+  Named `Loaders`, not `Assets`, because `ReplicatedStorage/Assets` is the
+  content itself and two folders called Assets meaning opposite halves of the
+  same feature is exactly the confusion this rebuild is removing.
 - `src/shared/Net/Remotes.luau` — **every** remote is declared here, nowhere
-  else. `Guard.luau` does rate limiting and argument validation.
+  else, each with its direction. `Guard.luau` does rate limiting and argument
+  validation.
+
+### Where content lives in Studio
+
+`AssetTree.luau` declares the tree and **creates it at boot**, so the folder for
+a feature exists before the feature does. Every folder carries a `Purpose`
+attribute — select it in Studio and Properties tells you what belongs in it.
+
+```
+ReplicatedStorage/Assets/    Camos Outfits Charms KillEffects Tracers
+                             Emotes Titles NameTags
+                             Guns Attachments Viewmodel Effects
+                             Audio/{Weapons,Impacts,UI,Music}
+ServerStorage/               Streaks Templates Maps
+```
+
+It **only ever creates** — never deletes, moves or renames. The place file is
+not in git, so anything destroyed there is gone. Misplaced content is reported,
+not relocated. Run `AssetTree.ensure()` in **Edit** mode to persist the folders
+into the saved place; at runtime they are rebuilt each boot and vanish with the
+session.
+
+### The five structural rules
+
+1. **`shared/Config` is data.** A config file containing an `if` is wrong.
+2. **`shared/Systems` owns every shared answer.** Client and server never
+   compute the same number twice — they call the same resolver.
+3. **Dependency direction is Service → Systems → Config.** A Config requires
+   nothing but Config. A cycle is a bug.
+4. **An asset folder name IS its config id.** `ContentAudit` checks both
+   directions at boot: a config id with no asset is an item that is buyable and
+   invisible; an asset with no config id is work the game will never show.
+5. **Every remote is declared by the system that handles it**, never declared
+   without a handler. Both boot assertions enforce this.
 
 ## Rules that aren't negotiable
 

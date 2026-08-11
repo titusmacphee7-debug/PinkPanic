@@ -13,7 +13,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local GunModelLoader = require(ReplicatedStorage.Shared.Assets.GunModelLoader)
+local GunModelLoader = require(ReplicatedStorage.Shared.Loaders.GunModelLoader)
 local Theme = require(script.Parent.Theme)
 
 local GunPreview = {}

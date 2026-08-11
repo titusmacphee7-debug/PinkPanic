@@ -1,7 +1,7 @@
 --!strict
 -- GunModelLoader — turns imported gun meshes into ready combat models.
 -- Finds templates in ReplicatedStorage.GunModels OR
--- ReplicatedStorage.Shared.Assets.GunModels (either location works — the
+-- ReplicatedStorage.Shared.Loaders.GunModels (either location works — the
 -- second is what the handoff said, but it's inside the Rojo-managed tree;
 -- if Rojo ever eats it, drag the folder to ReplicatedStorage root).
 --
@@ -19,7 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local GunSkinCatalog = require(ReplicatedStorage.Shared.Config.GunSkinCatalog)
-local WeaponModels = require(ReplicatedStorage.Shared.Assets.WeaponModels)
+local WeaponModels = require(ReplicatedStorage.Shared.Loaders.WeaponModels)
 
 local GunModelLoader = {}
 
