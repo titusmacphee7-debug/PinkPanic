@@ -214,7 +214,16 @@ function GunPreview.createCharacter(parent: GuiObject): ViewportFrame?
 	local bounds, size = clone:GetBoundingBox()
 	local centre = bounds.Position
 	local distance = math.max(size.Y * 1.5, 6)
-	camera.CFrame = CFrame.lookAt(centre + Vector3.new(0, size.Y * 0.12, distance), centre)
+
+	-- Stand the camera along the character's OWN facing, not world +Z, or you
+	-- get the back of their head whichever way they happened to be turned.
+	local root = clone:FindFirstChild("HumanoidRootPart")
+	local facing = if root and root:IsA("BasePart") then root.CFrame.LookVector else Vector3.zAxis
+	local flat = Vector3.new(facing.X, 0, facing.Z)
+	facing = if flat.Magnitude > 0.05 then flat.Unit else Vector3.zAxis
+
+	camera.CFrame =
+		CFrame.lookAt(centre + facing * distance + Vector3.new(0, size.Y * 0.12, 0), centre)
 
 	return viewport
 end

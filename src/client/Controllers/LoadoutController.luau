@@ -1152,6 +1152,11 @@ function LoadoutController.setOpen(open: boolean)
 	if open then
 		picking = false
 		lastSignature = nil
+		-- Open on a slot that actually holds a gun. Defaulting to Primary
+		-- meant a new player — who owns only the starter pistol — landed on an
+		-- empty stat column reading "No gun equipped".
+		local primary = select(1, ClientData.loadout())
+		activeSlot = if primary then "Primary" else "Secondary"
 		refreshCoins()
 		showScreen("loadout")
 	end
