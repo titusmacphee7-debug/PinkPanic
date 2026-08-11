@@ -12,6 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 local ClientData = require(script.Parent.Parent.ClientData)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local CameraController = require(script.Parent.CameraController)
@@ -21,6 +22,7 @@ local LoadoutController = require(script.Parent.LoadoutController)
 
 
 local SHOT_COOLDOWN = 0.25
+local SYSTEM = "LobbyController"
 
 local LobbyController = {}
 
@@ -57,6 +59,35 @@ local cachedPads: { BasePart } = {}
 local padWatch: Instance? = nil
 local padsScannedAt = -math.huge
 
+-- The manifest prints during init, which is exactly when this client is most
+-- likely to see zero pads for reasons that are not a bug. So the count is
+-- reported once at boot AND corrected out loud the first time pads appear —
+-- otherwise "0 pads" sits in the log as the last word on a lobby that started
+-- working a second later, and the next person to read it debugs a ghost.
+-- Only transitions are reported. The manifest is a boot surface, not a live
+-- readout, and a line reprinted every second stops being read at all.
+local padsReported = false
+local padsHealthy = false
+
+local function reportPads(count: number)
+	if count > 0 then
+		if not padsHealthy then
+			if padsReported and Diagnostics.hasReported() then
+				print(`[PinkPanic] ✅ {SYSTEM}: {count} pad(s) found once the lobby replicated`)
+			end
+			padsHealthy = true
+			padsReported = true
+			Diagnostics.ok(SYSTEM, `{count} pad(s)`)
+		end
+		return
+	end
+
+	if not padsReported then
+		padsReported = true
+		Diagnostics.warn(SYSTEM, "0 pads visible yet — rescanning every second; normal for a moment at join")
+	end
+end
+
 local function customPads(custom: Instance): { BasePart }
 	if padWatch ~= custom then
 		padWatch = custom
@@ -77,6 +108,7 @@ local function customPads(custom: Instance): { BasePart }
 		end
 	end
 	cachedPads = list
+	reportPads(#list)
 	return list
 end
 
@@ -329,6 +361,15 @@ end
 
 function LobbyController.init()
 	buildBanner()
+
+	-- Scan once here rather than waiting for the first Heartbeat, so the count
+	-- lands in the manifest instead of a frame after it.
+	local lobby = workspace:FindFirstChild("Lobby")
+	if lobby then
+		customPads(lobby)
+	else
+		Diagnostics.warn(SYSTEM, "no workspace.Lobby on this client yet — pads and banners are inactive")
+	end
 
 	RunService.Heartbeat:Connect(updateZones)
 

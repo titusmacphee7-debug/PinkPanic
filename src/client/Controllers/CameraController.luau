@@ -11,7 +11,12 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 local ClientData = require(script.Parent.Parent.ClientData)
+
+local SYSTEM = "CameraController"
 
 -- Tuning knobs (all feel-related feedback lands here):
 local FOLLOW_OFFSET = Vector3.new(0, 11, 34) -- low + pulled back: ~15° down-angle
@@ -35,6 +40,40 @@ local function lobbyFolder(): Folder?
 	return workspace:FindFirstChild("PinkPanicLobby") :: Folder?
 end
 
+-- Which camera the lobby gets is decided by whether a tagged part exists, so
+-- the manifest has to say which one is live — otherwise "the lobby camera is
+-- wrong" and "there is no CameraAnchor" look identical from the outside.
+--
+-- Reported on the first frame the anchor resolves rather than at init, because
+-- init reliably loses the race with workspace.Lobby replicating: the honest
+-- answer at boot is "not yet", and a manifest line that says "no CameraAnchor"
+-- about a lobby that has one is worse than no line at all.
+local anchorReported = false
+
+local function reportAnchor(anchor: BasePart?)
+	if anchorReported then
+		return
+	end
+	anchorReported = true
+
+	local detail
+	if anchor then
+		local yaw = anchor:GetAttribute("MaxYawDeg")
+		local pitch = anchor:GetAttribute("MaxPitchDeg")
+		detail = `CameraAnchor found · yaw ±{if type(yaw) == "number" then yaw else 20}° `
+			.. `pitch ±{if type(pitch) == "number" then pitch else 10}°`
+	else
+		detail = "no CameraAnchor — using the follow camera"
+	end
+
+	Diagnostics.ok(SYSTEM, detail)
+	-- The manifest has usually already printed by the time this resolves, so
+	-- the answer has to reach the log on its own or it reaches nobody.
+	if Diagnostics.hasReported() then
+		print(`[PinkPanic] ✅ {SYSTEM}: {detail}`)
+	end
+end
+
 -- Titus's hand-built lobby (workspace.Lobby) supplies a CameraAnchor part:
 -- its position is the camera eye, its facing is the base view, and the
 -- camera PIVOTS in place to follow you — clamped (MaxYawDeg / MaxPitchDeg
@@ -43,7 +82,11 @@ local function cameraAnchor(): BasePart?
 	local lobby = workspace:FindFirstChild("Lobby")
 	-- Recursive: the anchor works nested anywhere inside the lobby build.
 	local anchor = lobby and lobby:FindFirstChild("CameraAnchor", true)
-	return if anchor and anchor:IsA("BasePart") then anchor else nil
+	local resolved = if anchor and anchor:IsA("BasePart") then anchor else nil
+	if resolved then
+		reportAnchor(resolved)
+	end
+	return resolved
 end
 
 local function plazaCenter(): Vector3
@@ -196,6 +239,15 @@ end
 
 function CameraController.init()
 	RunService:BindToRenderStep("PinkPanicCamera", Enum.RenderPriority.Camera.Value + 1, update)
+
+	-- One attempt now so a lobby that has already replicated reports inside the
+	-- manifest; if it hasn't, the render step reports the moment it does. Give
+	-- up after a few seconds and say so, otherwise a genuinely missing anchor
+	-- would sit as PENDING forever.
+	cameraAnchor()
+	task.delay(5, function()
+		reportAnchor(cameraAnchor())
+	end)
 end
 
 return CameraController

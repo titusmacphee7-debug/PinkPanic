@@ -11,9 +11,21 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Guard = require(ReplicatedStorage.Shared.Net.Guard)
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
+local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
+
+local SYSTEM = "LobbyService"
 
 local LEGACY_LOBBY_NAME = "PinkPanicLobby" -- retired generated plaza
 local ARENA_NAMES = { "PinkPanicMap", "Arena" }
+
+-- The pad actions LobbyController actually dispatches on. Anything else is a
+-- pad that looks tagged and does nothing — usually a capitalisation slip.
+local KNOWN_PAD_ACTIONS: { [string]: boolean } = {
+	shop = true,
+	loadout = true,
+	portal = true,
+}
 
 -- Mirrors Theme.color primary / primaryDeep / surfaceRaised. Theme lives in
 -- src/client and the server can't require it, so these are kept in step by
@@ -238,16 +250,16 @@ end
 
 -- Safety net: a lobby with no spawn pads drops players at the world origin.
 -- Plants a small ring of pads in the middle of the town instead.
-local function ensureLobbySpawns(lobby: Instance)
+local function ensureLobbySpawns(lobby: Instance): boolean
 	for _, child in lobby:GetDescendants() do
 		if child:IsA("SpawnLocation") then
-			return
+			return false
 		end
 	end
 	local bounds = { lobbyBounds(lobby) }
 	local min, max = bounds[1], bounds[2]
 	if not min or not max then
-		return
+		return false
 	end
 	local center = (min + max) / 2
 	local radius = math.clamp(math.min(max.X - min.X, max.Z - min.Z) * 0.18, 4, 16)
@@ -270,19 +282,20 @@ local function ensureLobbySpawns(lobby: Instance)
 		pad.Parent = lobby
 	end
 	warn("[PinkPanic] Lobby had no spawn pads — planted 6 in the middle. Drag them where you want players to appear.")
+	return true
 end
 
 -- The fixed lobby camera: if no CameraAnchor exists, place one back from the
 -- town at a flattering height, aimed at its center. Titus drags it to taste;
 -- MaxYawDeg / MaxPitchDeg attributes clamp how far it pivots.
-local function ensureCameraAnchor(lobby: Instance)
+local function ensureCameraAnchor(lobby: Instance): boolean
 	if lobby:FindFirstChild("CameraAnchor", true) then
-		return
+		return false
 	end
 	local bounds = { lobbyBounds(lobby) }
 	local min, max = bounds[1], bounds[2]
 	if not min or not max then
-		return
+		return false
 	end
 	local center = (min + max) / 2
 	local span = max - min
@@ -304,6 +317,152 @@ local function ensureCameraAnchor(lobby: Instance)
 	anchor:SetAttribute("MaxPitchDeg", 10)
 	anchor.Parent = lobby
 	warn("[PinkPanic] Lobby had no CameraAnchor — placed one facing the town. Drag/rotate it to frame your shot.")
+	return true
+end
+
+-- ---------------------------------------------------------------------------
+-- Census (NOD-162)
+-- ---------------------------------------------------------------------------
+--
+-- Everything in the lobby is content Titus tags by hand, which means the whole
+-- feature can be switched off by a typo nothing complains about. A part with
+-- `PadAction = "Shop"` looks tagged in the Explorer, reads as tagged to a
+-- human, and dispatches to nothing — the pad is simply inert forever.
+--
+-- So the manifest reports what the lobby actually CONTAINS, not merely that
+-- the service started. "LobbyService OK" with no numbers behind it was true on
+-- an empty Workspace, which is the same class of lie the boot manifest was
+-- built to end.
+
+export type Census = {
+	pads: number,
+	padActions: { [string]: number },
+	badActions: { string },
+	unnamedPads: number,
+	spawns: number,
+	targets: number,
+	displays: number,
+	badDisplays: { string },
+	mats: number,
+	anchor: boolean,
+}
+
+function LobbyService.census(lobby: Instance): Census
+	local census: Census = {
+		pads = 0,
+		padActions = {},
+		badActions = {},
+		unnamedPads = 0,
+		spawns = 0,
+		targets = 0,
+		displays = 0,
+		badDisplays = {},
+		mats = 0,
+		anchor = lobby:FindFirstChild("CameraAnchor", true) ~= nil,
+	}
+
+	for _, child in lobby:GetDescendants() do
+		if child:IsA("SpawnLocation") then
+			census.spawns += 1
+		end
+		if not child:IsA("BasePart") then
+			continue
+		end
+
+		local action = child:GetAttribute("PadAction")
+		if type(action) == "string" then
+			census.pads += 1
+			census.padActions[action] = (census.padActions[action] or 0) + 1
+			if not KNOWN_PAD_ACTIONS[action] then
+				table.insert(census.badActions, `{child.Name} has PadAction "{action}"`)
+			end
+			if type(child:GetAttribute("PadName")) ~= "string" then
+				census.unnamedPads += 1
+			end
+		end
+
+		if child:GetAttribute("LobbyTarget") then
+			census.targets += 1
+		end
+	end
+
+	-- Armory tags are counted across the whole Workspace, not just the lobby,
+	-- because that is where ArmoryController looks for them. Counting a smaller
+	-- set here would report displays as missing that the client can see, which
+	-- is worse than not counting them.
+	for _, part in workspace:GetDescendants() do
+		if not part:IsA("BasePart") then
+			continue
+		end
+		local gunId = part:GetAttribute("GunDisplay")
+		if type(gunId) == "string" then
+			census.displays += 1
+			-- ArmoryController skips these silently, so a renamed gun leaves an
+			-- empty case that looks like a load failure. Name it here instead.
+			if not GunCatalog.get(gunId) then
+				table.insert(census.badDisplays, `{part.Name} → "{gunId}"`)
+			end
+		end
+		if part:GetAttribute("ArmoryMat") then
+			census.mats += 1
+		end
+	end
+
+	return census
+end
+
+-- Turns the census into one manifest line, and decides whether that line is an
+-- OK or a WARN. A lobby with no pads is not an error — it is a lobby being
+-- built — but it must never read as healthy.
+local function reportCensus(census: Census, planted: boolean, placedAnchor: boolean)
+	local actions: { string } = {}
+	for action, count in census.padActions do
+		table.insert(actions, `{action} {count}`)
+	end
+	table.sort(actions)
+	local padDetail = if #actions > 0 then ` ({table.concat(actions, ", ")})` else ""
+
+	local summary = `{census.pads} pad(s){padDetail} · {census.spawns} spawn(s) · `
+		.. `{census.displays} display(s) · {census.mats} mat(s) · {census.targets} target(s) · `
+		.. `anchor {if census.anchor then "✓" else "✗"}`
+
+	local problems: { string } = {}
+	if census.pads == 0 then
+		table.insert(problems, "no pads tagged — add a PadAction attribute to a part under workspace.Lobby")
+	end
+	if #census.badActions > 0 then
+		table.insert(
+			problems,
+			`unknown PadAction (expected shop/loadout/portal, lowercase): {table.concat(census.badActions, ", ")}`
+		)
+	end
+	if census.unnamedPads > 0 then
+		table.insert(problems, `{census.unnamedPads} pad(s) with no PadName — they get no sign and no banner`)
+	end
+	if #census.badDisplays > 0 then
+		table.insert(problems, `GunDisplay names no such gun: {table.concat(census.badDisplays, ", ")}`)
+	end
+	if census.displays > 0 and census.mats == 0 then
+		table.insert(problems, "displays but no ArmoryMat — there is nowhere to inspect a gun")
+	end
+	if planted then
+		table.insert(problems, "no spawn pads existed; 6 were planted in the middle")
+	end
+	if placedAnchor then
+		table.insert(problems, "no CameraAnchor existed; one was placed facing the town")
+	elseif not census.anchor then
+		-- ensureCameraAnchor gives up silently when the lobby has no parts to
+		-- measure, which is the one path that leaves the fixed lobby camera off
+		-- with nothing saying so.
+		table.insert(problems, "no CameraAnchor and none could be placed — the lobby camera is off")
+	end
+
+	if #problems > 0 then
+		Diagnostics.warn(SYSTEM, `{summary} — {table.concat(problems, "; ")}`)
+		return
+	end
+
+	Diagnostics.ok(SYSTEM, summary)
 end
 
 function LobbyService.init()
@@ -324,12 +483,15 @@ function LobbyService.init()
 
 	local lobby = workspace:FindFirstChild("Lobby")
 	if not lobby then
-		warn("[PinkPanic] No workspace.Lobby found — build your town inside a folder named exactly 'Lobby'.")
+		-- WARN, not DEAD: the service itself is fine and LobbyShot is handled.
+		-- What is missing is content, and saying so in the manifest is the point
+		-- — this used to be a bare warn() above an "OK LobbyService" line.
+		Diagnostics.warn(SYSTEM, "no workspace.Lobby — build your town inside a folder named exactly 'Lobby'")
 		return
 	end
 
-	ensureLobbySpawns(lobby)
-	ensureCameraAnchor(lobby)
+	local planted = ensureLobbySpawns(lobby)
+	local placedAnchor = ensureCameraAnchor(lobby)
 
 	-- Signs are aimed at the CameraAnchor, so they're built AFTER the anchor is
 	-- guaranteed to exist — otherwise the first boot of a fresh lobby would
@@ -344,6 +506,10 @@ function LobbyService.init()
 			end
 		end
 	end
+
+	-- Last, so the counts include the spawns and anchor that may have just been
+	-- planted rather than reporting the lobby as it was a moment ago.
+	reportCensus(LobbyService.census(lobby), planted, placedAnchor)
 end
 
 return LobbyService

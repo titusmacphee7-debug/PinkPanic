@@ -322,16 +322,22 @@ what paints it (§4.5):
 
 | Region | Painted by |
 |---|---|
-| `Body` | camo |
-| `Panel` | camo |
-| `Grip` | skin colour |
-| `Hardware` | skin colour |
-| `Accent` | skin colour |
+| `Body` | camo texture |
+| `Panel` | camo texture |
+| `Grip` | camo palette, else skin colour |
+| `Hardware` | camo palette, else skin colour |
+| `Accent` | camo palette, else skin colour |
 
 A camo covers the receiver and handguard, not the whole weapon — the contrast is
 what makes it read as applied rather than dipped. Override per part with a
 `TakesCamo` attribute when a specific gun wants a painted stock or a bare
 receiver.
+
+**Every region is always painted by something.** The regions a camo does not
+texture are coloured by the camo's own palette, and failing that by the equipped
+skin (§4.5). A modeller must therefore never merge regions to save a part: two
+regions fused into one mean a grip that gets textured with the receiver, which
+is the one way to end up with an uncoloured, un-pink weapon.
 
 **THE SHARED UV LAYOUT**
 
@@ -479,17 +485,63 @@ a correctly-named model needs no attributes at all.
 Attachments never take camo. They are their own parts with their own finish,
 which is what keeps a built gun looking assembled rather than dipped.
 
+### The uncovered regions are never grey — a camo carries its own palette
+
+Titus's correction, and it is the thing that makes partial coverage work at all
+in a game that is supposed to be pink and cutesy: *"the guns aren't gonna be
+grey and metal."*
+
+Partial coverage on its own would leave the grip, hardware and accents wearing
+whatever they wore before — which on a fresh gun means whatever the modeller
+left them as. Half a candy-striped receiver bolted to a bare metal grip is not a
+cute weapon, it is an unfinished one.
+
+So **a camo is not just a texture. It is a texture plus a palette.**
+
+| Field | Applies to | Required |
+|---|---|---|
+| `texture` | `Body`, `Panel` | ✅ |
+| `accent` | `Accent` | ✅ |
+| `grip` | `Grip` | derived from `accent` if absent |
+| `hardware` | `Hardware` | derived from `accent` if absent |
+
+One authored colour is enough. `grip` and `hardware` are derived from `accent`
+by shifting value and saturation in HSV — staying in the same hue family, so a
+strawberry camo gets a deeper strawberry grip and never a grey one. Derivation
+in HSV rather than by RGB multiply matters: multiplying toward black
+desaturates, which is precisely how a pink gun turns into a grey one.
+
+The two override fields exist because derivation is a good default and a bad
+mandate. A camo whose look depends on a contrasting grip says so.
+
+**A camo with no palette at all keeps the equipped skin's colours.** That is the
+opt-out, and it is also the safety net: skins are already authored pink across
+the whole roster, so the fallback for a camo Titus never coloured is not grey —
+it is the gun's existing candy palette. There is no path to a metal-looking gun.
+
+The consequence for the shop: a camo previews as a **complete gun**, not a
+patch, and camos read as coordinated looks rather than decals. It also means a
+universal camo can ship one texture plus one colour and land correctly on the
+whole roster.
+
 ### Applying it
 
-One texture ID written to the camo regions only:
+Texture on the camo regions, palette on the rest:
 
 ```lua
 for _, part in gun:GetDescendants() do
-    if part:IsA("MeshPart") and takesCamo(part) then
-        part.TextureID = camo.textureId
+    if not part:IsA("BasePart") then continue end
+    if takesCamo(part) then
+        part.TextureID = camo.texture
+    else
+        part.Color = camo.paletteFor(regionOf(part)) or skin.colorFor(regionOf(part))
     end
 end
 ```
+
+Two rules hide in that `or`: a camo without a palette falls through to the skin,
+and a region the palette does not name falls through to the skin too. Neither
+case can produce an unpainted part.
 
 That is the entire application logic, and it is the same code for both scopes —
 a universal camo relies on the shared UV layout (§3.4) to land correctly on any

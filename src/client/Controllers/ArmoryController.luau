@@ -20,8 +20,11 @@ local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local GunSkinCatalog = require(ReplicatedStorage.Shared.Config.GunSkinCatalog)
 local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
 local GunModelLoader = require(ReplicatedStorage.Shared.Loaders.GunModelLoader)
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 local ClientData = require(script.Parent.Parent.ClientData)
 local Theme = require(script.Parent.Parent.UI.Theme)
+
+local SYSTEM = "ArmoryController"
 
 local ArmoryController = {}
 
@@ -111,7 +114,11 @@ local function clearDisplays()
 	displays = {}
 end
 
-local function renderDisplays()
+-- Returns built and skipped counts so init can report what the client can
+-- actually see. The server counts the same tags, but the two can legitimately
+-- differ: a display that has not replicated to this client yet is invisible
+-- here and present there, and that gap is worth being able to read.
+local function renderDisplays(): (number, number)
 	clearDisplays()
 	local folder = displayFolder
 	if not folder then
@@ -121,12 +128,15 @@ local function renderDisplays()
 		displayFolder = folder
 	end
 
+	local built, skipped = 0, 0
 	for _, part in workspace:GetDescendants() do
 		if part:IsA("BasePart") and typeof(part:GetAttribute("GunDisplay")) == "string" then
 			local gunId = part:GetAttribute("GunDisplay") :: string
 			if not GunCatalog.get(gunId) then
+				skipped += 1
 				continue
 			end
+			built += 1
 			local model = GunModelLoader.build(gunId, nil)
 			for _, piece in model:GetDescendants() do
 				if piece:IsA("BasePart") then
@@ -141,6 +151,7 @@ local function renderDisplays()
 			displays[model] = { gunId = gunId, slot = part, model = model }
 		end
 	end
+	return built, skipped
 end
 
 local function recordFromInstance(instance: Instance): DisplayRecord?
@@ -705,7 +716,27 @@ end
 
 function ArmoryController.init()
 	buildUi()
-	renderDisplays()
+	local built, skipped = renderDisplays()
+
+	-- The armory is entirely attribute-driven, so "0 displays" is the normal
+	-- shape of every failure in it: a mistyped attribute, an interior that has
+	-- not streamed in, a renamed gun. Reporting the count turns all three from
+	-- an empty room into a line in the manifest.
+	local mats = 0
+	for _, part in workspace:GetDescendants() do
+		if part:IsA("BasePart") and part:GetAttribute("ArmoryMat") then
+			mats += 1
+		end
+	end
+
+	local detail = `{built} display(s), {mats} mat(s)`
+	if skipped > 0 then
+		Diagnostics.warn(SYSTEM, `{detail} — {skipped} GunDisplay tag(s) name a gun that is not in the catalog`)
+	elseif built > 0 and mats == 0 then
+		Diagnostics.warn(SYSTEM, `{detail} — no ArmoryMat, so guns cannot be taken out and inspected`)
+	else
+		Diagnostics.ok(SYSTEM, detail)
+	end
 
 	ClientData.roundStateChanged:Connect(function()
 		if ClientData.inLobby() then
