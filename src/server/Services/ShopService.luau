@@ -4,29 +4,23 @@
 -- update, so there is no window for double-buys or free equips. Free items
 -- (price 0) are equippable without purchase.
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Guard = require(ReplicatedStorage.Shared.Net.Guard)
 local CatalogConfig = require(ReplicatedStorage.Shared.Config.CatalogConfig)
-local WeaponCosmetics = require(ReplicatedStorage.Shared.Assets.WeaponCosmetics)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local EconomyService = require(script.Parent.EconomyService)
 
 local ShopService = {}
 
--- Re-dresses the player's world gun to match their equipped cosmetics.
-local function applyToCharacter(player: Player)
-	local data = PlayerDataService.get(player)
-	local character = player.Character
-	local gun = character and character:FindFirstChild("WorldGun")
-	if not data or not gun or not gun:IsA("Model") then
-		return
-	end
-	WeaponCosmetics.applySkin(gun, data.equipped.skins.Pistol)
-	WeaponCosmetics.applyCharm(gun, data.equipped.charms.Pistol)
-end
+-- NOTE: this service no longer touches the world gun. It used to re-dress it
+-- 1s after every spawn from `equipped.skins.Pistol`, a pre-roster field that
+-- is nil for every current profile — and WeaponCosmetics.applySkin falls back
+-- to SkinDefault rather than returning, so it repainted the roster gun's Grip
+-- and Slide with legacy pistol colours over whatever skin the player actually
+-- equipped. Gun cosmetics belong to GunShopService -> GunModelLoader now.
+-- The whole service is slated for deletion in NOD-119.
 
 local function onPurchase(player: Player, itemId: any): { [string]: any }
 	if not Guard.checkRate(player, "PurchaseItem", 5, 2) then
@@ -105,22 +99,12 @@ local function onEquip(player: Player, kind: any, itemId: any): { [string]: any 
 	end
 
 	EconomyService.push(player)
-	applyToCharacter(player)
 	return { ok = true }
 end
 
 function ShopService.init()
 	Remotes.func("PurchaseItem").OnServerInvoke = onPurchase
 	Remotes.func("EquipItem").OnServerInvoke = onEquip
-
-	-- Dress spawns in their equipped cosmetics (world gun attaches async).
-	Players.PlayerAdded:Connect(function(player)
-		player.CharacterAdded:Connect(function()
-			task.delay(1, function()
-				applyToCharacter(player)
-			end)
-		end)
-	end)
 end
 
 return ShopService

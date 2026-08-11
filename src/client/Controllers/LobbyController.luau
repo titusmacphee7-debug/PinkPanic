@@ -11,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local ClientData = require(script.Parent.Parent.ClientData)
 local CameraController = require(script.Parent.CameraController)
 local EffectsController = require(script.Parent.EffectsController)
@@ -39,33 +40,36 @@ end
 
 -- Titus's hand-built lobby: pads are attribute-tagged parts (PadAction /
 -- PadName / optional PadRadius) anywhere under workspace.Lobby.
--- The scan is cached, but an *empty* result never is: the client's first
--- Heartbeat can easily beat workspace.Lobby replicating, and caching {} there
--- would kill every pad for the rest of the session. We also drop the cache
--- when the lobby's contents change, so pads added after boot still register.
-local cachedPads: { BasePart }? = nil
+-- This scan walks the whole hand-built town, and updateZones runs it every
+-- Heartbeat, so it has to be cached — but it can't be cached forever:
+--
+--   · the client's first Heartbeat can beat workspace.Lobby replicating, so
+--     an empty first result must not stick (that killed pads for whole
+--     sessions), and
+--   · Titus tags pads by adding a PadAction *attribute* to a part that
+--     already exists, which fires no DescendantAdded — so signal-based
+--     invalidation misses exactly the workflow CLAUDE.md documents.
+--
+-- A time-boxed rescan covers both without a per-frame walk: newly tagged pads
+-- appear within a second, and the cost is bounded no matter how big the town
+-- gets or how few pads are tagged.
+local RESCAN_INTERVAL = 1
+local cachedPads: { BasePart } = {}
 local padWatch: Instance? = nil
-local padWatchConns: { RBXScriptConnection } = {}
+local padsScannedAt = -math.huge
 
 local function customPads(custom: Instance): { BasePart }
 	if padWatch ~= custom then
-		for _, conn in padWatchConns do
-			conn:Disconnect()
-		end
-		table.clear(padWatchConns)
 		padWatch = custom
-		cachedPads = nil
-		local invalidate = function()
-			cachedPads = nil
-		end
-		table.insert(padWatchConns, custom.DescendantAdded:Connect(invalidate))
-		table.insert(padWatchConns, custom.DescendantRemoving:Connect(invalidate))
+		cachedPads = {}
+		padsScannedAt = -math.huge
 	end
 
-	local cached = cachedPads
-	if cached then
-		return cached
+	local now = os.clock()
+	if now - padsScannedAt < RESCAN_INTERVAL then
+		return cachedPads
 	end
+	padsScannedAt = now
 
 	local list: { BasePart } = {}
 	for _, descendant in custom:GetDescendants() do
@@ -73,10 +77,7 @@ local function customPads(custom: Instance): { BasePart }
 			table.insert(list, descendant)
 		end
 	end
-	-- An empty list means "lobby not replicated yet" — rescan next frame.
-	if #list > 0 then
-		cachedPads = list
-	end
+	cachedPads = list
 	return list
 end
 
@@ -124,6 +125,15 @@ local function buildBanner()
 	stroke.Transparency = 0.25
 	stroke.Parent = button
 	button.Activated:Connect(function()
+		-- RoundService drops the press unless there are enough players, and
+		-- EnterPortal is a fire-and-forget Event with no reply — so claiming
+		-- "Starting the round" unconditionally means the UI confirms a start
+		-- that will never happen, and the only symptom is "nothing happened".
+		-- Check the same condition the server checks.
+		if #Players:GetPlayers() < GameConfig.minPlayers then
+			showBanner(`Need {GameConfig.minPlayers} players to start 💗`)
+			return
+		end
 		Remotes.event("EnterPortal"):FireServer()
 		showBanner("Starting the round... 💗")
 	end)
@@ -142,9 +152,14 @@ local function updateStartButton()
 	button.Visible = ClientData.inLobby()
 		and not ClientData.menuOpen()
 		and not ClientData.armoryBusy
-	button.Text = if ClientData.roundState == "Intermission"
-		then "STARTING... 💗"
-		else "START GAME 💗"
+	-- Say up front when the round can't start, rather than after a dead press.
+	if ClientData.roundState == "Intermission" then
+		button.Text = "STARTING... 💗"
+	elseif #Players:GetPlayers() < GameConfig.minPlayers then
+		button.Text = `NEED {GameConfig.minPlayers} PLAYERS 💗`
+	else
+		button.Text = "START GAME 💗"
+	end
 end
 
 function showBanner(text: string)

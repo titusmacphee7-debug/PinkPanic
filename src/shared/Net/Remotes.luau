@@ -82,8 +82,24 @@ local function getRemote(name: string): Instance
 		return assert(folder:FindFirstChild(name), `Remote "{name}" missing — was init called?`)
 	end
 
-	local folder = ReplicatedStorage:WaitForChild(FOLDER_NAME)
-	return folder:WaitForChild(name)
+	-- These used to be untimed. If the server errored before Remotes.init()
+	-- ran, the client parked here forever, printed nothing at all, and looked
+	-- "fine, just idle" — the same silent death that hid a server parse error
+	-- for days. Warn loudly, then keep waiting so a late server still works.
+	local folder = ReplicatedStorage:WaitForChild(FOLDER_NAME, 10)
+	if not folder then
+		warn(
+			`[PinkPanic] ⚠️ ReplicatedStorage.{FOLDER_NAME} never appeared after 10s — `
+				.. `the SERVER failed to boot. Scroll up in Output for the server error.`
+		)
+		folder = ReplicatedStorage:WaitForChild(FOLDER_NAME)
+	end
+	local remote = (folder :: Instance):WaitForChild(name, 10)
+	if not remote then
+		warn(`[PinkPanic] ⚠️ Remote "{name}" never appeared — is it declared in Remotes.Definitions?`)
+		remote = (folder :: Instance):WaitForChild(name)
+	end
+	return remote :: Instance
 end
 
 function Remotes.event(name: string): RemoteEvent

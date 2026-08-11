@@ -92,12 +92,29 @@ local Migrations: { [number]: (any) -> () } = {}
 -- v1 -> v2: the gun roster era (docs/GUNS_HANDOFF.md §4.2). Everyone gets
 -- the free starter and empty collections; the legacy four-weapon fields
 -- remain untouched until Phase C retires them.
+--
+-- BACKFILL ONLY — never assign unconditionally here. A genuine v1 profile has
+-- none of these fields, so `or` is free; but a v2 profile that arrives with a
+-- missing or non-numeric `version` is treated as v1 (see migrate below), and
+-- a bare assignment would silently destroy every gun, skin, camo and loadout
+-- the player owns while leaving coins and XP intact. It would then autosave
+-- 60s later and the loss would be permanent.
 Migrations[1] = function(data)
-	data.ownedGuns = { "Pistol_1" }
-	data.ownedGunSkins = {}
-	data.ownedCamos = {}
-	data.loadout = { primary = nil, secondary = "Pistol_1" }
-	data.gunCosmetics = {}
+	if type(data.ownedGuns) ~= "table" then
+		data.ownedGuns = { "Pistol_1" }
+	end
+	if type(data.ownedGunSkins) ~= "table" then
+		data.ownedGunSkins = {}
+	end
+	if type(data.ownedCamos) ~= "table" then
+		data.ownedCamos = {}
+	end
+	if type(data.loadout) ~= "table" then
+		data.loadout = { primary = nil, secondary = "Pistol_1" }
+	end
+	if type(data.gunCosmetics) ~= "table" then
+		data.gunCosmetics = {}
+	end
 end
 
 -- Fills in any missing keys from the default profile (new fields added in the
@@ -135,6 +152,23 @@ function PlayerDataSchema.migrate(data: any): PlayerData
 		version += 1
 	end
 	data.version = PlayerDataSchema.VERSION
+
+	-- reconcile() only fills keys that are nil, so a field present with the
+	-- WRONG type survives untouched. The server indexes these without guards
+	-- (WeaponService.resolveLoadout, every table.find in GunShopService), so a
+	-- corrupt scalar here throws on the player's first spawn, every spawn.
+	-- Coerce the shapes the rest of the codebase is entitled to assume.
+	for _, key in { "ownedGuns", "ownedGunSkins", "ownedCamos", "ownedSkins", "ownedCharms" } do
+		if type(data[key]) ~= "table" then
+			data[key] = {}
+		end
+	end
+	if type(data.loadout) ~= "table" then
+		data.loadout = { primary = nil, secondary = "Pistol_1" }
+	end
+	if type(data.gunCosmetics) ~= "table" then
+		data.gunCosmetics = {}
+	end
 
 	reconcile(data, PlayerDataSchema.default())
 	return data :: PlayerData

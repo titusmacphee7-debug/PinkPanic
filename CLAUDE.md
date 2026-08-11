@@ -139,10 +139,16 @@ legacy folders are destroyed unconditionally at boot. Do not reintroduce it.
 **Locked ≠ anchored.** Imported parts that are Locked but not Anchored will
 explode the moment you press Play.
 
-**Studio solo holds in the lobby.** With one player in Studio the round waits
-in `Waiting` until the START GAME button (or a portal pad) fires `EnterPortal`.
-Two or more players, or the published game, run the normal timer. This exists
-so the lobby — fixed camera, free cursor, pads, armory — is testable alone.
+**Rounds never auto-start, and never start solo.** Titus asked for this
+explicitly on 2026-08-10. `RoundService` holds in `Waiting` until *both*
+`#Players >= GameConfig.minPlayers` (2) **and** the START GAME button fires
+`EnterPortal`. There is no timer, no pad path, and no Studio exception —
+walking somewhere can never drop you into a match.
+
+The consequence: **a solo Studio session can't start a round**, so combat,
+respawn, scoring and payouts are only testable with `Test → Players → 2
+Players`. The lobby itself (camera, cursor, pads, armory, loadout) is still
+fully testable alone.
 
 ## Git
 

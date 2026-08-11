@@ -46,12 +46,15 @@ Theme.color = {
 }
 
 -- Rarity drives border colour on gun cards and the rarity line.
+-- Annotated with a string indexer: without it, indexing this sealed literal
+-- with a `string` variable is a --!strict analysis error, and standing red
+-- squiggles are how the next real type bug gets missed.
 Theme.rarity = {
 	Common = Color3.fromRGB(168, 150, 162),
 	Rare = Color3.fromRGB(96, 168, 236),
 	Epic = Color3.fromRGB(186, 108, 240),
 	Legendary = Color3.fromRGB(240, 172, 60),
-}
+} :: { [string]: Color3 }
 
 function Theme.rarityColor(name: string?): Color3
 	return (name and Theme.rarity[name]) or Theme.color.textMuted

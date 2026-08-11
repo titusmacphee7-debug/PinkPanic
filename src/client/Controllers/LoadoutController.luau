@@ -45,7 +45,8 @@ local slotButtons: { [string]: TextButton } = {}
 local activeSlot = "Primary"
 local selectedGun: string? = nil
 local busy = false
-local spinners: { { model: Model, pivot: CFrame } } = {}
+local spinners: { { model: Model, centre: Vector3, basePivot: CFrame } } = {}
+local lastSignature: string? = nil
 
 local function showStatus(text: string, isError: boolean)
 	local label = statusLabel
@@ -116,14 +117,21 @@ local function buildPreview(card: GuiObject, gunId: string, owned: boolean)
 	viewport.CurrentCamera = camera
 	model.Parent = viewport
 
-	local pivot, size = model:GetBoundingBox()
+	local bounds, size = model:GetBoundingBox()
+	local centre = bounds.Position
 	local distance = math.max(math.max(size.X, size.Y, size.Z) * 1.7, 2)
 	camera.CFrame = CFrame.lookAt(
-		pivot.Position + Vector3.new(distance * 0.62, distance * 0.3, distance * 0.62),
-		pivot.Position
+		centre + Vector3.new(distance * 0.62, distance * 0.3, distance * 0.62),
+		centre
 	)
 
-	table.insert(spinners, { model = model, pivot = pivot })
+	-- Spin about the BOUNDING-BOX centre while preserving the model's own
+	-- pivot. PivotTo positions the PrimaryPart (GunModelLoader picks the part
+	-- named "Body"), which is a different point from the bbox centre — so
+	-- handing the bbox CFrame straight to PivotTo shifts the gun by
+	-- (bboxCentre - bodyCentre) on its very first frame. On a rifle that is a
+	-- large fraction of its length, enough to leave a 78px viewport empty.
+	table.insert(spinners, { model = model, centre = centre, basePivot = model:GetPivot() })
 end
 
 -- ---------------------------------------------------------------------------
@@ -212,12 +220,15 @@ local function addGunCard(gunId: string, def: any, order: number)
 	end
 
 	card.Activated:Connect(function()
-		selectedGun = gunId
 		if not owned then
+			-- Deliberately does NOT set selectedGun: pointing the camo strip at
+			-- a gun the player doesn't own makes every camo tap round-trip to a
+			-- guaranteed "You don't own that gun" from the server, about a gun
+			-- they never meant to target.
 			showStatus(`{def.name} costs {def.price} coins — buy it in the Armory 💗`, true)
-			LoadoutController.refresh()
 			return
 		end
+		selectedGun = gunId
 		equipGun(gunId)
 	end)
 end
@@ -277,6 +288,34 @@ end
 -- Rebuild
 -- ---------------------------------------------------------------------------
 
+-- Everything the panel actually draws, as one cheap comparable string. Coins
+-- and XP deliberately do NOT appear here: they arrive on the same DataChanged
+-- event, change constantly, and change nothing on this screen.
+function LoadoutController.signature(): string
+	local snap = ClientData.snapshot
+	local owned = if type(snap) == "table" and type(snap.ownedGuns) == "table"
+		then table.concat(snap.ownedGuns :: { string }, ",")
+		else ""
+	local camos = if type(snap) == "table" and type(snap.ownedCamos) == "table"
+		then table.concat(snap.ownedCamos :: { string }, ",")
+		else ""
+	local primary, secondary = ClientData.loadout()
+	local skinId: string?, camoId: string? = nil, nil
+	if selectedGun then
+		skinId, camoId = ClientData.gunCosmeticsFor(selectedGun)
+	end
+	return table.concat({
+		activeSlot,
+		tostring(selectedGun),
+		tostring(primary),
+		secondary,
+		tostring(skinId),
+		tostring(camoId),
+		owned,
+		camos,
+	}, "|")
+end
+
 function LoadoutController.refresh()
 	local container = grid
 	local row = camoRow
@@ -327,13 +366,36 @@ function LoadoutController.refresh()
 	end
 
 	if selectedGun then
-		addCamoChip(nil, nil, 0)
-		local order = 1
-		for camoId, def in GunSkinCatalog.universal do
-			addCamoChip(camoId, def, order)
-			order += 1
+		-- A camo whose PNG was never uploaded has textureId "" and the server
+		-- refuses to sell it, so listing it produces chips that can only fail.
+		-- Today that is all ten of them. Show the real ones; if there are none
+		-- yet, say so once instead of rendering a row of dead buttons.
+		local available = 0
+		for _, def in GunSkinCatalog.universal do
+			if def.textureId ~= "" then
+				available += 1
+			end
 		end
-		row.CanvasSize = UDim2.fromOffset(order * 120 + Theme.space.md, 0)
+
+		if available == 0 then
+			Components.text(row, {
+				text = "Camos coming soon 💗",
+				size = Theme.text.label,
+				color = Theme.color.textMuted,
+				area = UDim2.fromOffset(220, 46),
+			})
+			row.CanvasSize = UDim2.fromOffset(0, 0)
+		else
+			addCamoChip(nil, nil, 0)
+			local order = 1
+			for camoId, def in GunSkinCatalog.universal do
+				if def.textureId ~= "" then
+					addCamoChip(camoId, def, order)
+					order += 1
+				end
+			end
+			row.CanvasSize = UDim2.fromOffset(order * 120 + Theme.space.md, 0)
+		end
 	end
 
 	for slot, button in slotButtons do
@@ -341,6 +403,8 @@ function LoadoutController.refresh()
 		button.BackgroundColor3 = if selected then Theme.color.primary else Theme.color.surfaceRaised
 		button.TextColor3 = if selected then Theme.color.textOnPrimary else Theme.color.text
 	end
+
+	lastSignature = LoadoutController.signature()
 end
 
 function LoadoutController.setOpen(open: boolean)
@@ -353,8 +417,14 @@ function LoadoutController.setOpen(open: boolean)
 	blocker.Visible = open
 	ClientData.loadoutOpen = open
 	ClientData.updateMouseUnlock()
+	-- Always clear the in-flight guard on open/close. InvokeServer has no
+	-- timeout, so a handler that yields forever would otherwise latch `busy`
+	-- true and silently deaden every card and chip for the rest of the
+	-- session, with reopening the panel powerless to recover it.
+	busy = false
 	if open then
 		selectedGun = nil
+		lastSignature = nil
 		LoadoutController.refresh()
 	end
 end
@@ -455,15 +525,27 @@ function LoadoutController.init()
 		local angle = os.clock() % (math.pi * 2)
 		for _, entry in spinners do
 			if entry.model.Parent then
-				entry.model:PivotTo(entry.pivot * CFrame.Angles(0, angle, 0))
+				local spin = CFrame.new(entry.centre)
+					* CFrame.Angles(0, angle, 0)
+					* CFrame.new(-entry.centre)
+				entry.model:PivotTo(spin * entry.basePivot)
 			end
 		end
 	end)
 
-	-- Ownership, coins, and loadout all arrive on DataChanged.
+	-- Ownership, coins and loadout all arrive on the same DataChanged event,
+	-- but a refresh destroys and re-clones every gun model on the tab (up to
+	-- 25 ViewportFrames, the most expensive GUI object Roblox has). Coins tick
+	-- on every kill, so refreshing blindly would hitch the panel constantly —
+	-- and equipping pushes data by definition, so every tap paid for a full
+	-- rebuild. Only rebuild when something the panel actually draws changed.
 	ClientData.changed:Connect(function()
 		local screen = gui
-		if screen and screen.Enabled then
+		if not screen or not screen.Enabled then
+			return
+		end
+		local signature = LoadoutController.signature()
+		if signature ~= lastSignature then
 			LoadoutController.refresh()
 		end
 	end)
