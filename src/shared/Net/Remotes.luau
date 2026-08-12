@@ -50,6 +50,11 @@ local Definitions: { [string]: RemoteDef } = {
 	-- have to take the client's word for is absent by design, which is why
 	-- there is nothing here for a modified client to lie about.
 	FireWeapon = { kind = "Event", dir = "ClientToServer", note = "fire intent: origin + unit direction" },
+	-- To the shooter only. The hitmarker is the most important feedback in a
+	-- shooter — it is how you learn whether your aim was right — so the server
+	-- says so the moment it knows, rather than the client inferring it from a
+	-- health bar it may not even be able to see.
+	DamageDealt = { kind = "Event", dir = "ServerToClient", note = "you hit someone: amount + zone" },
 
 	-- Lobby
 	LobbyShot = { kind = "Event", dir = "ClientToServer", note = "cosmetic lobby shot (target pops)" },

@@ -326,6 +326,20 @@ function EffectsController.init()
 	-- round loop, so nothing clears them now — call EffectsController.clearShells()
 	-- from the new loop's round-start transition.
 
+	-- Hitmarker feedback. Sent only to the shooter, and only when the SERVER
+	-- decided a hit landed — so it never lies about a shot that missed, which
+	-- is the whole reason a client-predicted hitmarker is worse than none.
+	-- Visual treatment lands with the HUD in M12; the sound is real now,
+	-- because silent hits are worse than plain ones.
+	Remotes.listen("DamageDealt", function(amount, zone)
+		if type(amount) ~= "number" then
+			return
+		end
+		-- A headshot sounds different. It is the one distinction worth making
+		-- before the UI pass, because it changes what you do next.
+		playSound(HIT_SOUND, 0.55, if zone == "Head" then 1.75 else 1.4)
+	end)
+
 	Remotes.listen("ShotFired", function(shooter, origin, direction, velocity, drop, travelMax, pellets)
 		-- The local player already drew their own effects at fire time.
 		if shooter == Players.LocalPlayer then

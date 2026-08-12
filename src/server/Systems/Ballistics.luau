@@ -99,6 +99,12 @@ local hitHandler: ((Hit) -> ())? = nil
 
 function Ballistics.setHitHandler(handler: (Hit) -> ())
 	hitHandler = handler
+	-- Clears init's warning. Health registers a moment AFTER this system's
+	-- init runs, so the warning is true when it is written and stale by the
+	-- time the manifest prints. A manifest that reports a resolved problem is
+	-- the same failure as one that hides a real one — both teach you to stop
+	-- reading it.
+	Diagnostics.ok(SYSTEM, "simulating, damage handler attached")
 end
 
 -- ---------------------------------------------------------------------------
