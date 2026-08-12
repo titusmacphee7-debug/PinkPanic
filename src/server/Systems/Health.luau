@@ -35,6 +35,21 @@ export type Source = {
 	attacker: Player?,
 	weaponId: string?,
 	zone: string?,
+	-- How far the shot travelled. Carried so scoring can price a longshot
+	-- (NOD-138) without re-deriving a distance that Ballistics already knew
+	-- exactly — measuring it again from two positions after the fact gets a
+	-- different answer, because by then both of them have moved.
+	distance: number?,
+}
+
+-- Who else shot the victim, and for how much.
+--
+-- The DAMAGE is here and the threshold is not. Health's job is to say what
+-- happened; whether 12 damage is worth crediting is a scoring rule, and rules
+-- belong in the system that owns them.
+export type Assist = {
+	player: Player,
+	damage: number,
 }
 
 -- The victim is a CHARACTER, and the player is optional.
@@ -50,7 +65,8 @@ export type Kill = {
 	killer: Player?,
 	weaponId: string?,
 	zone: string?,
-	assists: { Player },
+	distance: number?,
+	assists: { Assist },
 }
 
 type Record = {
@@ -68,6 +84,11 @@ local Health = {}
 
 local records: { [Model]: Record } = {}
 local friendlyFire = Config.friendlyFire
+
+-- Simulation time at which each player last DEALT damage to anybody. The
+-- inverse of a record's contributions, and the only thing that can answer
+-- "was this player already in a fight when they died".
+local lastDealtAt: { [Player]: number } = {}
 
 -- Simulation time, advanced by step() rather than read from os.clock().
 --
@@ -109,6 +130,22 @@ end
 -- that you cannot kill your own team by accident.
 function Health.setFriendlyFire(enabled: boolean)
 	friendlyFire = enabled
+end
+
+-- Health's simulation clock, exposed so a system that wants to age one of the
+-- timestamps below measures it against the same clock that produced it. Reading
+-- os.clock() instead would compare two different clocks and get an answer that
+-- drifts every time the server hitches.
+function Health.now(): number
+	return clock
+end
+
+-- When this player last damaged anybody, or nil if they never have this
+-- session. The saviour bonus is the only caller today: a victim who was mid-
+-- fight when they died was a threat to somebody, and killing them was worth
+-- more than killing someone idle.
+function Health.lastDealt(player: Player): number?
+	return lastDealtAt[player]
 end
 
 -- ---------------------------------------------------------------------------
@@ -155,13 +192,18 @@ end
 -- Damage
 -- ---------------------------------------------------------------------------
 
-local function assistsFor(record: Record, killer: Player?): { Player }
-	local list: { Player } = {}
+local function assistsFor(record: Record, killer: Player?): { Assist }
+	local list: { Assist } = {}
 	for player, contribution in record.contributions do
 		if player ~= killer and clock - contribution.at <= Config.assistWindowSeconds then
-			table.insert(list, player)
+			table.insert(list, { player = player, damage = contribution.damage })
 		end
 	end
+	-- Biggest contributor first, so a consumer that only wants "the" assist
+	-- gets the one that mattered rather than whatever the hash order gave it.
+	table.sort(list, function(a, b)
+		return a.damage > b.damage
+	end)
 	return list
 end
 
@@ -216,6 +258,11 @@ function Health.applyDamage(character: Model, amount: number, source: Source?): 
 
 	if attacker then
 		record.lastAttacker = attacker
+		-- When this player last hurt somebody, for the saviour bonus: killing
+		-- someone who was mid-fight with a third party is worth more than
+		-- killing someone standing still, and this is the only place that
+		-- knows it happened.
+		lastDealtAt[attacker] = clock
 		local contribution = record.contributions[attacker]
 		if contribution then
 			contribution.damage += amount
@@ -224,17 +271,28 @@ function Health.applyDamage(character: Model, amount: number, source: Source?): 
 			record.contributions[attacker] = { damage = amount, at = clock }
 		end
 
-		-- Hit feedback to the shooter, not to everyone. The hitmarker is the
-		-- single most important piece of feedback in a shooter — it is how you
-		-- learn whether your aim was right — so it is sent the moment the
-		-- server knows, rather than inferred client-side from a health bar.
-		Remotes.fireClient("DamageDealt", attacker, amount, source and source.zone or "Torso")
 	end
 
 	local remaining = record.humanoid.Health - amount
 	Diagnostics.count(SYSTEM, "damage", math.floor(amount + 0.5))
 
-	if remaining > 0 then
+	local killed = remaining <= 0
+
+	if attacker then
+		-- Hit feedback to the shooter, not to everyone. The hitmarker is the
+		-- single most important piece of feedback in a shooter — it is how you
+		-- learn whether your aim was right — so it is sent the moment the
+		-- server knows, rather than inferred client-side from a health bar.
+		--
+		-- `killed` rides along rather than arriving separately with the kill
+		-- event, because the marker that says you FINISHED someone has to be
+		-- the same marker, one frame, one sound. Two events racing to draw two
+		-- hitmarkers over each other is how you get a double flash on the last
+		-- shot of every fight.
+		Remotes.fireClient("DamageDealt", attacker, amount, source and source.zone or "Torso", killed)
+	end
+
+	if not killed then
 		record.humanoid.Health = remaining
 		return false
 	end
@@ -255,6 +313,7 @@ function Health.applyDamage(character: Model, amount: number, source: Source?): 
 			killer = attacker,
 			weaponId = source and source.weaponId,
 			zone = source and source.zone,
+			distance = source and source.distance,
 			assists = assistsFor(record, attacker),
 		}
 		for _, listener in killListeners do
@@ -347,6 +406,12 @@ function Health.init()
 	end
 	Players.PlayerAdded:Connect(watch)
 
+	-- Player keys never expire on their own, so a busy server would otherwise
+	-- hold one entry per player who ever fired, forever.
+	Players.PlayerRemoving:Connect(function(player)
+		lastDealtAt[player] = nil
+	end)
+
 	RunService.Heartbeat:Connect(Health.step)
 
 	-- The seam Ballistics has been WARNing about since NOD-133 shipped.
@@ -356,6 +421,7 @@ function Health.init()
 			attacker = hit.attacker,
 			weaponId = hit.weaponId,
 			zone = hit.zone,
+			distance = hit.distance,
 		})
 	end)
 

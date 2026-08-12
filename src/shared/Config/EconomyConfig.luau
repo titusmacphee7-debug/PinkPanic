@@ -1,11 +1,13 @@
 --!strict
 -- EconomyConfig — earn rates and the level curve (NOD-30, NOD-31).
 
+-- Per-kill rates moved to ScoreConfig with NOD-138 and are NOT duplicated here.
+-- A kill is worth score, xp and coins at three different rates plus bonuses for
+-- how it was taken; a `coinsPerKill` constant sitting next to that would be a
+-- second answer to a question that already has one.
 local EconomyConfig = {
-	coinsPerKill = 10,
 	coinsRoundPlayed = 25,
 	coinsRoundWin = 100,
-	xpPerKill = 20,
 	xpRoundPlayed = 50,
 	xpRoundWin = 100,
 }

@@ -334,6 +334,75 @@ local function worldGunPort(shooter: Player): CFrame?
 	return nil
 end
 
+-- ============ Kill effects ============
+--
+-- The cosmetic that plays where somebody died, resolved SERVER-side from the
+-- killer's profile and sent with the killfeed line (NOD-138). This end does no
+-- deciding at all — it looks up an id it was given and plays whatever is in the
+-- folder under that name.
+--
+-- `ReplicatedStorage/Assets/KillEffects` is empty until Titus drops something
+-- in it, and that is fine: a missing effect is silence, not an error. AssetTree
+-- already created the folder and wrote what belongs in it onto the Purpose
+-- attribute, so the hook is live the moment the first `KillEffect_<Name>`
+-- lands there.
+
+local KILL_EFFECT_LIFETIME = 4
+
+local function assetsFolder(): Folder?
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	if not assets then
+		return nil
+	end
+	local folder = assets:FindFirstChild("KillEffects")
+	return if folder and folder:IsA("Folder") then folder else nil
+end
+
+function EffectsController.playKillEffect(effectId: string, at: Vector3)
+	local folder = assetsFolder()
+	if not folder then
+		return
+	end
+	-- The registry's id is the folder name minus the prefix, so both spellings
+	-- are accepted rather than making the caller know which one it holds.
+	local template = folder:FindFirstChild(`KillEffect_{effectId}`) or folder:FindFirstChild(effectId)
+	if not template then
+		return
+	end
+
+	local clone = template:Clone()
+	if clone:IsA("BasePart") then
+		clone.Anchored = true
+		clone.CanCollide = false
+		clone.CFrame = CFrame.new(at)
+	elseif clone:IsA("Model") then
+		for _, descendant in clone:GetDescendants() do
+			if descendant:IsA("BasePart") then
+				descendant.Anchored = true
+				descendant.CanCollide = false
+			end
+		end
+		clone:PivotTo(CFrame.new(at))
+	else
+		-- A bare Attachment or ParticleEmitter needs something to hang on.
+		local host = Instance.new("Part")
+		host.Anchored = true
+		host.CanCollide = false
+		host.Transparency = 1
+		host.Size = Vector3.one
+		host.CFrame = CFrame.new(at)
+		clone.Parent = host
+		clone = host
+	end
+
+	clone.Parent = workspace
+	-- Enough for a burst to finish, short enough that nothing accumulates.
+	-- Every part is anchored, so it costs nothing while it waits.
+	task.delay(KILL_EFFECT_LIFETIME, function()
+		clone:Destroy()
+	end)
+end
+
 function EffectsController.init()
 	RunService.Heartbeat:Connect(stepStreaks)
 
@@ -342,18 +411,35 @@ function EffectsController.init()
 	-- round loop, so nothing clears them now — call EffectsController.clearShells()
 	-- from the new loop's round-start transition.
 
-	-- Hitmarker feedback. Sent only to the shooter, and only when the SERVER
-	-- decided a hit landed — so it never lies about a shot that missed, which
-	-- is the whole reason a client-predicted hitmarker is worse than none.
-	-- Visual treatment lands with the HUD in M12; the sound is real now,
-	-- because silent hits are worse than plain ones.
-	Remotes.listen("DamageDealt", function(amount, zone)
+	-- Hit feedback, sound half. The VISUAL half is CombatHUD (NOD-138), which
+	-- listens to this same event — deliberately, rather than one controller
+	-- calling into the other: the sound has to fire even if the HUD failed to
+	-- build, and a hitmarker has to draw even if audio is muted.
+	--
+	-- Sent only to the shooter, and only when the SERVER decided a hit landed,
+	-- so it never lies about a shot that missed. That is the whole reason a
+	-- client-predicted hitmarker is worse than none.
+	Remotes.listen("DamageDealt", function(amount, zone, killed)
 		if type(amount) ~= "number" then
 			return
 		end
-		-- A headshot sounds different. It is the one distinction worth making
-		-- before the UI pass, because it changes what you do next.
-		playSound(HIT_SOUND, 0.55, if zone == "Head" then 1.75 else 1.4)
+		-- Three sounds, matching the HUD's three shapes. A kill you can HEAR is
+		-- a kill you do not have to look away from the next target to confirm.
+		local pitch = if killed == true then 2.05 elseif zone == "Head" then 1.75 else 1.4
+		playSound(HIT_SOUND, if killed == true then 0.7 else 0.55, pitch)
+	end)
+
+	-- The world half of a kill. CombatHUD listens to this same event for the
+	-- screen half — two listeners rather than one controller calling the other,
+	-- so hearts and sparkles in the world do not depend on the HUD having
+	-- built, and the killfeed line does not depend on the effect existing.
+	Remotes.listen("Killfeed", function(entry)
+		if type(entry) ~= "table" then
+			return
+		end
+		if type(entry.effect) == "string" and typeof(entry.at) == "Vector3" then
+			EffectsController.playKillEffect(entry.effect, entry.at)
+		end
 	end)
 
 	Remotes.listen("ShotFired", function(shooter, origin, direction, velocity, drop, travelMax, pellets)

@@ -69,7 +69,16 @@ local Definitions: { [string]: RemoteDef } = {
 	-- shooter — it is how you learn whether your aim was right — so the server
 	-- says so the moment it knows, rather than the client inferring it from a
 	-- health bar it may not even be able to see.
-	DamageDealt = { kind = "Event", dir = "ServerToClient", note = "you hit someone: amount + zone" },
+	DamageDealt = { kind = "Event", dir = "ServerToClient", note = "you hit someone: amount + zone + killed" },
+	-- Score is sent to the ONE player who earned it, named, so the HUD can say
+	-- what it was for. A scoreboard-wide broadcast would be both bigger and
+	-- less useful: nobody needs to know the exact moment a stranger got an
+	-- assist.
+	ScoreEvent = { kind = "Event", dir = "ServerToClient", note = "you earned score: label + amounts" },
+	-- Killfeed goes to everyone, because who is killing whom is the state of
+	-- the match. Names, not player objects — a player who leaves mid-flight
+	-- would otherwise arrive as nil and print an empty line.
+	Killfeed = { kind = "Event", dir = "ServerToClient", note = "X killed Y with Z" },
 
 	-- Lobby
 	LobbyShot = { kind = "Event", dir = "ClientToServer", note = "cosmetic lobby shot (target pops)" },

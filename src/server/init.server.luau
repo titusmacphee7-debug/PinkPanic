@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-12-E · client firing loop + server ammo (NOD-136)"
+local BUILD_TAG = "2026-08-12-F · score ledger + combat HUD (NOD-138)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,6 +36,7 @@ Diagnostics.expect(
 	"AssetRegistry",
 	"Ballistics",
 	"Health",
+	"Score",
 	"Spawns",
 	"WeaponService",
 	"CharacterService",
@@ -61,6 +62,7 @@ local AssetRegistry: any = Diagnostics.load("AssetRegistry", ReplicatedStorage.S
 
 local Ballistics: any = Diagnostics.load("Ballistics", script.Systems.Ballistics)
 local Health: any = Diagnostics.load("Health", script.Systems.Health)
+local Score: any = Diagnostics.load("Score", script.Systems.Score)
 local Spawns: any = Diagnostics.load("Spawns", script.Systems.Spawns)
 
 local WeaponService: any = Diagnostics.load("WeaponService", script.Services.WeaponService)
@@ -140,12 +142,50 @@ if WeaponService and PlayerDataService then
 	end)
 end
 
+-- Score is the only thing that mints currency for combat, and it reaches the
+-- profile through here rather than requiring EconomyService itself: a System
+-- requiring a Service is the dependency direction backwards (rule 3), and this
+-- one would drag the whole DataStore layer in behind it.
+if Score and EconomyService then
+	Score.setPayout(function(player: Player, xp: number, coins: number)
+		EconomyService.award(player, xp, coins)
+	end)
+end
+
+-- The equipped kill effect, read from the profile and checked for ownership
+-- here rather than trusted from the client. Same seam shape and the same
+-- reason: Score has no business knowing how profiles are stored.
+if Score and PlayerDataService then
+	Score.setKillEffectResolver(function(player: Player): string?
+		local profile = PlayerDataService.get(player)
+		if not profile then
+			return nil
+		end
+		local equipped = profile.equippedCosmetics
+		local id = equipped and equipped.killEffect
+		if type(id) ~= "string" then
+			return nil
+		end
+		-- Owned, or it does not play. An item that fell out of the catalog, or
+		-- one equipped before a refund, is not a licence to keep wearing it.
+		local owned = profile.owned and profile.owned.killEffects
+		if type(owned) ~= "table" or not table.find(owned, id) then
+			return nil
+		end
+		return id
+	end)
+end
+
 local BOOT_ORDER: { { name: string, module: any } } = {
 	-- Ballistics before the services that will feed it, so the remote handler
 	-- exists before any client can reach it.
 	{ name = "Ballistics", module = Ballistics },
 	-- After Ballistics, whose hit handler it registers for.
 	{ name = "Health", module = Health },
+	-- After Health, whose kill event it listens for. Before the respawn loop
+	-- below registers its own listener, so on a kill the score lands first and
+	-- the corpse is dealt with second — which is the order they read in.
+	{ name = "Score", module = Score },
 	-- Before anything that touches a character. It hooks CharacterAdded, and a
 	-- player who spawns before it is listening keeps their own Roblox avatar
 	-- for that life — which is a different-sized target than everyone else.
@@ -230,6 +270,18 @@ if Health and Spawns then
 				WeaponService.onSpawned(player)
 			end
 		end)
+	end)
+end
+
+-- Lifetime K/D on the profile. Separate from Score, which owns the MATCH
+-- ledger and resets it: kills you got last round still count toward the number
+-- on your card, and the number on the scoreboard has to start at zero.
+if Health and EconomyService then
+	Health.onKill(function(kill)
+		local victim = kill.victimPlayer
+		if victim then
+			EconomyService.awardKill(victim, kill.killer, kill.weaponId)
+		end
 	end)
 end
 

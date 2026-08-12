@@ -59,6 +59,21 @@ end
 -- so the hooks are public now and the new loop calls them directly. The rules
 -- themselves (coins, XP, level-ups, K/D, rounds played/won) are unchanged and
 -- still the ONLY way currency is minted — the client cannot request it.
+
+-- The window Score (NOD-138) mints through. Argument order is xp-then-coins
+-- because that is the order the score table reads, and a silent swap of two
+-- numbers is exactly the bug that survives a code review.
+function EconomyService.award(player: Player, xp: number, coins: number)
+	if xp <= 0 and coins <= 0 then
+		return
+	end
+	grant(player, coins, xp)
+end
+
+-- STATS ONLY as of NOD-138. This used to hand out coinsPerKill/xpPerKill
+-- itself; Score does that now, and priced per event rather than per kill, so
+-- leaving the grant here would pay for every kill twice. K/D still belongs to
+-- the profile, which is why the function did not simply go away.
 function EconomyService.awardKill(victim: Player, attacker: Player?, _weaponId: string?)
 	PlayerDataService.update(victim, function(data)
 		data.stats.deaths += 1
@@ -67,7 +82,6 @@ function EconomyService.awardKill(victim: Player, attacker: Player?, _weaponId: 
 		PlayerDataService.update(attacker, function(data)
 			data.stats.kills += 1
 		end)
-		grant(attacker, EconomyConfig.coinsPerKill, EconomyConfig.xpPerKill)
 	end
 end
 
