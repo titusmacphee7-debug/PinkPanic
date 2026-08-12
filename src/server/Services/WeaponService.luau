@@ -34,9 +34,12 @@ local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local Guard = require(ReplicatedStorage.Shared.Net.Guard)
 local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
 local Weapon = require(ReplicatedStorage.Shared.Systems.Weapon)
+local Handling = require(ReplicatedStorage.Shared.Systems.Handling)
+local Movement = require(ReplicatedStorage.Shared.Systems.Movement)
 local Config = require(ReplicatedStorage.Shared.Config.FiringConfig)
 
 local Ballistics = require(script.Parent.Parent.Systems.Ballistics)
+local MoveAudit = require(script.Parent.Parent.Systems.MoveAudit)
 
 local SYSTEM = "WeaponService"
 
@@ -434,7 +437,7 @@ end
 --
 -- Client-reported and deliberately so. It is not exploitable in the direction
 -- that matters: claiming you are sprinting only ever DELAYS your own shots.
-local function onSprintState(player: Player, sprinting: any)
+local function onSprintState(player: Player, sprinting: any, tactical: any)
 	if type(sprinting) ~= "boolean" then
 		return
 	end
@@ -443,8 +446,58 @@ local function onSprintState(player: Player, sprinting: any)
 	end
 	local entry = held[player]
 	if entry then
-		Weapon.setSprinting(entry.state, sprinting)
+		-- Tactical costs more to come out of (NOD-143). Also safe to self-report:
+		-- claiming the more expensive kind only delays you further.
+		Weapon.setSprinting(entry.state, sprinting, tactical == true)
 	end
+end
+
+-- Aiming (NOD-143). **Not safe in the way sprint is.**
+--
+-- Claiming a sprint only ever delays your own shots, so a liar gains nothing.
+-- Claiming ADS tightens your cone, so a modified client would simply always
+-- claim it — which is why the claim is not enough on its own. It is honoured
+-- only while the player is actually moving slowly enough to be aiming, measured
+-- from the position samples MoveAudit already takes for its own reasons.
+--
+-- Lying then costs exactly what telling the truth costs: you have to slow down.
+local function onAimState(player: Player, aiming: any)
+	if type(aiming) ~= "boolean" then
+		return
+	end
+	if not Guard.checkRate(player, "AimState", 20, 1) then
+		return
+	end
+	local entry = held[player]
+	if entry then
+		Weapon.setAiming(entry.state, aiming)
+	end
+end
+
+-- The cone this player's next shot goes into. The one place that decides it.
+--
+-- `aim` comes from the shared machine — the client is running the identical
+-- code, so the two agree without the number ever going on the wire — and is
+-- then thrown away entirely if the player is moving too fast to be aiming.
+function WeaponService.spreadFor(player: Player, stats: CombatStats.Resolved): number
+	local entry = held[player]
+	if not entry then
+		return stats.spreadDeg
+	end
+
+	local aim = Weapon.aimFraction(entry.state)
+	if aim > 0 then
+		local ceiling = Movement.speedFor("Sprint", stats.moveSpeedMult)
+			* Config.ads.moveSpeedMult
+			* Config.ads.speedToleranceMultiplier
+		local measured = MoveAudit.lastSpeed(player)
+		if measured and measured > ceiling then
+			Diagnostics.count(SYSTEM, "adsRefused")
+			aim = 0
+		end
+	end
+
+	return Handling.spread(stats, aim)
 end
 
 -- ---------------------------------------------------------------------------
@@ -528,6 +581,11 @@ function WeaponService.init()
 	Remotes.handleEvent("ReloadWeapon", onReloadWeapon)
 	Remotes.handleEvent("SwapWeapon", onSwapWeapon)
 	Remotes.handleEvent("SprintState", onSprintState)
+	Remotes.handleEvent("AimState", onAimState)
+
+	-- The cone is ours to decide, and Ballistics' to use. Injected rather than
+	-- required, so the System never has to know a Service exists.
+	Ballistics.setSpreadResolver(WeaponService.spreadFor)
 
 	RunService.Heartbeat:Connect(WeaponService.step)
 
@@ -551,8 +609,8 @@ function WeaponService.init()
 
 	Diagnostics.ok(
 		SYSTEM,
-		`ammo enforced server-side · reload pays out at {math.floor(Config.reloadAmmoFraction * 100)}% · `
-			.. `holster {Config.holsterSeconds}s`
+		`ammo enforced server-side · reload pays out at {math.floor(Config.derive.cancelFraction * 100)}% · `
+			.. `holster derived per gun · ADS honoured only under {Config.ads.moveSpeedMult}x move speed`
 	)
 end
 

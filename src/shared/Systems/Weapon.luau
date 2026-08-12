@@ -49,7 +49,7 @@ export type State = {
 
 	ammo: number,
 	-- Rounds are not in the magazine the instant a reload starts. See
-	-- FiringConfig.reloadAmmoFraction.
+	-- Weapon.reloadCancelTime.
 	reload: Reload,
 	reloadStartedAt: number,
 	reloadAmmoAt: number,
@@ -60,7 +60,25 @@ export type State = {
 	holstered: boolean,
 	nextShotAt: number,
 	sprintUntil: number,
+	-- Which kind of sprint is being ended, remembered from the press.
+	sprintTactical: boolean,
 	dead: boolean,
+
+	-- Aiming (NOD-143). Stored as an intent plus the moment it changed, rather
+	-- than as a 0..1 that something has to remember to advance every frame: the
+	-- fraction is then a pure function of the clock, which is what lets the
+	-- client and the server arrive at the same cone without exchanging it.
+	--
+	-- `aimFrom` is where the transition started, so releasing halfway through
+	-- comes back from halfway rather than snapping to fully aimed first.
+	aiming: boolean,
+	aimChangedAt: number,
+	aimFrom: number,
+
+	-- Melee is declared here and driven by nobody yet — see the note on
+	-- `Weapon.setMelee`. Handling reads it so the state it names is the complete
+	-- set the issue asked for rather than seven of eight.
+	melee: boolean,
 
 	-- Semi-auto: one shot per press, so holding the button is one shot and a
 	-- macro is no faster than a finger.
@@ -106,6 +124,54 @@ function Weapon.reloadKind(stats: CombatStats.Resolved): Reload
 	return if stats.shellReload and stats.shellReload > 0 then "shells" else "magazine"
 end
 
+-- The derived handling times (NOD-143). They live HERE rather than in
+-- Systems/Handling because this is the machine that applies them, and Handling
+-- requires this file — putting them the other way round would be a cycle.
+-- Handling re-exports them so callers have one place to look.
+--
+-- Each reads the gun first and falls back to a ratio in FiringConfig. A gun
+-- that names its own number wins; a gun that does not gets the pattern.
+
+function Weapon.holsterTime(stats: CombatStats.Resolved): number
+	if stats.holsterTime then
+		return stats.holsterTime
+	end
+	return math.max(stats.equipTime * Config.derive.holsterFromEquip, Config.holsterSeconds)
+end
+
+-- Reloading from empty costs more: there is a bolt to run. That difference is
+-- the reason people count their shots.
+function Weapon.reloadTime(stats: CombatStats.Resolved, empty: boolean?): number
+	if not empty then
+		return stats.reloadSeconds
+	end
+	if stats.reloadEmptyTime then
+		return stats.reloadEmptyTime
+	end
+	return stats.reloadSeconds * Config.derive.emptyFromReload
+end
+
+-- Where in the reload the rounds actually land — `reloadCancelTime`, and the
+-- single most important number in how a reload feels.
+function Weapon.reloadCancelTime(stats: CombatStats.Resolved, empty: boolean?): number
+	if stats.reloadCancelTime then
+		return stats.reloadCancelTime
+	end
+	return Weapon.reloadTime(stats, empty) * Config.derive.cancelFraction
+end
+
+-- Tactical sprint has the gun right down, and this is the cost that stops it
+-- being a free upgrade over an ordinary sprint.
+function Weapon.sprintToFire(stats: CombatStats.Resolved, tactical: boolean?): number
+	if not tactical then
+		return stats.sprintToFire
+	end
+	if stats.tacSprintToFire then
+		return stats.tacSprintToFire
+	end
+	return stats.sprintToFire * Config.derive.tacFromSprint
+end
+
 -- ---------------------------------------------------------------------------
 -- Construction
 -- ---------------------------------------------------------------------------
@@ -125,10 +191,15 @@ function Weapon.create(stats: CombatStats.Resolved): State
 		holstered = false,
 		nextShotAt = 0,
 		sprintUntil = 0,
+		sprintTactical = false,
 		dead = false,
 		triggerHeld = false,
 		triggerConsumed = false,
 		burstRemaining = 0,
+		aiming = false,
+		aimChangedAt = 0,
+		aimFrom = 0,
+		melee = false,
 	}
 end
 
@@ -140,13 +211,24 @@ end
 -- that makes weapon swapping strictly better than reloading in every game that
 -- gets this wrong.
 function Weapon.equip(state: State, stats: CombatStats.Resolved, ammo: number?)
+	-- The gun going away owns the holster half, the gun coming out owns the
+	-- draw. Two guns, two numbers (NOD-143) — which is why an LMG is a bad
+	-- thing to be holding when you need your pistol NOW. This used to be one
+	-- flat 0.18s whatever you were putting away.
+	local holster = Weapon.holsterTime(state.stats)
+
 	state.stats = stats
 	state.ammo = math.clamp(ammo or stats.magSize, 0, stats.magSize)
 	state.reload = "none"
 	state.holstered = false
-	state.readyAt = state.clock + Config.holsterSeconds + stats.equipTime
+	state.readyAt = state.clock + holster + stats.equipTime
 	state.nextShotAt = state.readyAt
 	state.burstRemaining = 0
+	-- A swap drops you out of the sights. Coming up already aimed would make
+	-- swapping strictly better than aiming, which is the wrong lesson.
+	state.aiming = false
+	state.aimFrom = 0
+	state.aimChangedAt = state.clock
 	-- Deliberately NOT cleared: a trigger held through a weapon swap must not
 	-- fire the new gun the instant it is up. Clearing this here is how a swap
 	-- becomes a free shot.
@@ -184,8 +266,12 @@ end
 -- Sprinting blocks the trigger, and letting go of sprint does not unblock it
 -- immediately — sprintToFire is the delay, and it is one of the few handling
 -- stats a good player actually feels.
-function Weapon.setSprinting(state: State, sprinting: boolean)
+function Weapon.setSprinting(state: State, sprinting: boolean, tactical: boolean?)
 	if sprinting then
+		-- Remembered at the PRESS, spent at the release. The release does not
+		-- know which kind of sprint it is ending, and asking the caller to tell
+		-- it twice is asking for the two answers to disagree.
+		state.sprintTactical = tactical == true
 		-- Held at infinity so it keeps blocking while the key is down; the
 		-- release below is what turns it into a real deadline.
 		state.sprintUntil = math.huge
@@ -199,8 +285,50 @@ function Weapon.setSprinting(state: State, sprinting: boolean)
 	end
 
 	if state.sprintUntil == math.huge then
-		state.sprintUntil = state.clock + Config.sprintReleaseGraceSeconds + state.stats.sprintToFire
+		state.sprintUntil = state.clock
+			+ Config.sprintReleaseGraceSeconds
+			+ Weapon.sprintToFire(state.stats, state.sprintTactical)
 	end
+end
+
+-- ---------------------------------------------------------------------------
+-- Aiming (NOD-143)
+-- ---------------------------------------------------------------------------
+
+-- Stored as an intent plus the moment it changed. The fraction is then a pure
+-- function of the clock, which is what lets the client and the server arrive at
+-- the same cone without ever putting it on the wire.
+--
+-- `aimFrom` is where the transition started, so letting go halfway comes back
+-- from halfway rather than snapping to fully aimed and then falling.
+function Weapon.setAiming(state: State, aiming: boolean)
+	if state.aiming == aiming then
+		return
+	end
+	state.aimFrom = Weapon.aimFraction(state)
+	state.aiming = aiming
+	state.aimChangedAt = state.clock
+end
+
+function Weapon.aimFraction(state: State): number
+	local duration = state.stats.adsTime
+	if duration <= 0 then
+		return if state.aiming then 1 else 0
+	end
+	local progress = math.clamp((state.clock - state.aimChangedAt) / duration, 0, 1)
+	if state.aiming then
+		return state.aimFrom + (1 - state.aimFrom) * progress
+	end
+	return state.aimFrom * (1 - progress)
+end
+
+-- Melee. Declared and never set: a melee swing is a DAMAGE source, and every
+-- damage source in this game is server-simulated from something the client
+-- cannot fake. Adding the flag without the server half would be a state the
+-- HUD can show and the game cannot cause, so the swing itself is its own piece
+-- of work — this is the seam it will set.
+function Weapon.setMelee(state: State, active: boolean)
+	state.melee = active
 end
 
 -- ---------------------------------------------------------------------------
@@ -232,6 +360,10 @@ function Weapon.beginReload(state: State): boolean
 		local shell = state.stats.shellReload or 0.5
 		local missing = state.stats.magSize - state.ammo
 		state.shellNextAt = state.clock + Config.shellReloadStartSeconds + shell
+		-- A shell gun's cancel time is not derived from anything: the FIRST
+		-- shell is the payout, because from that moment cancelling keeps
+		-- whatever went in. That is the whole appeal of a tube-fed gun and it is
+		-- why `Weapon.reloadCancelTime` is only asked about magazine reloads.
 		-- The first shell IS the payout point: from that moment, cancelling
 		-- keeps whatever went in. That is the whole appeal of a tube-fed gun.
 		state.reloadAmmoAt = state.shellNextAt
@@ -242,19 +374,21 @@ function Weapon.beginReload(state: State): boolean
 		return true
 	end
 
-	-- A tactical reload (rounds left in the gun) runs the same duration here.
-	-- Empty-vs-tactical timing is a per-gun animation concern and belongs in
-	-- the catalog once the models exist; inventing a multiplier for it now
-	-- would be a balance change nobody asked for.
-	local duration = state.stats.reloadSeconds
-	state.reloadAmmoAt = state.clock + duration * Config.reloadAmmoFraction
+	-- Tactical (rounds still in the gun) versus from empty (NOD-143). From empty
+	-- there is a bolt to run, so it costs more — and that difference is the
+	-- reason people count their shots. Both durations, and the moment the rounds
+	-- land inside each, come from Weapon.reloadTime / reloadCancelTime, which
+	-- read the gun first and fall back to a ratio.
+	local empty = state.ammo <= 0
+	local duration = Weapon.reloadTime(state.stats, empty)
+	state.reloadAmmoAt = state.clock + Weapon.reloadCancelTime(state.stats, empty)
 	state.reloadEndsAt = state.clock + duration
 	state.shellNextAt = 0
 	return true
 end
 
 -- Interrupting. Rounds that have already landed stay landed — that is the
--- whole point of reloadAmmoFraction, and it makes reload cancelling a skill
+-- whole point of reloadCancelTime, and it makes reload cancelling a skill
 -- rather than an exploit.
 function Weapon.cancelReload(state: State)
 	if state.reload == "none" then

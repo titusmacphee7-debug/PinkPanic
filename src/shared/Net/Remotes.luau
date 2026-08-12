@@ -59,7 +59,16 @@ local Definitions: { [string]: RemoteDef } = {
 	-- Client-reported, and safe to be: claiming you are sprinting only ever
 	-- DELAYS your own shots. The server would otherwise have to infer sprint
 	-- from velocity, which is both wrong at the edges and expensive.
-	SprintState = { kind = "Event", dir = "ClientToServer", note = "sprint began/ended (gates sprintToFire)" },
+	SprintState = {
+		kind = "Event",
+		dir = "ClientToServer",
+		note = "sprint began/ended + whether it was tactical (gates sprintToFire)",
+	},
+	-- Also client-reported, and NOT safe in the same way. Claiming a sprint only
+	-- ever delays your own shots; claiming ADS would tighten your cone for free,
+	-- so the server honours it only while the player's measured speed is low
+	-- enough to actually be aiming. See FiringConfig.ads.
+	AimState = { kind = "Event", dir = "ClientToServer", note = "aiming down sights (gates the ADS cone)" },
 	-- The correction half of the seam. The client predicts its own magazine;
 	-- this is the server saying what it actually is, sent on anything the
 	-- client could not have predicted and on a slow heartbeat so a dropped

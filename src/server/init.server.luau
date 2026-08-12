@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-12-K · camera rig owns the render chain (NOD-142)"
+local BUILD_TAG = "2026-08-12-L · handling layer: ADS and pull-out times (NOD-143)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,6 +39,7 @@ Diagnostics.expect(
 	"Score",
 	"Spawns",
 	"Movement",
+	"Handling",
 	"MoveAudit",
 	"WeaponService",
 	"CharacterService",
@@ -67,6 +68,11 @@ local Health: any = Diagnostics.load("Health", script.Systems.Health)
 local Score: any = Diagnostics.load("Score", script.Systems.Score)
 local Spawns: any = Diagnostics.load("Spawns", script.Systems.Spawns)
 local MovementSystem: any = Diagnostics.load("Movement", ReplicatedStorage.Shared.Systems.Movement)
+-- Handling (NOD-143). Shared, and loaded on the SERVER too: the server enforces
+-- the same draw, reload and sprint gates the client predicts with, and its
+-- validate() is what measures whether those timings actually land where the
+-- config says they do.
+local HandlingSystem: any = Diagnostics.load("Handling", ReplicatedStorage.Shared.Systems.Handling)
 local MoveAudit: any = Diagnostics.load("MoveAudit", script.Systems.MoveAudit)
 
 local WeaponService: any = Diagnostics.load("WeaponService", script.Services.WeaponService)
@@ -111,6 +117,9 @@ end
 -- which is invisible until somebody asks why sliding does nothing.
 if MovementSystem then
 	Diagnostics.start("Movement", MovementSystem.validate)
+end
+if HandlingSystem then
+	Diagnostics.start("Handling", HandlingSystem.validate)
 end
 
 -- After AssetTree, which creates the folders it scans.

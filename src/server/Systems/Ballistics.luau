@@ -104,6 +104,17 @@ function Ballistics.onFire(listener: (Player) -> ())
 	table.insert(fireListeners, listener)
 end
 
+-- How wide this shooter's cone is (NOD-143). Injected, for the same reason the
+-- hit handler is: aiming is a weapon-layer concept whose claim has to be checked
+-- against the mover, and a System reaching into a Service to ask is the
+-- dependency direction backwards. Absent, every shot uses the hip cone — which
+-- is the safe default, because the hip cone is the WIDER one.
+local resolveSpread: ((Player, CombatStats.Resolved) -> number)? = nil
+
+function Ballistics.setSpreadResolver(resolver: (Player, CombatStats.Resolved) -> number)
+	resolveSpread = resolver
+end
+
 function Ballistics.setHitHandler(handler: (Hit) -> ())
 	hitHandler = handler
 	-- Clears init's warning. Health registers a moment AFTER this system's
@@ -268,7 +279,11 @@ function Ballistics.fire(shooter: Player, weaponId: string, origin: Vector3, dir
 	end
 
 	local pellets = math.min(stats.pellets, budget)
-	local spread = stats.spreadDeg
+	-- The cone. Hip by default; the ADS cone only when someone has injected a
+	-- resolver that can vouch for it (NOD-143). A System asking a Service
+	-- directly would be the dependency direction backwards, and it would drag
+	-- the whole weapon layer in here to read a single number.
+	local spread = if resolveSpread then resolveSpread(shooter, stats) else stats.spreadDeg
 	local filter = { character }
 
 	for _ = 1, pellets do

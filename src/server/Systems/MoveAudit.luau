@@ -34,6 +34,9 @@ type Sample = {
 	-- Worst planar speed seen this session, so the report has a number in it
 	-- rather than only a verdict.
 	fastest: number,
+	-- The most recent sample. Read by WeaponService to decide whether an ADS
+	-- claim is believable (NOD-143).
+	recent: number,
 	flagged: boolean,
 }
 
@@ -105,7 +108,7 @@ function MoveAudit.step(deltaTime: number)
 		local previous = samples[player]
 		local position = root.Position
 		if not previous then
-			samples[player] = { position = position, at = clock, strikes = 0, fastest = 0, flagged = false }
+			samples[player] = { position = position, at = clock, strikes = 0, fastest = 0, recent = 0, flagged = false }
 			continue
 		end
 
@@ -126,6 +129,7 @@ function MoveAudit.step(deltaTime: number)
 		if speed > previous.fastest then
 			previous.fastest = speed
 		end
+		previous.recent = speed
 
 		if speed > ceiling or teleported then
 			previous.strikes += 1
@@ -156,6 +160,17 @@ end
 function MoveAudit.fastest(player: Player): number?
 	local sample = samples[player]
 	return sample and sample.fastest
+end
+
+-- The most recent sampled planar speed, or nil if they have never been sampled.
+--
+-- Used by WeaponService to decide whether to believe an ADS claim (NOD-143).
+-- The sampler exists for the plausibility check and runs whether or not anyone
+-- asks; being able to answer "how fast is this player actually moving" turns out
+-- to be the thing that makes a client-reported stance safe to act on at all.
+function MoveAudit.lastSpeed(player: Player): number?
+	local sample = samples[player]
+	return sample and sample.recent
 end
 
 function MoveAudit.init()

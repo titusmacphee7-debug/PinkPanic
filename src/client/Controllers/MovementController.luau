@@ -184,9 +184,19 @@ end
 -- Desired state
 -- ---------------------------------------------------------------------------
 
+-- Aiming slows you down (NOD-143). Pushed in by WeaponController rather than
+-- read from Firing, because it is a fraction that eases in over the gun's own
+-- adsTime and the weapon layer is the only thing that knows how far through
+-- that transition you are.
+local aimPenalty = 1
+
+function MovementController.setAimPenalty(multiplier: number)
+	aimPenalty = math.clamp(multiplier, 0.1, 1)
+end
+
 local function weight(): number
 	local _, stats = Firing.weapon()
-	return if stats then stats.moveSpeedMult else 1
+	return (if stats then stats.moveSpeedMult else 1) * aimPenalty
 end
 
 -- Is the player asking to be crouched / prone right now? A tap latched the
@@ -876,6 +886,13 @@ end
 function MovementController.cancelSprint()
 	sprintHeld = false
 	tacRequested = false
+end
+
+-- Whether the sprint currently being asked for is the tactical kind. The weapon
+-- layer reads this to charge the right sprint-to-fire (NOD-143) rather than
+-- tracking the double-tap itself — one place decides what a tactical sprint is.
+function MovementController.tacticalSprinting(): boolean
+	return tacRequested and tacCharge > 0
 end
 
 -- ---------------------------------------------------------------------------

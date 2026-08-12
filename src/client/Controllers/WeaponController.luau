@@ -33,6 +33,7 @@ local EffectsController = require(script.Parent.EffectsController)
 -- MovementController does not require this file back, so there is no cycle.
 local MovementController = require(script.Parent.MovementController)
 local CameraRig = require(script.Parent.Parent.Camera.CameraRig)
+local Handling = require(ReplicatedStorage.Shared.Systems.Handling)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local Components = require(script.Parent.Parent.UI.Components)
 
@@ -53,6 +54,11 @@ local FIRE_ACTION = "PinkPanicFire"
 local RELOAD_ACTION = "PinkPanicReload"
 local SPRINT_ACTION = "PinkPanicSprint"
 local SLOT_ACTION = "PinkPanicSlot"
+-- Not "PinkPanicAim": that is the render-step bind's name, and while the two
+-- namespaces do not collide, a log line naming one of them should never leave
+-- you guessing which.
+local AIM_ACTION = "PinkPanicADS"
+local QUICK_SWAP_ACTION = "PinkPanicQuickSwap"
 
 local WeaponController = {}
 
@@ -65,6 +71,7 @@ local appliedPitch = 0
 local appliedYaw = 0
 
 local sprinting = false
+local aiming = false
 
 -- ---------------------------------------------------------------------------
 -- Gating
@@ -173,17 +180,21 @@ local function onReloadAction(_action: string, inputState: Enum.UserInputState):
 	return Enum.ContextActionResult.Sink
 end
 
-local function setSprinting(value: boolean)
+local function setSprinting(value: boolean, tactical: boolean?)
 	if sprinting == value then
 		return
 	end
 	sprinting = value
-	Firing.setSprinting(value)
+	-- Which kind matters: tactical sprint has the gun right down, and coming out
+	-- of it costs roughly twice what an ordinary sprint does (NOD-143).
+	Firing.setSprinting(value, tactical)
 end
 
 local function onSprintAction(_action: string, inputState: Enum.UserInputState): Enum.ContextActionResult
 	if inputState == Enum.UserInputState.Begin then
-		setSprinting(true)
+		-- Movement owns the double-tap; this only asks it which kind it granted,
+		-- so there is one place that decides what a tactical sprint IS.
+		setSprinting(true, MovementController.tacticalSprinting())
 	elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
 		setSprinting(false)
 	end
@@ -198,6 +209,49 @@ local function onSlotAction(_action: string, inputState: Enum.UserInputState, in
 		return Enum.ContextActionResult.Pass
 	end
 	Firing.swap(if input.KeyCode == Enum.KeyCode.One then "Primary" else "Secondary")
+	return Enum.ContextActionResult.Sink
+end
+
+-- Aiming down sights (NOD-143). Held, not toggled: a toggle is a setting
+-- argument and a hold is what every shooter this one is derived from does.
+--
+-- Sprinting ends the moment you aim, for the same reason firing does — refusing
+-- the input reads as the game dropping it, while cancelling the sprint charges
+-- you the sprint-to-fire delay, which is a price you can learn.
+local function setAiming(value: boolean)
+	if aiming == value then
+		return
+	end
+	aiming = value
+	if value then
+		MovementController.cancelSprint()
+		setSprinting(false)
+	end
+	Firing.setAiming(value)
+end
+
+local function onAimAction(_action: string, inputState: Enum.UserInputState): Enum.ContextActionResult
+	if inputState == Enum.UserInputState.Begin then
+		if not combatActive() then
+			return Enum.ContextActionResult.Pass
+		end
+		setAiming(true)
+	elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
+		setAiming(false)
+	end
+	return Enum.ContextActionResult.Sink
+end
+
+-- Quick swap to the last weapon you held. One key, no thinking — the whole
+-- point is that you press it without deciding which gun you are going to.
+local function onQuickSwapAction(_action: string, inputState: Enum.UserInputState): Enum.ContextActionResult
+	if inputState ~= Enum.UserInputState.Begin then
+		return Enum.ContextActionResult.Sink
+	end
+	if not combatActive() then
+		return Enum.ContextActionResult.Pass
+	end
+	Firing.swap(if Firing.slot() == "Primary" then "Secondary" else "Primary")
 	return Enum.ContextActionResult.Sink
 end
 
@@ -314,9 +368,21 @@ local function step(deltaTime: number)
 		if sprinting then
 			setSprinting(false)
 		end
+		if aiming then
+			setAiming(false)
+		end
 	end
 
 	Firing.step(deltaTime)
+
+	-- Aiming reaches the camera and the legs from here, every frame, because it
+	-- is a FRACTION rather than a flag: the FOV closes in over the gun's own
+	-- adsTime and so does the speed penalty, which is what makes adsTime a stat
+	-- you can feel rather than an animation length.
+	local aim = Firing.aimFraction()
+	local _, stats = Firing.weapon()
+	CameraRig.setAim(aim, stats and stats.class)
+	MovementController.setAimPenalty(Handling.moveSpeedMult(aim))
 	-- Every frame rather than on Firing.changed: the reload ring is a moving
 	-- value and nothing fires an event for "0.3 seconds have passed".
 	refreshAmmoHud()
@@ -344,6 +410,8 @@ function WeaponController.init()
 	ContextActionService:BindAction(RELOAD_ACTION, onReloadAction, false, Enum.KeyCode.R)
 	ContextActionService:BindAction(SPRINT_ACTION, onSprintAction, false, Enum.KeyCode.LeftShift)
 	ContextActionService:BindAction(SLOT_ACTION, onSlotAction, false, Enum.KeyCode.One, Enum.KeyCode.Two)
+	ContextActionService:BindAction(AIM_ACTION, onAimAction, false, Enum.UserInputType.MouseButton2)
+	ContextActionService:BindAction(QUICK_SWAP_ACTION, onQuickSwapAction, false, Enum.KeyCode.Q)
 
 	RunService.Heartbeat:Connect(step)
 
@@ -359,9 +427,15 @@ function WeaponController.init()
 	UserInputService.WindowFocusReleased:Connect(function()
 		Firing.setTrigger(false)
 		setSprinting(false)
+		-- Alt-tabbing while aimed would otherwise leave you permanently at 62%
+		-- move speed with a narrow FOV and no way to tell why.
+		setAiming(false)
 	end)
 
-	Diagnostics.ok(SYSTEM, `recoil x{RECOIL_SCALE}, no bloom · fire M1 · reload R · slots 1/2`)
+	Diagnostics.ok(
+		SYSTEM,
+		`recoil x{RECOIL_SCALE}, no bloom · fire M1 · ADS M2 · reload R · slots 1/2 · quick-swap Q`
+	)
 end
 
 return WeaponController

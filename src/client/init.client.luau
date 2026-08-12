@@ -9,7 +9,7 @@ local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-12-K · camera rig owns the render chain (NOD-142)"
+local CLIENT_BUILD_TAG = "2026-08-12-L · handling layer: ADS and pull-out times (NOD-143)"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false
@@ -29,6 +29,7 @@ Diagnostics.expect(
 	"CombatHUD",
 	"Movement",
 	"MovementController",
+	"Handling",
 	"Firing",
 	"WeaponController"
 )
@@ -75,6 +76,11 @@ local controllers: { { name: string, module: any } } = {
 		name = "MovementController",
 		module = Diagnostics.load("MovementController", script.Controllers.MovementController),
 	},
+	-- Shared with the server, and reported on both sides on purpose: the drift
+	-- check measures the timings against the machine that is actually running,
+	-- and "the client thinks the draw is 220ms" is a different fact from "the
+	-- server thinks it is 220ms".
+	{ name = "Handling", module = Diagnostics.load("Handling", ReplicatedStorage.Shared.Systems.Handling) },
 	-- Last, and after EffectsController, whose muzzle flash and tracer it
 	-- calls the moment a shot is predicted. WeaponController.init also starts
 	-- Firing, so the two report separately: "the trigger is bound" and "the

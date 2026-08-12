@@ -28,6 +28,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
 local Weapon = require(ReplicatedStorage.Shared.Systems.Weapon)
+local Handling = require(ReplicatedStorage.Shared.Systems.Handling)
 local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 local SYSTEM = "Firing"
@@ -109,13 +110,40 @@ function Firing.setTrigger(down: boolean)
 	end
 end
 
-function Firing.setSprinting(sprinting: boolean)
+function Firing.setSprinting(sprinting: boolean, tactical: boolean?)
 	local s = state
 	if not s then
 		return
 	end
-	Weapon.setSprinting(s, sprinting)
-	Remotes.fireServer("SprintState", sprinting)
+	Weapon.setSprinting(s, sprinting, tactical)
+	Remotes.fireServer("SprintState", sprinting, tactical == true)
+end
+
+-- Aiming (NOD-143). Sent to the server because the server decides the cone, but
+-- see the note on `FiringConfig.ads.speedToleranceMultiplier`: unlike sprint,
+-- this is a claim that would BENEFIT a liar, so the server only honours it while
+-- the player is actually moving slowly enough to be aiming.
+function Firing.setAiming(aiming: boolean)
+	local s = state
+	if not s then
+		return
+	end
+	if s.aiming == aiming then
+		return
+	end
+	Weapon.setAiming(s, aiming)
+	Remotes.fireServer("AimState", aiming)
+	signalChange()
+end
+
+function Firing.aimFraction(): number
+	local s = state
+	return if s then Weapon.aimFraction(s) else 0
+end
+
+function Firing.handling(): Handling.State?
+	local s = state
+	return if s then Handling.stateOf(s) else nil
 end
 
 function Firing.reload()

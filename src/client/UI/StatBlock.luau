@@ -15,6 +15,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
+local Handling = require(ReplicatedStorage.Shared.Systems.Handling)
 local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local Theme = require(script.Parent.Theme)
 local Components = require(script.Parent.Components)
@@ -375,12 +376,37 @@ function StatBlock.build(parent: Instance, gunId: string, big: number): number
 	}, class, 4)
 
 	local weight = math.floor((stats.moveSpeedMult - 1) * 100 + 0.5)
-	groupCard(parent, "HANDLING", {
-		{ label = "Aim down sight", value = `{string.format("%.2f", stats.adsTime)}s`, key = "adsTime", raw = stats.adsTime },
-		{ label = "Draw", value = `{string.format("%.2f", stats.equipTime)}s`, key = "equipTime", raw = stats.equipTime },
-		{ label = "Sprint to fire", value = `{string.format("%.2f", stats.sprintToFire)}s`, key = "sprintToFire", raw = stats.sprintToFire },
+	-- In MILLISECONDS, and that is the point (NOD-143). A player can compare 180
+	-- and 240 at a glance; nobody compares 0.18 and 0.24, and handling decides
+	-- more fights than damage does — so it has to be the readable half of the
+	-- card, not the decimal one.
+	local timings = Handling.timings(stats)
+	local function ms(seconds: number): string
+		return `{math.floor(seconds * 1000 + 0.5)} ms`
+	end
+
+	local handling = {
+		{ label = "Aim down sight", value = ms(timings.adsTime), key = "adsTime", raw = stats.adsTime },
+		{ label = "Draw", value = ms(timings.equipTime), key = "equipTime", raw = stats.equipTime },
+		{ label = "Holster", value = ms(timings.holsterTime) },
+		{
+			label = "Sprint to fire",
+			value = ms(timings.sprintToFire),
+			key = "sprintToFire",
+			raw = stats.sprintToFire,
+		},
+		{ label = "Tac-sprint to fire", value = ms(timings.tacSprintToFire) },
+		{ label = "Reload", value = ms(timings.reloadTime), key = "reloadSeconds", raw = stats.reloadSeconds },
+		{ label = "Reload, empty", value = ms(timings.reloadEmptyTime) },
+		-- The one people miss: where the rounds actually land, which is what
+		-- makes reload-cancelling a technique rather than a rumour.
+		{ label = "Ammo lands at", value = ms(timings.reloadCancelTime) },
 		{ label = "Weight", value = `{if weight >= 0 then "+" else ""}{weight}% speed`, key = "moveSpeedMult", raw = stats.moveSpeedMult },
-	}, class, 5)
+	}
+	if timings.shellReloadTime then
+		table.insert(handling, #handling, { label = "Per shell", value = ms(timings.shellReloadTime) })
+	end
+	groupCard(parent, "HANDLING", handling, class, 5)
 
 	-- Bullets are real server-simulated projectiles with gravity drop, so
 	-- these are live numbers, not flavour.

@@ -54,6 +54,14 @@ export type GunStats = {
 	equipTime: number,
 	sprintToFire: number,
 	adsTime: number,
+	-- Optional handling overrides (NOD-143). Leave them out and they are derived
+	-- from the four above by the ratios in FiringConfig.derive, which is how a
+	-- roster of 32 guns avoids 128 hand-typed numbers. Name one only when a gun
+	-- should break the pattern on purpose.
+	holsterTime: number?,
+	reloadEmptyTime: number?,
+	reloadCancelTime: number?,
+	tacSprintToFire: number?,
 }
 
 export type GunDef = {

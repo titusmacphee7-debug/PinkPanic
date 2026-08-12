@@ -66,6 +66,16 @@ export type Resolved = {
 	equipTime: number,
 	sprintToFire: number,
 	adsTime: number,
+	-- Handling times a gun may name for itself (NOD-143). Absent means DERIVED
+	-- from the four above, by the ratios in FiringConfig.derive — see
+	-- Systems/Handling, which is the only thing that should read these. Optional
+	-- because thirty-two guns times four hand-typed numbers is a balance surface
+	-- nobody can hold in their head, and every one of them is a chance to fat-
+	-- finger a decimal point.
+	holsterTime: number?,
+	reloadEmptyTime: number?,
+	reloadCancelTime: number?,
+	tacSprintToFire: number?,
 	range: number, -- alias of travelMax for client visuals
 }
 
@@ -258,6 +268,10 @@ local function baseForGun(gunId: string): Resolved?
 		equipTime = s.equipTime,
 		sprintToFire = s.sprintToFire,
 		adsTime = s.adsTime,
+		holsterTime = s.holsterTime,
+		reloadEmptyTime = s.reloadEmptyTime,
+		reloadCancelTime = s.reloadCancelTime,
+		tacSprintToFire = s.tacSprintToFire,
 		range = travelMax,
 	}
 end
