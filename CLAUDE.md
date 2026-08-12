@@ -261,6 +261,30 @@ Because the Humanoid stays the mover in all three, a wall still stops you. The
 mass-bounded actuator in `client/Movement/Actuator.luau` is attached and
 bounded but drives nothing — it never needed to.
 
+**Writing `Camera.CFrame` after Roblox's camera step STICKS, and accumulates.**
+Reasoning says it cannot: in combat `CameraType` is `Custom`, Roblox's camera
+module runs at priority `Camera` (200), and it recomputes the CFrame every frame
+— so a delta written at `Camera+2` should be thrown away on the next frame and
+recoil should be a one-frame flicker. Measured on 2026-08-12 it is not. A single
++10° pitch injected at `Camera+2` held at exactly 10.000° for 40 frames, and
+survived a full mouse loop that returned to its starting point (pitch still
++10.000, yaw netted to 0.000). The module applies mouse deltas *relative to the
+current CFrame*, so external writes compose with it instead of being replaced.
+This is why `WeaponController.stepRecoil` can write a delta and why the recoil
+does not need to own the camera. Verified end to end: a Pip (`recoilVert` 0.38,
+`snap` shot 1 = ×1.0, jitter ±12%) kicked the live camera **0.405°**.
+
+**A residue recomputed from the current value every frame is not a residue.**
+`Recoil.step` decayed toward `pitch * (1 - returnFraction)` — 28% below wherever
+the camera was *this* frame — which compounds straight to zero. The manifest
+said "28% stays behind"; the live camera settled at exactly 0.000. The number
+was doing nothing but slowing the return. Anchor a partial return to the *peak*
+of the burst, not to the running value. Latching the residue permanently is the
+other wrong answer: it never bleeds off, `state.pitch` walks into its own
+ceiling after a few magazines, and the clamp then eats every new shot — recoil
+silently switches off partway through a match and works fine every time you
+test it fresh.
+
 **A fixed sampling interval can be phase-locked.** `MoveAudit` originally
 sampled positions every 0.5s and read a character teleporting 260 studs back
 and forth every 0.25s as *perfectly stationary* — 0.0 studs moved, sixteen

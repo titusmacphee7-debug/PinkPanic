@@ -62,6 +62,11 @@ export type GunStats = {
 	reloadEmptyTime: number?,
 	reloadCancelTime: number?,
 	tacSprintToFire: number?,
+	-- Which recoil shape this gun climbs in, by name from RecoilConfig.patterns
+	-- (NOD-144). Absent means the one its CLASS uses, which is what most guns
+	-- should do — a pattern is a family trait, and 32 hand-authored ones is 32
+	-- chances to author one badly and never notice.
+	recoilPattern: string?,
 }
 
 export type GunDef = {

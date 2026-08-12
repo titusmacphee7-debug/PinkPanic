@@ -34,6 +34,8 @@ local EffectsController = require(script.Parent.EffectsController)
 local MovementController = require(script.Parent.MovementController)
 local CameraRig = require(script.Parent.Parent.Camera.CameraRig)
 local Handling = require(ReplicatedStorage.Shared.Systems.Handling)
+local Recoil = require(ReplicatedStorage.Shared.Systems.Recoil)
+local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local Components = require(script.Parent.Parent.UI.Components)
 
@@ -44,10 +46,9 @@ local SYSTEM = "WeaponController"
 -- rather than flattening both to the same feel.
 local RECOIL_SCALE = 1
 
--- How far the climb may accumulate before it stops climbing, as a multiple of
--- one shot's kick. A gun that kicks 0.38° per shot tops out much lower than
--- one that kicks 1.4°, which is the whole point of deriving it.
-local RECOIL_CEILING_SHOTS = 9
+-- The ceiling moved to RecoilConfig with the patterns (NOD-144). It is still
+-- derived from each gun's own kick — a pistol at 0.38° per shot must not top out
+-- where an LMG at 1.4° does — it is just no longer derived in two places.
 
 local AIM_BIND = "PinkPanicAim"
 local FIRE_ACTION = "PinkPanicFire"
@@ -62,11 +63,10 @@ local QUICK_SWAP_ACTION = "PinkPanicQuickSwap"
 
 local WeaponController = {}
 
--- Accumulated camera offset in degrees, and the amount already handed to the
--- camera. Tracking both is what lets recovery pull the view back down without
--- fighting the player's own mouse: we only ever apply the DIFFERENCE.
-local recoilPitch = 0
-local recoilYaw = 0
+-- How much of the recoil state has already been handed to the camera. The
+-- accumulated offset itself lives in the shared Recoil state; tracking what was
+-- APPLIED is what lets recovery pull the view back down without fighting the
+-- player's own mouse, because we only ever write the DIFFERENCE.
 local appliedPitch = 0
 local appliedYaw = 0
 
@@ -104,29 +104,29 @@ end
 -- Recoil
 -- ---------------------------------------------------------------------------
 
-local function kick(stats: any)
-	local vertical = stats.recoilVert * RECOIL_SCALE
-	local horizontal = stats.recoilHoriz * RECOIL_SCALE
-	local ceiling = vertical * RECOIL_CEILING_SHOTS
+-- The pattern, the jitter, the ceilings and the partial return all live in
+-- shared/Systems/Recoil (NOD-144). What is left here is the two things that are
+-- genuinely this file's: reading the player's current stance and aim, and
+-- writing the DELTA to the camera.
+local recoilState = Recoil.create()
 
-	recoilPitch = math.min(recoilPitch + vertical, ceiling)
-	recoilYaw = math.clamp(
-		recoilYaw + (math.random() * 2 - 1) * horizontal,
-		-ceiling * 0.5,
-		ceiling * 0.5
-	)
+local function moveState(): string
+	local character = Players.LocalPlayer.Character
+	local state = character and character:GetAttribute("PPMoveState")
+	return if type(state) == "string" then state else "Idle"
+end
+
+local function kick(stats: CombatStats.Resolved)
+	-- Aiming, stance and the master volume, multiplied together. Attachments
+	-- are already in `stats` — they modify recoilVert and recoilHoriz through
+	-- the M0 pipeline, so the pattern scales with them for free.
+	local modifier = Recoil.modifier(Firing.aimFraction(), moveState(), RECOIL_SCALE)
+	Recoil.fire(recoilState, stats, modifier)
 end
 
 local function stepRecoil(deltaTime: number)
 	local _, stats = Firing.weapon()
-	if stats then
-		-- Exponential settle rather than a linear one: the first part of the
-		-- recovery is fast enough to feel responsive between taps, and the
-		-- tail is slow enough that sustained fire still costs you something.
-		local decay = math.exp(-stats.recoilRecovery * deltaTime)
-		recoilPitch *= decay
-		recoilYaw *= decay
-	end
+	Recoil.step(recoilState, stats, deltaTime)
 
 	local camera = workspace.CurrentCamera
 	if not camera then
@@ -136,13 +136,13 @@ local function stepRecoil(deltaTime: number)
 	-- Only ever the delta. Writing the absolute offset would overwrite the
 	-- player's own mouse movement every frame, which reads as the camera
 	-- fighting you.
-	local dPitch = recoilPitch - appliedPitch
-	local dYaw = recoilYaw - appliedYaw
+	local dPitch = recoilState.pitch - appliedPitch
+	local dYaw = recoilState.yaw - appliedYaw
 	if math.abs(dPitch) < 1e-5 and math.abs(dYaw) < 1e-5 then
 		return
 	end
-	appliedPitch = recoilPitch
-	appliedYaw = recoilYaw
+	appliedPitch = recoilState.pitch
+	appliedYaw = recoilState.yaw
 
 	camera.CFrame = camera.CFrame * CFrame.Angles(math.rad(dPitch), math.rad(-dYaw), 0)
 end
@@ -165,6 +165,10 @@ local function onFireAction(_action: string, inputState: Enum.UserInputState): E
 		Firing.setTrigger(true)
 	elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
 		Firing.setTrigger(false)
+		-- Letting go restarts the pattern (NOD-144). That is the whole shape of
+		-- the mechanic: tapping is accurate because every tap is shot one, and
+		-- holding is a skill because shot seven is always shot seven.
+		Recoil.release(recoilState)
 	end
 	return Enum.ContextActionResult.Sink
 end
@@ -396,7 +400,7 @@ function WeaponController.init()
 	Firing.init()
 	buildAmmoHud()
 
-	Firing.fired:Connect(function(origin: Vector3, direction: Vector3, stats: any)
+	Firing.fired:Connect(function(origin: Vector3, direction: Vector3, stats: CombatStats.Resolved)
 		kick(stats)
 		-- Predicted, on the frame of the click. The server will draw this for
 		-- everyone else when it accepts the shot; drawing our own here is what

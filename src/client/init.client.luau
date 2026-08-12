@@ -9,7 +9,7 @@ local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-12-L · handling layer: ADS and pull-out times (NOD-143)"
+local CLIENT_BUILD_TAG = "2026-08-12-M · learnable recoil patterns, no bloom (NOD-144)"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false
@@ -30,6 +30,7 @@ Diagnostics.expect(
 	"Movement",
 	"MovementController",
 	"Handling",
+	"Recoil",
 	"Firing",
 	"WeaponController"
 )
@@ -81,6 +82,7 @@ local controllers: { { name: string, module: any } } = {
 	-- and "the client thinks the draw is 220ms" is a different fact from "the
 	-- server thinks it is 220ms".
 	{ name = "Handling", module = Diagnostics.load("Handling", ReplicatedStorage.Shared.Systems.Handling) },
+	{ name = "Recoil", module = Diagnostics.load("Recoil", ReplicatedStorage.Shared.Systems.Recoil) },
 	-- Last, and after EffectsController, whose muzzle flash and tracer it
 	-- calls the moment a shot is predicted. WeaponController.init also starts
 	-- Firing, so the two report separately: "the trigger is bound" and "the

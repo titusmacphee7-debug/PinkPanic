@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-12-L · handling layer: ADS and pull-out times (NOD-143)"
+local BUILD_TAG = "2026-08-12-M · learnable recoil patterns, no bloom (NOD-144)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -40,6 +40,7 @@ Diagnostics.expect(
 	"Spawns",
 	"Movement",
 	"Handling",
+	"Recoil",
 	"MoveAudit",
 	"WeaponService",
 	"CharacterService",
@@ -73,6 +74,10 @@ local MovementSystem: any = Diagnostics.load("Movement", ReplicatedStorage.Share
 -- validate() is what measures whether those timings actually land where the
 -- config says they do.
 local HandlingSystem: any = Diagnostics.load("Handling", ReplicatedStorage.Shared.Systems.Handling)
+-- Recoil (NOD-144). Nothing on the server fires it, and it is loaded here on
+-- purpose: its validate() is the boot check that no gun's aimed cone is wider
+-- than its hip cone, which is the no-bloom rule with a number behind it.
+local RecoilSystem: any = Diagnostics.load("Recoil", ReplicatedStorage.Shared.Systems.Recoil)
 local MoveAudit: any = Diagnostics.load("MoveAudit", script.Systems.MoveAudit)
 
 local WeaponService: any = Diagnostics.load("WeaponService", script.Services.WeaponService)
@@ -120,6 +125,9 @@ if MovementSystem then
 end
 if HandlingSystem then
 	Diagnostics.start("Handling", HandlingSystem.validate)
+end
+if RecoilSystem then
+	Diagnostics.start("Recoil", RecoilSystem.validate)
 end
 
 -- After AssetTree, which creates the folders it scans.

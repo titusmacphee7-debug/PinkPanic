@@ -76,6 +76,10 @@ export type Resolved = {
 	reloadEmptyTime: number?,
 	reloadCancelTime: number?,
 	tacSprintToFire: number?,
+	-- Which recoil shape this gun climbs in (NOD-144). Absent means the one its
+	-- CLASS uses. A pattern is a family trait, so most guns should leave this
+	-- alone; a gun with an identity of its own names it.
+	recoilPattern: string?,
 	range: number, -- alias of travelMax for client visuals
 }
 
@@ -272,6 +276,7 @@ local function baseForGun(gunId: string): Resolved?
 		reloadEmptyTime = s.reloadEmptyTime,
 		reloadCancelTime = s.reloadCancelTime,
 		tacSprintToFire = s.tacSprintToFire,
+		recoilPattern = s.recoilPattern,
 		range = travelMax,
 	}
 end
