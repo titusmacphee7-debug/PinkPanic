@@ -115,8 +115,17 @@ RecoilConfig.byClass = {
 	SMG = "fastWander",
 	Shotgun = "heavyThump",
 	Rifle = "climbThenRight",
-	Carbine = "climbThenRight",
-	Bullpup = "sweepingS",
+	-- A battle rifle is an AR that reaches, so it climbs like one. The
+	-- difference the player feels is the size of each kick, which comes from the
+	-- gun's own recoilVert, not from a different shape.
+	BattleRifle = "climbThenRight",
+	-- The S was written for this class before the class existed (NOD-148). A
+	-- long readable sweep is only legible on a gun you hold the trigger down on
+	-- for two seconds, which is the LMG and nothing else.
+	LMG = "sweepingS",
+	-- Semi-auto: there is no pattern to learn when you are not holding the
+	-- trigger, so every shot is the same snap.
+	Marksman = "snap",
 	Sniper = "heavyThump",
 }
 

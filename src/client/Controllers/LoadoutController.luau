@@ -44,7 +44,12 @@ local MARGIN = 44
 -- Ultrawides otherwise stretch the three columns further apart than they are
 -- tall, and the panel stops looking like an object.
 local MAX_PANEL = Vector2.new(1440, 900)
-local CLASSES = { "Pistol", "Revolver", "SMG", "Shotgun", "Rifle", "Carbine", "Bullpup", "Sniper" }
+-- The filter row, in the order a player reads the roster: close range first,
+-- reach last, secondaries at the end. Carbine and Bullpup are gone (NOD-148) —
+-- they were AR variants with their own tab, which made the roster look like it
+-- had more variety than it did.
+local CLASSES =
+	{ "SMG", "Shotgun", "Rifle", "BattleRifle", "LMG", "Marksman", "Sniper", "Pistol", "Revolver" }
 
 local LoadoutController = {}
 

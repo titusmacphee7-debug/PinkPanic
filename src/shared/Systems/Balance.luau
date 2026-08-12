@@ -39,6 +39,15 @@ export type Zone = "Head" | "Torso" | "Limb"
 -- where an SMG should already be losing, 60 is AR territory, 100 is a lane.
 Balance.bands = { 10, 30, 60, 100 }
 
+-- Classes whose falloff is FLAT by design, so the flat-TTK check does not flag
+-- them forever. A marksman rifle that hit softer at distance would have no job,
+-- and a sniper is balanced on handling and precision rather than on range.
+--
+-- Named rather than inferred, because "this gun is flat on purpose" and "this
+-- gun is flat because nobody set its range bands" look identical in the data
+-- and are the two ends of the bug NOD-148 exists to fix.
+Balance.falloffExempt = { Sniper = true, Marksman = true } :: { [string]: boolean }
+
 local function zoneMultiplier(stats: CombatStats.Resolved, zone: Zone): number
 	if zone == "Head" then
 		return stats.headshotMult
@@ -56,6 +65,14 @@ end
 -- zone applied. Shotguns are the reason this is per SHOT rather than per bullet:
 -- eight pellets landing is one event to the player and one event to Health.
 function Balance.damagePerShot(stats: CombatStats.Resolved, distance: number, zone: Zone): number
+	-- Past `travelMax` the bullet does not exist. `pelletDamageAt` answers for any
+	-- distance you hand it — it is a falloff curve, not a range check — so asking
+	-- it about 60 studs for a shotgun whose pellets die at 40 gets you a confident
+	-- number for a shot that never lands. That is the difference between "dead
+	-- past 25 studs" and "weak past 25 studs", which is the entire shotgun design.
+	if distance > stats.travelMax then
+		return 0
+	end
 	local perPellet = CombatStats.pelletDamageAt(stats, distance) * zoneMultiplier(stats, zone)
 	return perPellet * math.max(stats.pellets, 1)
 end
@@ -131,6 +148,7 @@ export type Row = {
 	ttk: { number }, -- one per band
 	stk: { number },
 	handling: number,
+	reach: number, -- travelMax: where the bullets stop existing
 	flat: boolean,
 }
 
@@ -152,12 +170,13 @@ local function rows(zone: Zone): { Row }
 				ttk = ttk,
 				stk = stk,
 				handling = Balance.handlingCost(stats),
+				reach = stats.travelMax,
 				-- Flat means the gun kills in the same number of rounds at 100
 				-- studs as at 10. Measured in SHOTS rather than seconds because
 				-- that is what the player experiences, and because a fractional
 				-- difference in seconds with the same shot count is not falloff
 				-- doing any work at all.
-				flat = stk[1] == stk[#Balance.bands],
+				flat = stk[1] == stk[#Balance.bands] and not Balance.falloffExempt[stats.class],
 			})
 		end
 	end
@@ -239,31 +258,44 @@ end
 -- The regression checks
 -- ---------------------------------------------------------------------------
 
--- Guns in the top third of BOTH kill speed and handling. The triangle says a
--- gun may be excellent at two things at most, and TTK-plus-handling is the pair
--- that produces a gun with no counterplay — it wins the trade before you have
--- finished aiming and it kills you faster once you have.
+-- Guns in the top third of kill speed, handling AND reach — all three corners
+-- of the triangle at once.
+--
+-- All THREE, not two. The first version of this check flagged the top third of
+-- TTK and handling together, and it was wrong in a way that matters: an SMG is
+-- *supposed* to be both. Killing fastest up close while handling best is the
+-- entire class, and what pays for it is that its bullets do not reach. A check
+-- that flags the design working as intended is a check everybody learns to
+-- ignore, and then it is not there for the gun that really is broken.
+--
+-- Reach is `travelMax` — literally how far the bullets go — because it is the
+-- one number no amount of falloff tuning can talk its way around.
 function Balance.dominant(): { string }
 	local list = rows("Torso")
-	local byTtk = table.clone(list)
-	local byHandling = table.clone(list)
-	table.sort(byTtk, function(a, b)
-		return a.ttk[1] < b.ttk[1]
-	end)
-	table.sort(byHandling, function(a, b)
-		return a.handling < b.handling
-	end)
 
-	local third = math.max(math.floor(#list / 3), 1)
-	local fastest: { [string]: boolean } = {}
-	for index = 1, third do
-		fastest[byTtk[index].id] = true
+	local function topThird(compare: (Row, Row) -> boolean): { [string]: boolean }
+		local sorted = table.clone(list)
+		table.sort(sorted, compare)
+		local set: { [string]: boolean } = {}
+		for index = 1, math.max(math.floor(#list / 3), 1) do
+			set[sorted[index].id] = true
+		end
+		return set
 	end
 
+	local fastest = topThird(function(a, b)
+		return a.ttk[1] < b.ttk[1]
+	end)
+	local slickest = topThird(function(a, b)
+		return a.handling < b.handling
+	end)
+	local longest = topThird(function(a, b)
+		return a.reach > b.reach
+	end)
+
 	local flagged: { string } = {}
-	for index = 1, third do
-		local row = byHandling[index]
-		if fastest[row.id] then
+	for _, row in list do
+		if fastest[row.id] and slickest[row.id] and longest[row.id] then
 			table.insert(flagged, `{row.name} ({row.class})`)
 		end
 	end
@@ -285,29 +317,75 @@ function Balance.validate()
 	local flat = Balance.flat()
 	local dominant = Balance.dominant()
 
-	-- One-shot kills at the FURTHEST band. A gun that deletes you at 100 studs
-	-- before you have heard it is the single worst thing to hand a new player,
-	-- and it is a different failure from flat falloff even though the same guns
-	-- usually have both.
-	local snipeAnywhere: { string } = {}
+	-- One-shot kills on a LIMB. A sniper one-shotting a chest is the class doing
+	-- its job; the same round deleting you through a foot is the thing that makes
+	-- a lobby quit, because there was nothing the victim could have done
+	-- differently. This is the check, rather than "one-shots at 100 studs" — that
+	-- would flag every sniper in the game forever and teach everyone to ignore it.
+	local limbDeleters: { string } = {}
 	for _, row in list do
-		if row.stk[#Balance.bands] <= 1 then
-			table.insert(snipeAnywhere, row.name)
+		local stats = CombatStats.forGun(row.id)
+		if stats and Balance.shotsToKill(stats, Balance.bands[1], "Limb") <= 1 then
+			table.insert(limbDeleters, row.name)
 		end
 	end
 
 	local problems: { string } = {}
+
+	-- A gun that did not load is a gun the shop will sell and the game cannot
+	-- fire. One file per gun made that possible, so it gets a check.
+	local failures = GunCatalog.failures()
+	if #failures > 0 then
+		table.insert(problems, `{#failures} gun file(s) failed to load: {table.concat(failures, " · ")}`)
+	end
+
+	-- "One sentence per gun: why pick this over its neighbour. If that sentence
+	-- doesn't exist, the gun doesn't ship." That is a rule with a check behind
+	-- it, or it is a rule that survives exactly as long as somebody is watching.
+	local unjustified: { string } = {}
+	for id, def in GunCatalog.guns do
+		if type(def.why) ~= "string" or #def.why < 20 then
+			table.insert(unjustified, def.name or id)
+		end
+	end
+	if #unjustified > 0 then
+		table.insert(problems, `{#unjustified} gun(s) with no reason to exist: {table.concat(unjustified, ", ")}`)
+	end
+
 	if #flat > 0 then
 		table.insert(problems, `{#flat}/{#list} guns have NO falloff (worst: {flat[1]})`)
 	end
 	if #dominant > 0 then
-		table.insert(problems, `{#dominant} gun(s) top-third in both TTK and handling: {table.concat(dominant, ", ")}`)
-	end
-	if #snipeAnywhere > 0 then
 		table.insert(
 			problems,
-			`{#snipeAnywhere} gun(s) one-shot at {Balance.bands[#Balance.bands]} studs: {table.concat(snipeAnywhere, ", ")}`
+			`{#dominant} gun(s) top-third in TTK, handling AND reach: {table.concat(dominant, ", ")}`
 		)
+	end
+	if #limbDeleters > 0 then
+		table.insert(problems, `{#limbDeleters} gun(s) one-shot a LIMB: {table.concat(limbDeleters, ", ")}`)
+	end
+
+	-- A secondary in the top third of close-range kill speed is a primary you did
+	-- not have to choose.
+	--
+	-- Stated as "top third overall" rather than the obvious "slower than every
+	-- primary", because the obvious version is wrong: a pistol SHOULD out-kill a
+	-- marksman rifle at 10 studs, and that is the entire reason you carry one
+	-- next to a scope. What must not happen is a sidearm competing with the guns
+	-- that own close range, and that is what this measures.
+	local closeRanked = table.clone(list)
+	table.sort(closeRanked, function(a, b)
+		return a.ttk[1] < b.ttk[1]
+	end)
+	local competing: { string } = {}
+	for index = 1, math.max(math.floor(#list / 3), 1) do
+		local row = closeRanked[index]
+		if row.slot == "Secondary" then
+			table.insert(competing, `{row.name} ({string.format("%.2f", row.ttk[1])}s)`)
+		end
+	end
+	if #competing > 0 then
+		table.insert(problems, `{#competing} secondary(s) in the top third of close TTK: {table.concat(competing, ", ")}`)
 	end
 
 	if #problems > 0 then
@@ -324,11 +402,21 @@ function Balance.validate()
 		fastest = math.min(fastest, row.ttk[1])
 		slowest = math.max(slowest, row.ttk[1])
 	end
+	local classes: { [string]: number } = {}
+	local classCount = 0
+	for _, row in list do
+		if not classes[row.class] then
+			classCount += 1
+		end
+		classes[row.class] = (classes[row.class] or 0) + 1
+	end
+
 	Diagnostics.ok(
 		SYSTEM,
-		`{#list} guns · close TTK {string.format("%.2f", fastest)}-{string.format("%.2f", slowest)}s · `
-			.. `every gun's falloff engages by {Balance.bands[#Balance.bands]} studs · `
-			.. `nothing tops the third in both TTK and handling`
+		`{#list} guns in {classCount} classes · close TTK {string.format("%.2f", fastest)}-{string.format("%.2f", slowest)}s · `
+			.. `falloff engages by {Balance.bands[#Balance.bands]} studs on every class that should have it · `
+			.. `nothing tops the third in TTK, handling and reach at once · nothing one-shots a limb · `
+			.. `no secondary competes up close`
 	)
 end
 

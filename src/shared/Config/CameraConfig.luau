@@ -56,8 +56,12 @@ CameraConfig.adsFovScale = {
 	SMG = 0.88,
 	Shotgun = 0.9,
 	Rifle = 0.8,
-	Carbine = 0.82,
-	Bullpup = 0.82,
+	BattleRifle = 0.74,
+	LMG = 0.84,
+	-- Between a rifle and a sniper, which is the whole class: enough
+	-- magnification to pick a chest out at 120 studs, not enough to lose the
+	-- room around it.
+	Marksman = 0.6,
 	Sniper = 0.42,
 }
 

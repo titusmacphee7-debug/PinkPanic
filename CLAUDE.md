@@ -33,8 +33,12 @@ Titus runs `.\rojo.exe serve` from the project folder in PowerShell.
 - `src/client/UI/*` — `Theme.luau` holds every colour, font, radius and spacing
   value. Nothing else calls `Color3.fromRGB` for chrome.
 - `src/shared/Config/*` — **data only, no behavior.** A config file containing
-  an `if` is in the wrong folder. `GunCatalog.luau` is the single balance file;
-  `Rarity.luau` is the one definition of the eight tiers.
+  an `if` is in the wrong folder. `Config/Guns/` holds one file per gun and the
+  **file name is the gun id**; `GunCatalog.luau` assembles them and is where the
+  types live. `Rarity.luau` is the one definition of the eight tiers.
+  Balance is never read out of these files — run
+  `require(game.ReplicatedStorage.Shared.Systems.Balance).report()` for the TTK
+  table at every range band, which is the thing guns are actually compared with.
 - `src/shared/Systems/*` — deterministic logic both sides run, plus the
   infrastructure that keeps the project honest: `Diagnostics` (boot manifest),
   `AssetTree` (Studio folders), `ContentAudit` (config vs content).
