@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-12-M · learnable recoil patterns, no bloom (NOD-144)"
+local BUILD_TAG = "2026-08-12-N · TTK table and balance regression checks (NOD-148)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -41,6 +41,7 @@ Diagnostics.expect(
 	"Movement",
 	"Handling",
 	"Recoil",
+	"Balance",
 	"MoveAudit",
 	"WeaponService",
 	"CharacterService",
@@ -78,6 +79,11 @@ local HandlingSystem: any = Diagnostics.load("Handling", ReplicatedStorage.Share
 -- purpose: its validate() is the boot check that no gun's aimed cone is wider
 -- than its hip cone, which is the no-bloom rule with a number behind it.
 local RecoilSystem: any = Diagnostics.load("Recoil", ReplicatedStorage.Shared.Systems.Recoil)
+-- Balance (NOD-148). Server-only: it is an audit of the catalog, not a thing
+-- either side runs during play. Its validate() is what notices that a gun kills
+-- as fast at 100 studs as at 10 — a failure nobody can feel in a playtest,
+-- because it reads as "that gun is good".
+local BalanceSystem: any = Diagnostics.load("Balance", ReplicatedStorage.Shared.Systems.Balance)
 local MoveAudit: any = Diagnostics.load("MoveAudit", script.Systems.MoveAudit)
 
 local WeaponService: any = Diagnostics.load("WeaponService", script.Services.WeaponService)
@@ -128,6 +134,10 @@ if HandlingSystem then
 end
 if RecoilSystem then
 	Diagnostics.start("Recoil", RecoilSystem.validate)
+end
+-- After CombatStats, whose resolver it reads every gun through.
+if BalanceSystem then
+	Diagnostics.start("Balance", BalanceSystem.validate)
 end
 
 -- After AssetTree, which creates the folders it scans.
