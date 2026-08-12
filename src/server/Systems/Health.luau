@@ -79,13 +79,30 @@ local friendlyFire = Config.friendlyFire
 -- hand out free regen for time during which nothing else moved.
 local clock = 0
 
--- Set by scoring (M1) and the match loop (M9). Same pattern as Ballistics'
--- hit handler: this system knows a player died and who did it, and nothing
--- about what that is worth.
-local killHandler: ((Kill) -> ())? = nil
+-- A LIST, not a single handler. Several systems legitimately care that
+-- somebody died — respawn, score, the killfeed, streaks — and a single slot
+-- means the second one to register silently replaces the first. That is a bug
+-- that presents as "the killfeed works but nobody respawns", with nothing
+-- anywhere saying why.
+--
+-- Each is called in its own pcall so one broken listener cannot stop the
+-- others: a scoring error must not also mean the dead never come back.
+local killListeners: { (Kill) -> () } = {}
 
-function Health.setKillHandler(handler: (Kill) -> ())
-	killHandler = handler
+function Health.onKill(listener: (Kill) -> ())
+	table.insert(killListeners, listener)
+end
+
+-- Vetoes. Any filter returning false rejects the damage entirely.
+--
+-- This is how spawn protection becomes real rather than a number in a config
+-- file that nothing reads. It is a list for the same reason kills are: godmode
+-- for testing, a mode with a damage-immune phase and spawn protection are all
+-- legitimate vetoes, and the second one to register must not delete the first.
+local damageFilters: { (character: Model, amount: number, source: Source?) -> boolean } = {}
+
+function Health.addDamageFilter(filter: (character: Model, amount: number, source: Source?) -> boolean)
+	table.insert(damageFilters, filter)
 end
 
 -- Team modes own this (M9). Until then it is off, because the safe default is
@@ -159,6 +176,16 @@ function Health.applyDamage(character: Model, amount: number, source: Source?): 
 		return false
 	end
 
+	-- Vetoes first, before anything is recorded. A blocked hit must leave no
+	-- trace: no contribution toward an assist, no reset of the regen delay,
+	-- and no hitmarker telling the shooter it landed.
+	for _, filter in damageFilters do
+		local ok, allowed = pcall(filter, character, amount, source)
+		if ok and allowed == false then
+			return false
+		end
+	end
+
 	local record = recordFor(character)
 	if not record then
 		return false
@@ -221,8 +248,7 @@ function Health.applyDamage(character: Model, amount: number, source: Source?): 
 
 	Diagnostics.count(SYSTEM, "deaths")
 
-	local handler = killHandler
-	if handler then
+	if #killListeners > 0 then
 		local kill: Kill = {
 			victim = character,
 			victimPlayer = victimPlayer,
@@ -231,9 +257,11 @@ function Health.applyDamage(character: Model, amount: number, source: Source?): 
 			zone = source and source.zone,
 			assists = assistsFor(record, attacker),
 		}
-		local ok, err = pcall(handler, kill)
-		if not ok then
-			Diagnostics.warn(SYSTEM, `kill handler errored — {err}`)
+		for _, listener in killListeners do
+			local ok, err = pcall(listener, kill)
+			if not ok then
+				Diagnostics.warn(SYSTEM, `a kill listener errored — {err}`)
+			end
 		end
 	end
 

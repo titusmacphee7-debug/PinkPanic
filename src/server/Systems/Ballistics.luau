@@ -278,6 +278,13 @@ function Ballistics.fire(shooter: Player, weaponId: string, origin: Vector3, dir
 	end
 	liveByPlayer[shooter] = live + pellets
 
+	for _, listener in fireListeners do
+		local ok = pcall(listener, shooter)
+		if not ok then
+			Diagnostics.count(SYSTEM, "fireListenerErrors")
+		end
+	end
+
 	Diagnostics.count(SYSTEM, "shots")
 	return true
 end
@@ -484,6 +491,15 @@ local resolveWeapon: ((Player) -> string?)? = nil
 
 function Ballistics.setWeaponResolver(resolver: (Player) -> string?)
 	resolveWeapon = resolver
+end
+
+-- Notified on every accepted shot. Spawn protection uses this to end the
+-- moment you fire: protection that survives your first shot is a free opening
+-- trade, which is worse than no protection at all.
+local fireListeners: { (Player) -> () } = {}
+
+function Ballistics.onFire(listener: (Player) -> ())
+	table.insert(fireListeners, listener)
 end
 
 local function onFireWeapon(player: Player, origin: any, direction: any)

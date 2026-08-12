@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-12-B · health and damage (NOD-134)"
+local BUILD_TAG = "2026-08-12-C · scored spawns and respawn (NOD-135)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,6 +22,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 -- Unguarded on purpose: if Diagnostics itself cannot load there is nothing left
 -- to report the failure with, and a hard error here is the loudest option.
 local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
+local SpawnConfig = require(ReplicatedStorage.Shared.Config.SpawnConfig)
 
 -- Declared up front so a system that never runs at all still shows up as NEVER
 -- REPORTED. Absent looks intentional; pending looks like the bug it is.
@@ -35,6 +36,7 @@ Diagnostics.expect(
 	"AssetRegistry",
 	"Ballistics",
 	"Health",
+	"Spawns",
 	"CharacterService",
 	"MapService",
 	"LobbyService",
@@ -58,6 +60,7 @@ local AssetRegistry: any = Diagnostics.load("AssetRegistry", ReplicatedStorage.S
 
 local Ballistics: any = Diagnostics.load("Ballistics", script.Systems.Ballistics)
 local Health: any = Diagnostics.load("Health", script.Systems.Health)
+local Spawns: any = Diagnostics.load("Spawns", script.Systems.Spawns)
 
 local CharacterService: any = Diagnostics.load("CharacterService", script.Services.CharacterService)
 local MapService: any = Diagnostics.load("MapService", script.Services.MapService)
@@ -129,6 +132,10 @@ local BOOT_ORDER: { { name: string, module: any } } = {
 	-- for that life — which is a different-sized target than everyone else.
 	{ name = "CharacterService", module = CharacterService },
 	{ name = "MapService", module = MapService },
+	-- AFTER MapService, which decides which arena is live and can destroy a
+	-- stale one. Counting spawn points before that runs counts them in a map
+	-- that is about to stop existing, and reports a number that was never true.
+	{ name = "Spawns", module = Spawns },
 	{ name = "LobbyService", module = LobbyService },
 	{ name = "PlayerDataService", module = PlayerDataService },
 	{ name = "EconomyService", module = EconomyService },
@@ -143,6 +150,55 @@ for _, service in BOOT_ORDER do
 	if service.module then
 		Diagnostics.start(service.name, service.module.init)
 	end
+end
+
+-- The respawn loop. Composed here rather than inside either system, because
+-- "a kill happened" and "put this player somewhere good five seconds later"
+-- are separate concerns that would otherwise import each other.
+--
+-- Registered as a LISTENER, not the handler: scoring, the killfeed and streaks
+-- all want this same event, and a single slot means whoever registers second
+-- silently replaces the first.
+if Health and Spawns then
+	local RunService = game:GetService("RunService")
+	RunService.Heartbeat:Connect(Spawns.step)
+
+	-- Spawn protection, made real. Without these two lines it is a number in a
+	-- config file that nothing reads — and it ends the moment you fire, so it
+	-- can never be used as a free opening trade.
+	Health.addDamageFilter(function(character)
+		local victim = Players:GetPlayerFromCharacter(character)
+		return not (victim and Spawns.isProtected(victim))
+	end)
+	if Ballistics then
+		Ballistics.onFire(Spawns.clearProtection)
+	end
+
+	Health.onKill(function(kill)
+		local character = kill.victim
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if root and root:IsA("BasePart") then
+			-- Where someone died is where the fight still is, so the point
+			-- nearest it gets penalised for the next few seconds.
+			Spawns.markDeath(root.Position)
+		end
+
+		local player = kill.victimPlayer
+		if not player then
+			return -- a bot or a prop; nothing to respawn
+		end
+
+		task.delay(SpawnConfig.respawnSeconds, function()
+			if player.Parent == nil then
+				return -- left during the timer
+			end
+			player:LoadCharacter()
+			-- One frame for CharacterService to standardise the rig before it
+			-- gets moved; pivoting first would be undone by ApplyDescription.
+			task.wait()
+			Spawns.place(player)
+		end)
+	end)
 end
 
 -- Must run after every service has had its chance to attach handlers. Any

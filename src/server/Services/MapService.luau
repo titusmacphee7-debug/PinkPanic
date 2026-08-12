@@ -1,11 +1,31 @@
 --!strict
--- MapService — code-generated "Pink Mall" arena (NOD-41/NOD-65 first pass).
--- A symmetric FFA layout in the locked palette (docs/ART_DIRECTION.md):
--- central fountain atrium, shop platforms with kiosk cover along both long
--- sides, second-floor walkways with corner ramps, and 10 spawn pads.
--- Everything is parented under workspace.PinkPanicMap; foreign SpawnLocations
--- (e.g. the Baseplate's) are disabled so all spawning happens in-arena.
+-- MapService — decides which arena a round is played in.
+--
+-- ⚠️ THIS FILE STILL CONTAINS A MAP GENERATOR, AND IT SHOULD NOT.
+--
+-- CLAUDE.md is unambiguous: "Never generate lobbies or maps. Earlier versions
+-- built a placeholder plaza and arena procedurally; it got baked into saved
+-- place files and kept coming back after Titus built his own. All generator
+-- code was deleted on purpose. Do not reintroduce it."
+--
+-- This one survived the wipe. It builds a full "Pink Mall" — floor, walls,
+-- fountain, kiosks, two walkways, ramps and ten spawn pads — into
+-- workspace.PinkPanicMap, and it does so on EVERY boot where no hand-built
+-- Arena exists. For a long time it reported "OK" with no detail while doing
+-- it, which is the exact silent-success the boot manifest exists to end.
+--
+-- It is kept only as a place to stand while the real map is built, and it is
+-- now LOUD about being a placeholder. Delete `buildFloorAndWalls` and
+-- everything it calls the day a real Arena is finished — the selection logic
+-- at the bottom is the part worth keeping.
+--
+-- A Workspace folder named exactly "Arena" wins over it, always.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
+
+local SYSTEM = "MapService"
 local MAP_NAME = "PinkPanicMap"
 
 -- The arena generates FAR from the world origin so it can never overlap or
@@ -265,16 +285,44 @@ local function buildSpawns()
 	end
 end
 
+-- Counts what a map actually offers to spawn on, so the manifest can say
+-- "your Arena has no spawn points" instead of a round quietly dropping
+-- everyone at the world origin.
+local function countSpawns(container: Instance): number
+	local count = 0
+	for _, descendant in container:GetDescendants() do
+		if descendant:IsA("SpawnLocation") or descendant:GetAttribute("PPSpawn") then
+			count += 1
+		end
+	end
+	return count
+end
+
 function MapService.init()
 	local existing = workspace:FindFirstChild(MAP_NAME)
 
 	-- A hand-built map named "Arena" replaces the generated mall entirely:
-	-- put SpawnLocations inside it and rounds happen there. Any saved
-	-- generated mall gets cleaned up.
-	if workspace:FindFirstChild("Arena") then
+	-- put SpawnLocations or PPSpawn-tagged parts inside it and rounds happen
+	-- there. Any saved generated mall gets cleaned up.
+	local arena = workspace:FindFirstChild("Arena")
+	if arena then
+		local removed = ""
 		if existing then
 			existing:Destroy()
+			removed = ", removed a leftover generated mall"
 		end
+
+		local spawns = countSpawns(arena)
+		if spawns == 0 then
+			Diagnostics.warn(
+				SYSTEM,
+				`hand-built Arena in use{removed} — but it has NO spawn points. `
+					.. "Add SpawnLocations, or parts with a PPSpawn attribute."
+			)
+			return
+		end
+
+		Diagnostics.ok(SYSTEM, `hand-built Arena, {spawns} spawn point(s){removed}`)
 		return
 	end
 
@@ -282,6 +330,11 @@ function MapService.init()
 	-- the origin stamp) is stale: destroy and regenerate in place.
 	if existing then
 		if existing:GetAttribute("ArenaOrigin") == ARENA_ORIGIN then
+			Diagnostics.warn(
+				SYSTEM,
+				`running on the GENERATED placeholder mall ({countSpawns(existing)} spawns). `
+					.. "Build a Workspace folder named exactly 'Arena' to replace it — see CLAUDE.md."
+			)
 			return
 		end
 		existing:Destroy()
@@ -313,6 +366,15 @@ function MapService.init()
 			descendant.Enabled = false
 		end
 	end
+
+	-- Loud on purpose, every boot, until a real Arena exists. This generator
+	-- is the thing CLAUDE.md says was deleted; a silent OK is how it survived
+	-- long enough to be generating a mall nobody knew about.
+	Diagnostics.warn(
+		SYSTEM,
+		`GENERATED a placeholder mall ({countSpawns(newFolder)} spawns) because no Arena exists. `
+			.. "Build a Workspace folder named exactly 'Arena' and this stops — see CLAUDE.md."
+	)
 end
 
 return MapService
