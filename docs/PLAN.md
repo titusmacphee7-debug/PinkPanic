@@ -30,8 +30,13 @@ palettes at once — soft pastel *and* candy-saturated, not one or the other.
 cutesy guns."* Weapon models and camos are not the polish pass, they are the
 retention mechanic. Treat them accordingly.
 
-**Characters:** Roblox avatars, kept — with outfits layered on, **like Arsenal**.
-Players stay themselves. We do not replace the avatar.
+**Characters:** **one standard R15 character, same size for everyone**, with a
+free simplified character creator on first join. The player's own Roblox avatar
+does not carry over; instead they build a look from options we authored, so
+everyone is uniform to a bullet and nothing imported can clash with the art
+direction. Outfits are how you look, not a layer over how you already looked.
+See §4.5 — this reverses an earlier Arsenal-style plan and the reasons are
+there.
 
 **Hit vs kill feedback — a real distinction she drew:** hearts and sparkles on
 every *hit* is a maybe-not. On a **kill**, absolutely. So hitmarkers stay crisp
@@ -549,20 +554,69 @@ gun, while a gun-specific camo was drawn against that one gun's UV and lands
 correctly by construction. Optional `SurfaceAppearance` support layers on later
 for PBR camos (normal/roughness/metalness) without changing this path.
 
-### Character outfits — Arsenal-style, per Leah
+### Character outfits — one standard character, per Leah
 
-**Players keep their own Roblox avatar.** We do not standardize or replace it.
-Outfits layer on top: clothing texture IDs and accessory models applied over
-whatever character the player brought.
+**Everyone is the same character.** R15, one rig, one size. Nothing of the
+player's own Roblox avatar carries over — not the body, not the face, not the
+clothing, not the accessories.
+
+This is a reversal of an earlier plan that kept players' avatars and layered
+outfits on top. Two things it buys, and both are worth more than the identity
+it costs:
+
+**Fairness is structural, not compensated for.** Roblox avatars vary enormously
+in height and width, and in a shooter that is a live advantage — a tall thin
+character is a harder target than a wide one, at every range, in every fight.
+The earlier plan solved this by resolving damage against an invisible
+normalized hit volume welded over whatever body the player brought. That works,
+but it means the thing you shoot at is not the thing you see, and every
+animation, scaling change and edge case is one more way for those two to
+diverge. One rig for everyone deletes the problem instead of correcting for it:
+what you aim at IS the hitbox, because there is only one shape in the game.
+
+**Outfits stop being decoration and become the identity system.** When players
+keep their own avatar, an outfit competes with a look they already have and
+mostly reads as an accessory. When everyone starts identical, the outfit is the
+*entire* answer to "who am I on this screen" — which makes it the most valuable
+cosmetic category in the game rather than the third or fourth, and gives the
+pink art direction a canvas it actually controls.
+
+The cost is real: a player cannot bring themselves into the game, and that is a
+genuine loss for a Roblox audience used to it.
+
+### The character creator answers that cost
+
+Titus's solve, and it is better than the problem it fixes. **A simplified,
+Sims-style creator on first join, where everything is free.** Paid outfits and
+cosmetics layer on afterwards.
+
+It beats the obvious alternative — a handful of free preset characters — on
+arithmetic. Fifteen presets is fifteen pieces of art and fifteen possible
+players. Six categories with a handful of options each is the *same* amount of
+art and thousands of distinct-looking players, because the combinations do the
+work rather than the asset count. Adding one hairstyle then adds it to every
+combination that already exists, which is the same
+convention-over-configuration argument the whole cosmetic registry rests on.
+
+And it lands the trade precisely: **players get to be themselves without anyone
+being able to ruin the aesthetic or the game.** Every option is authored by us,
+so nothing imported can clash with the pink direction — and, critically:
+
+> **No creator choice may change the silhouette.** Face, eyes, hair, skin tone,
+> colours, base outfit: free and generous. Height, build, proportions, anything
+> that alters the collision or visual footprint: never.
+
+That rule is enforced where the rig is applied, not in the creator's option
+list, so it cannot be broken by adding content later.
+
+The free tier and the paid tier are one system: creator options and purchasable
+outfits come from the same registry and appear in the same picker, marked owned
+or not. A paid outfit is not a different mechanism — it is an option with a
+price and an ownership check. Which makes the creator the free-to-play rule
+made literal.
 
 Same registry pattern — `ReplicatedStorage/Assets/Outfits/<OutfitId>`, scanned
 at boot, no per-outfit code.
-
-The cost of keeping avatars is that hitboxes vary with body type. We solve that
-where it actually matters rather than by taking the avatar away: **damage is
-resolved against a normalized hit volume** derived from the rig, not against
-whatever mesh the player is wearing. Fairness comes from the hit resolution, not
-from making everyone look the same.
 
 ### The launch cosmetic set — eight categories
 
@@ -572,7 +626,7 @@ rarity tiers:
 | Category | Applies to | Notes |
 |---|---|---|
 | **Camo** | skin-region MeshParts | shared UV, one texture fits all guns |
-| **Outfit** | avatar layer | clothing + accessories, Arsenal-style over the player's own avatar |
+| **Outfit** | the standard character | clothing + accessories on one uniform R15 rig — this IS how you look |
 | **Charm** | `Mount_Charm` socket | dangles, small physics |
 | **Kill effect** | plays on YOUR kill | **hearts and sparkles live here** |
 | **Bullet tracer** | projectile trail | colour, shape, particle — the one you see constantly |
