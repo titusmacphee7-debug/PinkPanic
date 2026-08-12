@@ -110,19 +110,35 @@ learnable, never a fight.
 ## Render step ordering
 
 Several systems write the camera every frame. They are chained deliberately —
-breaking this order causes jitter that looks like a physics bug. This is what
-currently EXISTS; `PinkPanicViewmodel` and `PinkPanicSkid` went with the combat
-rewrite and come back with M11.
+breaking this order causes jitter that looks like a physics bug.
+
+**`client/Camera/CameraRig.luau` owns every camera `BindToRenderStep`.** Ask it
+for a slot; never pick a priority yourself:
+
+```lua
+CameraRig.claim("Aim", "WeaponController", stepRecoil)
+```
 
 ```
 PinkPanicMovement      Input+1   (after Roblox's control script, which
                                   writes MoveDirection at Input)
 engine Camera (200)
-  → PinkPanicCamera      +1
-  → PinkPanicAim         +2      (recoil)
-  → PinkPanicSlideRoll   +3      (slide lean; skipped in the lobby)
-PinkPanicMouseUnlock   Last
+  → Base        +1   PinkPanicCamera      the shot itself
+  → Aim         +2   PinkPanicAim         recoil, always a delta
+  → Effects     +3   PinkPanicSlideRoll   roll, dive tilt, landing dip, FOV
+  → Viewmodel   +4   PinkPanicViewmodel   the gun (M11, unclaimed)
+                Last-1  PinkPanicCameraAudit
+  → MouseUnlock Last  PinkPanicMouseUnlock
 ```
+
+The rig records what it wrote and checks at `Last-1` that the camera still says
+that. Anything writing the camera outside the chain warns by name after half a
+second of drift — verified by planting a rogue writer at Camera+5, which was
+caught at 0.35 studs. This catches the SYMPTOM, not the syntax, so it works for
+a plugin or a system nobody has written yet.
+
+Camera tuning lives in `shared/Config/CameraConfig.luau` — all of it, including
+the slide lean, which is caused by a movement state but is not a movement number.
 
 Never bind at exactly `Input`: that is where Roblox's own control script lives,
 and sharing a priority leaves the order down to whoever registered first —
@@ -258,11 +274,17 @@ explicitly on 2026-08-10. `RoundService` holds in `Waiting` until *both*
 `EnterPortal`. There is no timer, no pad path, and no Studio exception —
 walking somewhere can never drop you into a match.
 
-The consequence: **a solo Studio session can't start a round**, so combat,
-respawn, scoring and payouts are only testable with `Test → Players → 2
-Players`. The lobby itself (camera, cursor, pads, armory, loadout) is still
-fully testable alone — and so is **all** of movement, because the lobby profile
-now allows slide, dive and mantle. It used to exclude them on the grounds that
+**Until RoundService exists, standing in the `Arena` folder IS the round.**
+`ClientData.fighting()` is the one answer — `not inLobby() or inArena()` — and
+both the trigger and the camera read it. Before NOD-142 only the trigger did,
+so you could shoot people in the arena while looking through the lobby's fixed
+cinematic camera with a free mouse cursor. Delete `inArena` the day M9 lands.
+
+The consequence: **a solo Studio session can't start a round**, so respawn,
+scoring and payouts are only testable with `Test → Players → 2 Players`. The
+lobby itself (camera, cursor, pads, armory, loadout) is still fully testable
+alone — and so is **all** of movement, because the lobby profile now allows
+slide, dive and mantle. It used to exclude them on the grounds that
 the fixed lobby camera could not show an arc, which was a rule about the camera
 written as a rule about the moves: with no round loop until M9, "not in the
 lobby" meant "nowhere", and all three would have shipped never having run. The

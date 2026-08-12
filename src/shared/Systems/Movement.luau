@@ -64,24 +64,31 @@ Movement.STATES = STATES
 -- eleven times.
 -- ---------------------------------------------------------------------------
 
+-- TacSprint sits beside Sprint in every row that has Sprint, and that is a rule
+-- `validate` enforces rather than a habit. It was NOT true at first — TacSprint
+-- was reachable only from Sprint, on the theory that a tactical sprint is a
+-- sprint you upgraded — and the consequence was found in a log rather than in
+-- the table: double-tapping shift out of a crouch asked for Crouch → TacSprint,
+-- which was refused every frame, and left the player STUCK crouched until they
+-- let go of the key. "Sometimes crouch doesn't work", exactly as advertised.
 local EDGES: { [State]: { State } } = {
-	Idle = { "Walk", "Sprint", "Crouch", "Prone", "Mantle" },
-	Walk = { "Idle", "Sprint", "Crouch", "Prone", "Mantle" },
+	Idle = { "Walk", "Sprint", "TacSprint", "Crouch", "Prone", "Mantle" },
+	Walk = { "Idle", "Sprint", "TacSprint", "Crouch", "Prone", "Mantle" },
 	-- Sprint into a slide, or into a tactical sprint. NOT straight to prone:
 	-- that is a dive, and a dive is its own state with its own arc.
 	Sprint = { "Idle", "Walk", "TacSprint", "Crouch", "Slide", "Dive", "Mantle" },
 	-- Tactical sprint has your gun down, so it cannot go anywhere that shoots
 	-- without passing through Sprint first.
 	TacSprint = { "Sprint", "Walk", "Idle", "Slide", "Dive", "Mantle" },
-	Crouch = { "Idle", "Walk", "Sprint", "Prone", "Mantle" },
+	Crouch = { "Idle", "Walk", "Sprint", "TacSprint", "Prone", "Mantle" },
 	Prone = { "Crouch", "Idle" },
 	-- A slide ends standing, crouched or prone; you cannot re-enter a slide
 	-- from a slide, which is what makes slide-cancelling a technique instead of
 	-- a hold-the-key exploit.
-	Slide = { "Idle", "Walk", "Sprint", "Crouch", "Prone" },
+	Slide = { "Idle", "Walk", "Sprint", "TacSprint", "Crouch", "Prone" },
 	Dive = { "Prone", "Crouch", "Idle" },
 	Air = { "Idle", "Walk", "Sprint", "TacSprint", "Crouch", "Dive", "Mantle" },
-	Mantle = { "Idle", "Walk", "Sprint", "Crouch" },
+	Mantle = { "Idle", "Walk", "Sprint", "TacSprint", "Crouch" },
 	-- Stun releases to standing, whatever you were doing when it landed.
 	Stun = { "Idle", "Walk", "Crouch" },
 }
@@ -399,6 +406,20 @@ function Movement.validate()
 		end
 		if value <= 0 then
 			table.insert(problems, `directional.{name} is {value} — a direction you cannot move in`)
+		end
+	end
+
+	-- Anywhere you can start sprinting, you can start tactically sprinting.
+	--
+	-- This is here because the alternative was a bug that hid in the input layer
+	-- rather than in the table: `desiredState` returns TacSprint the moment the
+	-- key is double-tapped, from whatever state you were in, so a row with
+	-- Sprint and without TacSprint is a state the player can get STUCK in — the
+	-- transition is refused every frame for as long as the key is held. Found in
+	-- a log for Crouch; enforced here so it cannot come back for any of them.
+	for from, row in allowed do
+		if row.Sprint and not row.TacSprint then
+			table.insert(problems, `{from} can enter Sprint but not TacSprint — a double-tap from {from} sticks`)
 		end
 	end
 

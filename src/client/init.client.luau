@@ -9,13 +9,14 @@ local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-12-J · slide, dive and mantle (NOD-141)"
+local CLIENT_BUILD_TAG = "2026-08-12-K · camera rig owns the render chain (NOD-142)"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false
 
 Diagnostics.expect(
 	"Remotes",
+	"CameraRig",
 	"ClientData",
 	"EffectsController",
 	"EconomyController",
@@ -47,6 +48,10 @@ end
 -- guarded init() but not require(), which left the worse half unguarded: a
 -- module that fails to compile never reaches its init at all.
 local controllers: { { name: string, module: any } } = {
+	-- First. It owns every camera render-step binding (NOD-142), and ClientData
+	-- claims the mouse-unlock slot the moment a menu opens — a slot claimed
+	-- before the rig exists is a camera write nobody is ordering.
+	{ name = "CameraRig", module = Diagnostics.load("CameraRig", script.Camera.CameraRig) },
 	{ name = "ClientData", module = Diagnostics.load("ClientData", script.ClientData) },
 	{ name = "EffectsController", module = Diagnostics.load("EffectsController", script.Controllers.EffectsController) },
 	{ name = "EconomyController", module = Diagnostics.load("EconomyController", script.Controllers.EconomyController) },

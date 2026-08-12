@@ -32,6 +32,7 @@ local EffectsController = require(script.Parent.EffectsController)
 -- One direction only: the trigger tells movement that a sprint is over.
 -- MovementController does not require this file back, so there is no cycle.
 local MovementController = require(script.Parent.MovementController)
+local CameraRig = require(script.Parent.Parent.Camera.CameraRig)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local Components = require(script.Parent.Parent.UI.Components)
 
@@ -69,79 +70,14 @@ local sprinting = false
 -- Gating
 -- ---------------------------------------------------------------------------
 
--- Standing in the arena, as a stand-in for the round state.
---
--- The round loop was deleted in the rebuild and has not landed again, so
--- ClientData.roundState is permanently "Waiting" and inLobby() is permanently
--- true. Gating combat on that alone would mean the trigger can NEVER fire —
--- the firing loop would be finished, correct, and unreachable, which is
--- indistinguishable from broken.
---
--- So: if your feet are in the arena, you can shoot. Delete this the moment
--- RoundService exists and the roundState check below is enough on its own.
--- Recomputed rarely. The arena is content and does not move, so this is a
--- scan of a few thousand parts once every ten seconds rather than per frame.
-local ARENA_RECHECK_SECONDS = 10
-
-local arenaBox: { min: Vector3, max: Vector3 }? = nil
-local arenaCheckedAt = -math.huge
-
-local function arenaBounds(): { min: Vector3, max: Vector3 }?
-	local now = os.clock()
-	if now - arenaCheckedAt < ARENA_RECHECK_SECONDS then
-		return arenaBox
-	end
-	arenaCheckedAt = now
-
-	-- The arena is a FOLDER, per the attribute conventions in CLAUDE.md, so
-	-- there is no GetBoundingBox to call — that was the first version and it
-	-- threw, which `combatActive` swallowed as "not in the arena". A trigger
-	-- that never fires and reports nothing is the worst of both.
-	local arena = workspace:FindFirstChild("Arena") or workspace:FindFirstChild("PinkPanicMap")
-	if not arena then
-		arenaBox = nil
-		return nil
-	end
-
-	local min: Vector3? = nil
-	local max: Vector3? = nil
-	for _, part in arena:GetDescendants() do
-		if not part:IsA("BasePart") then
-			continue
-		end
-		local half = part.Size / 2
-		local lo, hi = part.Position - half, part.Position + half
-		min = if min then Vector3.new(math.min(min.X, lo.X), math.min(min.Y, lo.Y), math.min(min.Z, lo.Z)) else lo
-		max = if max then Vector3.new(math.max(max.X, hi.X), math.max(max.Y, hi.Y), math.max(max.Z, hi.Z)) else hi
-	end
-	if not min or not max then
-		arenaBox = nil
-		return nil
-	end
-
-	-- Generous vertically: the box stops at the rooftops, and falling off one
-	-- should not disarm you on the way down.
-	arenaBox = { min = min - Vector3.new(0, 80, 0), max = max + Vector3.new(0, 80, 0) }
-	return arenaBox
-end
-
-local function inArena(root: BasePart): boolean
-	local box = arenaBounds()
-	if not box then
-		return false
-	end
-	local p = root.Position
-	return p.X >= box.min.X
-		and p.X <= box.max.X
-		and p.Y >= box.min.Y
-		and p.Y <= box.max.Y
-		and p.Z >= box.min.Z
-		and p.Z <= box.max.Z
-end
-
 -- Shooting is off while any menu owns the mouse, off in the lobby (which has
 -- its own cosmetic shot), and off when you are dead. All three used to be
 -- checked in separate places with three slightly different answers.
+--
+-- "Am I in a fight" moved to `ClientData.fighting()` (NOD-142), because the
+-- CAMERA needs exactly the same answer: whichever rule decides the trigger
+-- works has to be the rule that decides you are in first person, or you end up
+-- shooting people through a lobby camera.
 local function combatActive(): boolean
 	if ClientData.menuOpen() or ClientData.armoryBusy then
 		return false
@@ -154,10 +90,7 @@ local function combatActive(): boolean
 		return false
 	end
 
-	if ClientData.inLobby() and not inArena(root) then
-		return false
-	end
-	return true
+	return ClientData.fighting()
 end
 
 -- ---------------------------------------------------------------------------
@@ -414,10 +347,11 @@ function WeaponController.init()
 
 	RunService.Heartbeat:Connect(step)
 
-	-- One priority above the camera itself. See the render step order in
-	-- CLAUDE.md: everything that writes the camera is chained deliberately and
-	-- getting the order wrong produces jitter that reads as a physics bug.
-	RunService:BindToRenderStep(AIM_BIND, Enum.RenderPriority.Camera.Value + 2, stepRecoil)
+	-- The Aim slot, claimed from the rig rather than bound here (NOD-142). The
+	-- order of the camera chain was hard-won and is not this file's to know: it
+	-- asks for the slot that runs after the shot and before the effects, and the
+	-- rig decides what number that is.
+	CameraRig.claim("Aim", SYSTEM, stepRecoil)
 
 	-- Releasing the trigger when the window loses focus. Without it, alt-tab
 	-- mid-burst leaves the mouse button logically held and the gun keeps

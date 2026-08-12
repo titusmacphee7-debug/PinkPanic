@@ -49,11 +49,11 @@ local Theme = require(script.Parent.Parent.UI.Theme)
 local Components = require(script.Parent.Parent.UI.Components)
 local Actuator = require(script.Parent.Parent.Movement.Actuator)
 local Traversal = require(script.Parent.Parent.Movement.Traversal)
+local CameraRig = require(script.Parent.Parent.Camera.CameraRig)
 local Firing = require(script.Parent.Parent.Systems.Firing)
 
 local SYSTEM = "MovementController"
 local BIND = "PinkPanicMovement"
-local ROLL_BIND = "PinkPanicSlideRoll"
 
 local MovementController = {}
 
@@ -398,6 +398,7 @@ end
 
 local function endSlide(current: Actuator.Rig)
 	slideCooldownUntil = clock + Config.slide.cooldownSeconds
+	CameraRig.setSlideHeading(nil)
 	if proneWanted() then
 		enter(current, "Prone")
 	elseif crouchWanted() then
@@ -459,6 +460,11 @@ local function stepSlide(current: Actuator.Rig, deltaTime: number)
 	if wanted then
 		slideHeading = turnToward(slideHeading, wanted, math.rad(slide.turnRateDeg) * deltaTime)
 	end
+	-- The lean is the rig's (NOD-142); the heading is ours. Handing over a
+	-- vector rather than writing the camera is what keeps every camera write in
+	-- one chain — and it means the roll is tuned in CameraConfig with the rest
+	-- of the camera instead of in the middle of the movement numbers.
+	CameraRig.setSlideHeading(slideHeading)
 
 	current.humanoid.WalkSpeed = speed
 	current.humanoid:Move(slideHeading, false)
@@ -815,46 +821,6 @@ local function step(deltaTime: number)
 end
 
 -- ---------------------------------------------------------------------------
--- Camera roll (PinkPanicSlideRoll, Camera+3 in the documented chain)
---
--- The roll IS the carve. It is proportional to how far the slide heading has
--- turned away from where you are looking, so a straight slide gets none and a
--- slide you are steering leans into it — which makes the steering visible, and
--- the steering is the part of a slide players are supposed to feel.
--- ---------------------------------------------------------------------------
-
-local rollNow = 0
-
-local function slideRoll(deltaTime: number)
-	local camera = workspace.CurrentCamera
-	if not camera then
-		return
-	end
-
-	local target = 0
-	local current = rig
-	-- Skipped in the lobby on purpose: there the camera is a fixed hand-placed
-	-- shot of the storefront row, and rolling it tilts the storefront rather
-	-- than the player. That is the whole of what "the lobby cannot show an arc"
-	-- ever really meant, and it is a rule about this function, not about slides.
-	if current and machine.state == "Slide" and not ClientData.inLobby() then
-		local right = current.root.CFrame.RightVector
-		local flat = Vector3.new(right.X, 0, right.Z)
-		if flat.Magnitude > 1e-4 then
-			target = math.rad(Config.slide.rollDegrees) * math.clamp(flat.Unit:Dot(slideHeading), -1, 1)
-		end
-	end
-
-	local rate = if math.abs(target) > math.abs(rollNow) then Config.slide.rollInSeconds else Config.slide.rollOutSeconds
-	rollNow += (target - rollNow) * (1 - math.exp(-deltaTime / math.max(rate, 1e-3)))
-	if math.abs(rollNow) < 1e-4 then
-		rollNow = 0
-		return
-	end
-	camera.CFrame = camera.CFrame * CFrame.Angles(0, 0, rollNow)
-end
-
--- ---------------------------------------------------------------------------
 -- Trigger counts
 --
 -- The old build had a slide that never fired. It was in the code, it compiled,
@@ -1135,9 +1101,6 @@ function MovementController.init()
 	-- sessions. One above it is always after — which is also what lets
 	-- `Humanoid:Move` override the control script during a slide or a dive.
 	RunService:BindToRenderStep(BIND, Enum.RenderPriority.Input.Value + 1, step)
-	-- Camera+3, between the aim recoil and the viewmodel. Documented in
-	-- CLAUDE.md; breaking that order is the jitter that looks like a physics bug.
-	RunService:BindToRenderStep(ROLL_BIND, Enum.RenderPriority.Camera.Value + 3, slideRoll)
 
 	buildOverlay()
 

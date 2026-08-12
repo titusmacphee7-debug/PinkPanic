@@ -22,6 +22,10 @@ export type EquippedLoadout = {
 export type PlayerSettings = {
 	sensitivity: number,
 	volume: number,
+	-- v3, added without a migration: `reconcile` fills keys that are nil, so a
+	-- new field with a default costs nothing and a bump would be a chance to
+	-- damage somebody's collection for no reason.
+	fov: number,
 }
 
 export type LifetimeStats = {
@@ -149,6 +153,8 @@ export type PlayerData = {
 	onboarded: boolean,
 }
 
+local CameraConfig = require(script.Parent.Parent.Config.CameraConfig)
+
 local PlayerDataSchema = {}
 
 PlayerDataSchema.VERSION = 3
@@ -231,6 +237,10 @@ function PlayerDataSchema.default(): PlayerData
 		settings = {
 			sensitivity = 1,
 			volume = 1,
+			-- From CameraConfig, not a literal. Two files each naming the default
+			-- FOV is two answers to one question, and the one that drifts is
+			-- always the one nobody is looking at.
+			fov = CameraConfig.baseFov,
 		},
 		stats = {
 			kills = 0,

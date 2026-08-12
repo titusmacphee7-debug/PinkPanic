@@ -1,6 +1,7 @@
 --!strict
--- SettingsController — ⚙️ panel (NOD-44): mouse sensitivity + volume sliders
--- and the starting-weapon loadout picker (NOD-28), all persisted server-side.
+-- SettingsController — ⚙️ panel (NOD-44): mouse sensitivity, volume and
+-- field-of-view sliders and the starting-weapon loadout picker (NOD-28), all
+-- persisted server-side.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,7 +10,9 @@ local UserInputService = game:GetService("UserInputService")
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
 local WeaponConfig = require(ReplicatedStorage.Shared.Config.WeaponConfig)
+local CameraConfig = require(ReplicatedStorage.Shared.Config.CameraConfig)
 local ClientData = require(script.Parent.Parent.ClientData)
+local CameraRig = require(script.Parent.Parent.Camera.CameraRig)
 local Theme = require(script.Parent.Parent.UI.Theme)
 
 
@@ -22,6 +25,7 @@ local modalUnlock: TextButton
 local weaponButtons: { [string]: TextButton } = {}
 local sensSlider: { set: (number) -> () }
 local volSlider: { set: (number) -> () }
+local fovSlider: { set: (number) -> () }
 local suppressCallbacks = false
 
 local function mkText(parent: Instance, textSize: number, color: Color3): TextLabel
@@ -173,6 +177,10 @@ local function applySnapshot(data: any)
 		if type(settings.volume) == "number" then
 			volSlider.set(settings.volume)
 		end
+		if type(settings.fov) == "number" then
+			fovSlider.set(settings.fov)
+			CameraRig.setFov(settings.fov)
+		end
 	end
 	local equipped = data.equipped
 	if type(equipped) == "table" and type(equipped.weapon) == "string" then
@@ -207,7 +215,8 @@ local function buildGui()
 	panel = Instance.new("Frame")
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.Size = UDim2.fromOffset(400, 330)
+	-- Taller than it was: the field-of-view slider is a third row (NOD-142).
+	panel.Size = UDim2.fromOffset(400, 386)
 	panel.BackgroundColor3 = Theme.color.surface
 	panel.Visible = false
 	round(panel, 18)
@@ -259,14 +268,31 @@ local function buildGui()
 		persist({ volume = value })
 	end)
 
+	local fovLabel = mkText(panel, 17, Theme.color.text)
+	fovLabel.Position = UDim2.new(0, 24, 0, 168)
+	fovLabel.Size = UDim2.new(1, -48, 0, 20)
+	fovLabel.TextXAlignment = Enum.TextXAlignment.Left
+	fovLabel.Text = "Field of view"
+	-- Applied live as you drag and persisted on release. FOV is the one setting
+	-- you cannot judge from a number, so it has to change while you are looking
+	-- at it — and the range comes from CameraConfig, the same table the server
+	-- validates against.
+	fovSlider = mkSlider(panel, 196, CameraConfig.fovMin, CameraConfig.fovMax, function(value)
+		if not suppressCallbacks then
+			CameraRig.setFov(value)
+		end
+	end, function(value)
+		persist({ fov = value })
+	end)
+
 	local loadoutLabel = mkText(panel, 17, Theme.color.text)
-	loadoutLabel.Position = UDim2.new(0, 24, 0, 176)
+	loadoutLabel.Position = UDim2.new(0, 24, 0, 232)
 	loadoutLabel.Size = UDim2.new(1, -48, 0, 20)
 	loadoutLabel.TextXAlignment = Enum.TextXAlignment.Left
 	loadoutLabel.Text = "Starting weapon (next spawn)"
 
 	local row = Instance.new("Frame")
-	row.Position = UDim2.new(0, 24, 0, 204)
+	row.Position = UDim2.new(0, 24, 0, 260)
 	row.Size = UDim2.new(1, -48, 0, 40)
 	row.BackgroundTransparency = 1
 	local layout = Instance.new("UIListLayout")

@@ -9,12 +9,11 @@
 -- chase, so every transition feels like one continuous camera.
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 local ClientData = require(script.Parent.Parent.ClientData)
+local CameraRig = require(script.Parent.Parent.Camera.CameraRig)
 
 local SYSTEM = "CameraController"
 
@@ -25,6 +24,10 @@ local CHASE_SPEED = 6 -- camera position responsiveness (higher = snappier)
 local LEAD_SECONDS = 0.25 -- how far ahead of your velocity the camera drifts
 local LEAD_MAX = 5 -- studs of maximum lead
 local LEAD_SMOOTHING = 4 -- how quickly the lead itself eases in/out
+-- How close counts as arrived. Well under a pixel at any sane FOV, and the
+-- point of it is that the jitter test reads exactly zero rather than "small".
+local SNAP_STUDS = 0.002
+local SNAP_DOT = 0.9999999
 
 local UserGameSettings = UserSettings():GetService("UserGameSettings")
 
@@ -35,6 +38,7 @@ local shotOverride: CFrame? = nil -- interiors (NOD-90) will set fixed shots her
 local currentCFrame: CFrame? = nil
 local smoothedLead = Vector3.zero
 local combatApplied = false
+local wasFighting = false
 
 local function lobbyFolder(): Folder?
 	return workspace:FindFirstChild("PinkPanicLobby") :: Folder?
@@ -180,7 +184,29 @@ local function update(deltaTime: number)
 		return
 	end
 
-	if not ClientData.inLobby() then
+	-- `fighting()` rather than `not inLobby()`. The round loop is deleted until
+	-- M9 and `inLobby()` is permanently true, so this used to mean the arena got
+	-- the LOBBY camera: you could shoot people while looking at a fixed
+	-- cinematic shot of the storefront row, and every first-person camera effect
+	-- was unreachable code. Standing in the arena is standing in a fight, and it
+	-- is the same answer the trigger uses.
+	local fighting = ClientData.fighting()
+
+	-- The cursor follows the same line. It used to be re-evaluated only when a
+	-- menu opened or the round state changed, neither of which happens when you
+	-- WALK into the arena — so you arrived in first person with a free mouse
+	-- pointer floating over the middle of the screen.
+	if fighting ~= wasFighting then
+		wasFighting = fighting
+		ClientData.updateMouseUnlock()
+	end
+
+	-- The rig's roll, tilt, dip and FOV kicks are all effects about a view you
+	-- look THROUGH. The lobby shot is one you look AT, so it is told which world
+	-- it is in rather than guessing from the camera type.
+	CameraRig.setCombat(fighting)
+
+	if fighting then
 		if not combatApplied then
 			setCombatCamera()
 		end
@@ -222,7 +248,21 @@ local function update(deltaTime: number)
 	end
 	local alpha = 1 - math.exp(-deltaTime * CHASE_SPEED)
 	local current = currentCFrame
-	currentCFrame = if current then current:Lerp(desired, alpha) else desired
+	if not current then
+		currentCFrame = desired
+	elseif
+		(desired.Position - current.Position).Magnitude < SNAP_STUDS
+		and math.abs(desired.LookVector:Dot(current.LookVector)) > SNAP_DOT
+	then
+		-- Arrived. An exponential chase converges but never actually gets there,
+		-- so a camera watching a player who is standing perfectly still keeps
+		-- moving forever by ever-smaller amounts. Sub-pixel — measured worst
+		-- 0.028 falling to nothing — but it makes "is the camera stable?"
+		-- unanswerable, and the answer to that question should be a flat zero.
+		currentCFrame = desired
+	else
+		currentCFrame = current:Lerp(desired, alpha)
+	end
 	camera.CFrame = currentCFrame :: CFrame
 end
 
@@ -238,7 +278,10 @@ function CameraController.setShot(cframe: CFrame?)
 end
 
 function CameraController.init()
-	RunService:BindToRenderStep("PinkPanicCamera", Enum.RenderPriority.Camera.Value + 1, update)
+	-- Through the rig, not straight at RunService. The chain's order is the rig's
+	-- to own (NOD-142) — this file asks for the Base slot and does not get to
+	-- know, or accidentally change, what number that is.
+	CameraRig.claim("Base", SYSTEM, update)
 
 	-- One attempt now so a lobby that has already replicated reports inside the
 	-- manifest; if it hasn't, the render step reports the moment it does. Give

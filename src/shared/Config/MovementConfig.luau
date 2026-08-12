@@ -175,10 +175,9 @@ MovementConfig.slide = {
 	-- It CURVES, it does not pivot — a slide you can spin on the spot is a slide
 	-- that dodges bullets, and the whole trade is supposed to be that you cannot.
 	turnRateDeg = 190,
-	-- Camera roll, degrees, applied at PinkPanicSlideRoll in the render chain.
-	rollDegrees = 7,
-	rollInSeconds = 0.1,
-	rollOutSeconds = 0.22,
+	-- The camera lean lives in CameraConfig (NOD-142), with the rest of the
+	-- camera. It is caused by a slide but it is not a movement number, and
+	-- keeping it here is how there came to be camera tuning in three files.
 }
 
 -- The decay curve, hand-tunable: speed as a fraction of the entry speed, sampled
