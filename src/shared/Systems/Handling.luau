@@ -53,6 +53,7 @@ end
 -- They are re-exported so a caller has one place to look.
 Handling.holsterTime = Weapon.holsterTime
 Handling.sprintToFire = Weapon.sprintToFire
+Handling.slideToFire = Weapon.slideToFire
 Handling.reloadTime = Weapon.reloadTime
 
 -- **The one people miss.** Ammo arrives partway through the animation, so
@@ -85,6 +86,7 @@ export type Timings = {
 	adsTime: number,
 	sprintToFire: number,
 	tacSprintToFire: number,
+	slideToFire: number,
 	equipTime: number,
 	holsterTime: number,
 	reloadTime: number,
@@ -98,6 +100,7 @@ function Handling.timings(stats: CombatStats.Resolved): Timings
 		adsTime = Handling.adsTime(stats),
 		sprintToFire = Handling.sprintToFire(stats, false),
 		tacSprintToFire = Handling.sprintToFire(stats, true),
+		slideToFire = Handling.slideToFire(stats),
 		equipTime = Handling.equipTime(stats),
 		holsterTime = Handling.holsterTime(stats),
 		reloadTime = Handling.reloadTime(stats, false),

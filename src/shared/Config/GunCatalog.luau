@@ -73,6 +73,10 @@ export type GunStats = {
 	velocity: number, -- studs/s
 	drop: number, -- studs/s^2 of bullet gravity
 	moveSpeedMult: number,
+	-- Sprint speed, separately from walk. Absent means the same as
+	-- `moveSpeedMult`. Name it when a gun should be fine to shuffle with and
+	-- bad to run with — which is most of the heavy end of the roster.
+	sprintSpeedMult: number?,
 	equipTime: number,
 	sprintToFire: number,
 	adsTime: number,
@@ -84,6 +88,7 @@ export type GunStats = {
 	reloadEmptyTime: number?,
 	reloadCancelTime: number?,
 	tacSprintToFire: number?,
+	slideToFire: number?,
 	-- Which recoil shape this gun climbs in, by name from RecoilConfig.patterns
 	-- (NOD-144). Absent means the one its CLASS uses, which is what most guns
 	-- should do — a pattern is a family trait, and hand-authoring one per gun is
@@ -93,10 +98,19 @@ export type GunStats = {
 
 export type GunDef = {
 	name: string,
+	-- The real weapon this is. Kept next to the joke name because the joke is
+	-- what players read and the archetype is what the model has to look like —
+	-- "Bestie" tells an artist nothing, "M4A1" tells them everything.
+	archetype: string,
 	class: GunClass,
 	slot: GunSlot,
 	rarity: Rarity,
 	price: number,
+	-- The level this unlocks at. Buying is gated on it server-side; TRYING is
+	-- not, deliberately — Titus: *"if you gatekeep trials by levels it defeats
+	-- the purpose because when you unlock the trial you unlock the gun."* The
+	-- trial is the shop window for a gun you cannot have yet.
+	unlockLevel: number,
 	-- **Why you would pick this over its neighbour, in one sentence.** Not
 	-- flavour text: it is the design justification, and a gun without one is a
 	-- gun that does not ship. `validate()` enforces that at boot rather than
@@ -132,12 +146,20 @@ for _, module in script.Parent.Guns:GetChildren() do
 		local ok, result = pcall(require, module)
 		if ok and type(result) == "table" then
 			local def = result :: GunDef
+			-- `archetype` and `unlockLevel` are defaulted rather than required
+			-- while the roster rework (NOD-148) runs one class at a time. A gun
+			-- that still has neither is a gun that has not been reworked yet,
+			-- which `GunCatalog.unconverted()` reports at boot — that is a
+			-- progress readout, not an error, and it disappears on its own as
+			-- the last class lands.
 			loaded[module.Name] = {
 				name = def.name,
+				archetype = def.archetype or "",
 				class = def.class,
 				slot = def.slot,
 				rarity = def.rarity,
 				price = math.floor(def.price * PRICE_MULTIPLIER + 0.5),
+				unlockLevel = def.unlockLevel or 1,
 				why = def.why,
 				stats = def.stats,
 			}
@@ -152,6 +174,19 @@ GunCatalog.guns = loaded
 -- Guns that failed to load, for the boot report. Empty is the only good answer.
 function GunCatalog.failures(): { string }
 	return failures
+end
+
+-- Guns still on the pre-rework roster: no `archetype`, so nobody has decided
+-- what real weapon they are. Shrinks to zero as NOD-148 lands class by class.
+function GunCatalog.unconverted(): { string }
+	local list: { string } = {}
+	for id, def in loaded do
+		if def.archetype == "" then
+			table.insert(list, id)
+		end
+	end
+	table.sort(list)
+	return list
 end
 
 function GunCatalog.get(gunId: string): GunDef?

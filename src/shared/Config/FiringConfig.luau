@@ -71,6 +71,15 @@ FiringConfig.derive = {
 	-- tacSprintToFire. Tactical sprint has the gun right down, and this is the
 	-- cost that stops it being a free upgrade over an ordinary sprint.
 	tacFromSprint = 1.9,
+	-- slideToFire. A slide is the most committed thing you can do with your
+	-- legs — you are low, moving on a locked heading, and your hands are nowhere
+	-- near ready. It costs MORE than a tactical sprint for the same reason it
+	-- covers more ground.
+	--
+	-- This is what stops slide-canceling into an instant shot from being the
+	-- strictly correct way to enter every room, which is the single most
+	-- copied-and-hated movement exploit in the genre.
+	slideFromSprint = 2.3,
 }
 
 -- ---------------------------------------------------------------------------

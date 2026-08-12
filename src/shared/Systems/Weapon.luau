@@ -62,6 +62,10 @@ export type State = {
 	sprintUntil: number,
 	-- Which kind of sprint is being ended, remembered from the press.
 	sprintTactical: boolean,
+	-- Mid-slide. Separate from the sprint flag because a slide ends into a
+	-- sprint far more often than it ends into standing still, and the slide's
+	-- longer deadline has to survive that transition.
+	slidingNow: boolean,
 	dead: boolean,
 
 	-- Aiming (NOD-143). Stored as an intent plus the moment it changed, rather
@@ -172,6 +176,16 @@ function Weapon.sprintToFire(stats: CombatStats.Resolved, tactical: boolean?): n
 	return stats.sprintToFire * Config.derive.tacFromSprint
 end
 
+-- Coming out of a slide, which is the most committed your legs can be. Costs
+-- more than a tactical sprint: a slide is low, heading-locked and fast, and if
+-- it were free to shoot out of it would be the correct way to enter every room.
+function Weapon.slideToFire(stats: CombatStats.Resolved): number
+	if stats.slideToFire then
+		return stats.slideToFire
+	end
+	return stats.sprintToFire * Config.derive.slideFromSprint
+end
+
 -- ---------------------------------------------------------------------------
 -- Construction
 -- ---------------------------------------------------------------------------
@@ -192,6 +206,7 @@ function Weapon.create(stats: CombatStats.Resolved): State
 		nextShotAt = 0,
 		sprintUntil = 0,
 		sprintTactical = false,
+		slidingNow = false,
 		dead = false,
 		triggerHeld = false,
 		triggerConsumed = false,
@@ -266,7 +281,33 @@ end
 -- Sprinting blocks the trigger, and letting go of sprint does not unblock it
 -- immediately — sprintToFire is the delay, and it is one of the few handling
 -- stats a good player actually feels.
+-- Sliding blocks the trigger like sprinting does, and unblocks more slowly.
+-- Shares `sprintUntil` deliberately: that field means "when the gun is ready
+-- again", and having a second deadline would mean two answers to one question
+-- and a race between them the first time you slide out of a sprint.
+function Weapon.setSliding(state: State, sliding: boolean)
+	if sliding then
+		state.slidingNow = true
+		state.sprintUntil = math.huge
+		if state.reload ~= "none" and state.clock < state.reloadAmmoAt then
+			Weapon.cancelReload(state)
+		end
+		state.burstRemaining = 0
+		return
+	end
+
+	if state.slidingNow then
+		state.slidingNow = false
+		state.sprintUntil = state.clock + Weapon.slideToFire(state.stats)
+	end
+end
+
 function Weapon.setSprinting(state: State, sprinting: boolean, tactical: boolean?)
+	-- A slide that ends by standing up into a sprint must not have its longer
+	-- deadline overwritten by the sprint's shorter one.
+	if state.slidingNow and sprinting then
+		return
+	end
 	if sprinting then
 		-- Remembered at the PRESS, spent at the release. The release does not
 		-- know which kind of sprint it is ending, and asking the caller to tell
