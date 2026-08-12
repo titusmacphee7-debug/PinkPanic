@@ -20,6 +20,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
+local GunSockets = require(ReplicatedStorage.Shared.Loaders.GunSockets)
 
 local SYSTEM = "ContentAudit"
 
@@ -116,6 +117,32 @@ function ContentAudit.run()
 			table.insert(problems, `{r.label} models with NO config entry: {nameList(r.orphanAssets)}`)
 		end
 	end
+
+	-- Sockets (NOD-137). Having a model is not the same as having a USABLE one:
+	-- a mesh with no tagged Muzzle or Grip is a gun the game has to guess about,
+	-- and the guessing is what put seven of them backwards in the first place.
+	local gunIds: { string } = {}
+	for gunId in GunCatalog.guns do
+		table.insert(gunIds, gunId)
+	end
+	local sockets = GunSockets.audit(gunIds)
+	local socketed = sockets.total - sockets.withoutModel
+
+	if sockets.fullyTagged < socketed then
+		local worst, worstCount = "?", 0
+		for name, count in sockets.missingBySocket do
+			if count > worstCount then
+				worst, worstCount = name, count
+			end
+		end
+		table.insert(
+			problems,
+			`{socketed - sockets.fullyTagged}/{socketed} models are missing sockets `
+				.. `(worst: {worst}, absent on {worstCount}) — for the full table run `
+				.. `require(game.ReplicatedStorage.Shared.Loaders.GunSockets).printReport()`
+		)
+	end
+	table.insert(summary, `sockets {sockets.fullyTagged}/{socketed}`)
 
 	if #problems > 0 then
 		Diagnostics.warn(SYSTEM, `{table.concat(summary, " · ")} — {table.concat(problems, "; ")}`)

@@ -14,6 +14,7 @@ local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
+local GunModelLoader = require(ReplicatedStorage.Shared.Loaders.GunModelLoader)
 local ClientData = require(script.Parent.Parent.ClientData)
 local Theme = require(script.Parent.Parent.UI.Theme)
 
@@ -308,10 +309,25 @@ local function stepStreaks(deltaTime: number)
 end
 
 -- Other players' shells pop from the gun welded to their hand.
+-- Where shells come out.
+--
+-- The tagged EjectPort socket first (NOD-137), because it is the only answer
+-- that is actually right. The offset-from-the-pivot fallback below is a guess
+-- about a shape nobody measured, and it is the reason shells used to appear
+-- out of the middle of a stock.
 local function worldGunPort(shooter: Player): CFrame?
 	local character = shooter.Character
 	local gun = character and character:FindFirstChild("WorldGun")
-	local primary = if gun and gun:IsA("Model") then gun.PrimaryPart else nil
+	if not gun or not gun:IsA("Model") then
+		return nil
+	end
+
+	local socket = GunModelLoader.socketCFrame(gun, "EjectPort")
+	if socket then
+		return socket
+	end
+
+	local primary = gun.PrimaryPart
 	if primary then
 		return primary.CFrame * CFrame.new(primary.Size.X / 2 + 0.05, primary.Size.Y * 0.2, 0)
 	end
