@@ -194,9 +194,27 @@ function MovementController.setAimPenalty(multiplier: number)
 	aimPenalty = math.clamp(multiplier, 0.1, 1)
 end
 
-local function weight(): number
+-- The held gun's drag on your legs, for a given movement state.
+--
+-- Sprint reads `sprintSpeedMult` and everything else reads `moveSpeedMult`
+-- (NOD-143). They are separate because "heavy" should mean you cannot RUN with
+-- it, not that you shuffle around a room in slow motion — a sniper that walks
+-- at 92% and sprints at 78% repositions badly and still holds an angle
+-- normally, which is the trade the class is supposed to make.
+local SPRINT_STATES: { [string]: boolean } = {
+	Sprint = true,
+	TacSprint = true,
+	Slide = true,
+	Dive = true,
+}
+
+local function weight(state: string?): number
 	local _, stats = Firing.weapon()
-	return (if stats then stats.moveSpeedMult else 1) * aimPenalty
+	if not stats then
+		return aimPenalty
+	end
+	local mult = if state and SPRINT_STATES[state] then stats.sprintSpeedMult else stats.moveSpeedMult
+	return mult * aimPenalty
 end
 
 -- Is the player asking to be crouched / prone right now? A tap latched the
@@ -378,7 +396,7 @@ local function beginSlide(current: Actuator.Rig): boolean
 	end
 
 	slideHeading = heading
-	slideEntrySpeed = Movement.slideEntrySpeed(carried, weight())
+	slideEntrySpeed = Movement.slideEntrySpeed(carried, weight("Slide"))
 	slideCooldownUntil = clock + Config.slide.maxSeconds + Config.slide.cooldownSeconds
 	sprintSince = math.huge -- re-earn the sprint before the next one
 	Diagnostics.count(SYSTEM, "slide")
@@ -441,7 +459,7 @@ local function stepSlide(current: Actuator.Rig, deltaTime: number)
 		crouchToggled = false
 		proneToggled = false
 		endSlide(current)
-		current.humanoid.WalkSpeed = Movement.speedFor("Sprint", weight())
+		current.humanoid.WalkSpeed = Movement.speedFor("Sprint", weight("Sprint"))
 		return
 	end
 
@@ -501,7 +519,7 @@ local function beginDive(current: Actuator.Rig): boolean
 	end
 
 	diveHeading = heading
-	diveSpeed = Movement.diveLaunchSpeed(dot, weight())
+	diveSpeed = Movement.diveLaunchSpeed(dot, weight("Dive"))
 	diveLeftGround = false
 	diveLanded = false
 	diveHitWall = false
@@ -690,7 +708,7 @@ local function step(deltaTime: number)
 	-- exactly the speed a sprint-jump would have. This is the "grants no speed"
 	-- subtask, and it is enforced here rather than trusted to the decay curve.
 	if clock < slideHopCapUntil then
-		local ceiling = Movement.speedFor("Sprint", weight())
+		local ceiling = Movement.speedFor("Sprint", weight("Sprint"))
 		local velocity = current.root.AssemblyLinearVelocity
 		local planar = Vector3.new(velocity.X, 0, velocity.Z)
 		if planar.Magnitude > ceiling then
@@ -824,10 +842,30 @@ local function step(deltaTime: number)
 	-- Idle resolves to 0 and would freeze the character mid-step, so a state
 	-- with no speed leaves the walk speed alone: Idle means "not asking to
 	-- move", not "may not move".
-	local speed = Movement.resolvedSpeed(machine.state, weight(), dot)
-	if speed > 0 then
-		current.humanoid.WalkSpeed = speed
+	local speed = Movement.resolvedSpeed(machine.state, weight(machine.state), dot)
+	if speed <= 0 then
+		return
 	end
+
+	-- **Weight, not just slowness.** The Humanoid snaps to whatever WalkSpeed
+	-- says, so a Barrett and an MP5 reach their top speed in the same single
+	-- frame — one is simply slower once there. That reads as "the number is
+	-- lower", never as "this thing is heavy".
+	--
+	-- Ramping WalkSpeed instead gives the gun inertia: a heavy weapon takes
+	-- real time to get you moving and real time to stop. Slowing DOWN is always
+	-- quicker than speeding up, because a gun that will not let you stop is a
+	-- gun that gets you killed by geometry rather than by players.
+	--
+	-- The Humanoid stays the mover throughout, so walls still stop you and the
+	-- fling stays gone.
+	local w = weight(machine.state)
+	local speedNow = current.humanoid.WalkSpeed
+	local rising = speed > speedNow
+	local rate = if rising then Config.acceleration * w else Config.deceleration
+	current.humanoid.WalkSpeed = if rising
+		then math.min(speed, speedNow + rate * deltaTime)
+		else math.max(speed, speedNow - rate * deltaTime)
 end
 
 -- ---------------------------------------------------------------------------
@@ -1011,7 +1049,7 @@ local function buildOverlay()
 				`state    {machine.state}  (from {machine.previous})`,
 				`profile  {machine.profile}`,
 				`speed    {string.format("%.1f", speed)} actual / {string.format("%.1f", walk)} driven`,
-				`ceiling  {string.format("%.1f", Movement.speedFor(machine.state, weight()))} forward, this state`,
+				`ceiling  {string.format("%.1f", Movement.speedFor(machine.state, weight(machine.state)))} forward, this state`,
 				`grounded {tostring(grounded)}   tac {math.floor(tacCharge * 100)}%`,
 				`stance   crouch={tostring(crouchWanted())} prone={tostring(proneWanted())}`,
 				`moves    slide {counts.slide} · dive {counts.dive} · mantle {counts.mantle}`,

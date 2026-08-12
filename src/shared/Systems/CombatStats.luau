@@ -63,6 +63,13 @@ export type Resolved = {
 	velocity: number,
 	drop: number,
 	moveSpeedMult: number,
+	-- Sprint is its own multiplier, not the same one (NOD-143). A heavy gun
+	-- that shuffles around fine but cannot RUN with you is a different weapon
+	-- from one that is uniformly slow, and collapsing both into one number
+	-- meant a sniper and an SMG repositioned at the same relative cost.
+	--
+	-- Absent means "same as moveSpeedMult", which is what most guns want.
+	sprintSpeedMult: number,
 	equipTime: number,
 	sprintToFire: number,
 	adsTime: number,
@@ -76,6 +83,7 @@ export type Resolved = {
 	reloadEmptyTime: number?,
 	reloadCancelTime: number?,
 	tacSprintToFire: number?,
+	slideToFire: number?,
 	-- Which recoil shape this gun climbs in (NOD-144). Absent means the one its
 	-- CLASS uses. A pattern is a family trait, so most guns should leave this
 	-- alone; a gun with an identity of its own names it.
@@ -113,6 +121,7 @@ local MODIFIABLE: { [string]: boolean } = {
 	velocity = true,
 	drop = true,
 	moveSpeedMult = true,
+	sprintSpeedMult = true,
 	equipTime = true,
 	sprintToFire = true,
 	adsTime = true,
@@ -160,6 +169,7 @@ local CLAMPS: { [string]: { min: number, max: number? } } = {
 	velocity = { min = 10 },
 	drop = { min = 0 },
 	moveSpeedMult = { min = 0.4, max = 1.6 },
+	sprintSpeedMult = { min = 0.4, max = 1.6 },
 	equipTime = { min = 0.05 },
 	sprintToFire = { min = 0 },
 	adsTime = { min = 0.02 },
@@ -324,6 +334,7 @@ local function baseForGun(gunId: string): Resolved?
 		velocity = s.velocity,
 		drop = s.drop,
 		moveSpeedMult = s.moveSpeedMult,
+		sprintSpeedMult = s.sprintSpeedMult or s.moveSpeedMult,
 		equipTime = s.equipTime,
 		sprintToFire = s.sprintToFire,
 		adsTime = s.adsTime,
@@ -331,6 +342,7 @@ local function baseForGun(gunId: string): Resolved?
 		reloadEmptyTime = s.reloadEmptyTime,
 		reloadCancelTime = s.reloadCancelTime,
 		tacSprintToFire = s.tacSprintToFire,
+		slideToFire = s.slideToFire,
 		recoilPattern = s.recoilPattern,
 		range = travelMax,
 	}
@@ -362,6 +374,7 @@ function CombatStats.knife(): Resolved
 		velocity = 0,
 		drop = 0,
 		moveSpeedMult = 1.06, -- knife feet: classic
+		sprintSpeedMult = 1.10, -- and it runs even better than it walks
 		equipTime = config.equipTime,
 		sprintToFire = config.sprintToFire,
 		adsTime = config.adsTime,

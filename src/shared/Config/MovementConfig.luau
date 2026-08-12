@@ -294,6 +294,21 @@ MovementConfig.brakeMultiplier = 1.6
 -- Ground
 -- ---------------------------------------------------------------------------
 
+-- How fast WalkSpeed is allowed to change, in studs/s per second (NOD-143).
+--
+-- Titus: *"you gotta feel clunky."* The Humanoid snaps to whatever WalkSpeed
+-- says, so without this a Barrett and an MP5 reach top speed in the same single
+-- frame and the heavy one is merely slower once there. That reads as "the
+-- number is lower", never as "this thing is heavy".
+--
+-- Acceleration is scaled by the held gun's weight, so a light SMG gets going
+-- almost instantly and an LMG takes a beat. Deceleration is NOT scaled and is
+-- deliberately faster than acceleration in every case: a gun that will not let
+-- you STOP gets you killed by geometry rather than by players, which is
+-- frustrating in a way that heaviness is not.
+MovementConfig.acceleration = 105
+MovementConfig.deceleration = 165
+
 -- How far below the root to look for floor. The R15 rig's hip height plus
 -- enough margin to survive a step, and not so much that standing beside a ledge
 -- counts as standing on it.

@@ -24,7 +24,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
+local Scale = require(ReplicatedStorage.Shared.Systems.Scale)
 local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
+local ClassCharter = require(ReplicatedStorage.Shared.Config.ClassCharter)
 local BallisticsConfig = require(ReplicatedStorage.Shared.Config.BallisticsConfig)
 local HealthConfig = require(ReplicatedStorage.Shared.Config.HealthConfig)
 
@@ -34,10 +36,10 @@ local Balance = {}
 
 export type Zone = "Head" | "Torso" | "Limb"
 
--- The four distances the roster is judged at. Chosen to sit either side of
--- where each class is supposed to stop working: 10 is knife-fight range, 30 is
--- where an SMG should already be losing, 60 is AR territory, 100 is a lane.
-Balance.bands = { 10, 30, 60, 100 }
+-- The distances the roster is judged at. Owned by ClassCharter, because a band
+-- the charter does not have a window for is a band nothing can be checked at —
+-- two lists of distances that drift apart would silently disable the check.
+Balance.bands = ClassCharter.bands
 
 -- Classes whose falloff is FLAT by design, so the flat-TTK check does not flag
 -- them forever. A marksman rifle that hit softer at distance would have no job,
@@ -129,11 +131,22 @@ end
 -- is better, and the mobility bonus is expressed as time it gives back.
 -- ---------------------------------------------------------------------------
 
+-- Reloading is real time on the clock, but you do it between fights far more
+-- often than inside one, so it counts at a quarter. Leaving it out entirely was
+-- the bug: a gun could buy a fast ADS with a four-second reload and this model
+-- called it nimble.
+local RELOAD_WEIGHT = 0.25
+
 function Balance.handlingCost(stats: CombatStats.Resolved): number
 	local raw = stats.adsTime + stats.sprintToFire + stats.equipTime
-	-- A gun that moves you 6% faster is worth roughly a tenth of a second of
-	-- readiness. Rough on purpose: this is a sorting key, not a simulation.
-	return raw - (stats.moveSpeedMult - 1) * 1.6
+	raw += stats.reloadSeconds * RELOAD_WEIGHT
+
+	-- Mobility is a benefit, expressed as the time it gives back. Walk and
+	-- sprint are counted separately because they are authored separately —
+	-- a gun you can carry but not run with is a real design, and one number
+	-- could not say it.
+	local mobility = (stats.moveSpeedMult - 1) * 1.6 + (stats.sprintSpeedMult - 1) * 1.2
+	return raw - mobility
 end
 
 -- ---------------------------------------------------------------------------
@@ -302,6 +315,103 @@ function Balance.dominant(): { string }
 	return flagged
 end
 
+-- ---------------------------------------------------------------------------
+-- The charter check
+--
+-- Every gun must sit inside its class's window at every band. This is what
+-- makes "some guns are better than others, but there's no god gun" a property
+-- of the build rather than an intention: power varies freely INSIDE the box,
+-- and leaving the box is a boot warning with the gun's name on it.
+--
+-- Reports the miss in seconds and in feet, because "Bestie is 0.06s over at
+-- band 5" is not actionable and "Bestie takes 0.78s at 117 ft, window is
+-- 0.62-0.72" is.
+-- ---------------------------------------------------------------------------
+
+function Balance.charter(): { string }
+	local problems: { string } = {}
+
+	for _, row in rows("Torso") do
+		local spec = ClassCharter.classes[row.class]
+		if not spec then
+			table.insert(problems, `{row.name}: class "{row.class}" has no charter entry`)
+			continue
+		end
+
+		if not spec.special then
+			for index, distance in Balance.bands do
+				local window = spec.ttk[index]
+				local ttk = row.ttk[index]
+				local at = Scale.describe(distance)
+
+				if not window then
+					-- No window means the class must be DEAD here. This is how a
+					-- shotgun's death gets specified rather than left to
+					-- whatever travelMax happened to be.
+					if ttk ~= math.huge then
+						table.insert(
+							problems,
+							`{row.name} ({row.class}) still kills at {at} — its class must not reach that far`
+						)
+					end
+				elseif ttk == math.huge then
+					table.insert(problems, `{row.name} ({row.class}) cannot kill at {at} — its class must`)
+				elseif ttk < window.min - 1e-6 or ttk > window.max + 1e-6 then
+					table.insert(
+						problems,
+						`{row.name} ({row.class}) {string.format("%.2f", ttk)}s at {at}, `
+							.. `window {string.format("%.2f", window.min)}-{string.format("%.2f", window.max)}`
+					)
+				end
+			end
+		end
+
+		if row.handling < spec.handling.min - 1e-6 or row.handling > spec.handling.max + 1e-6 then
+			table.insert(
+				problems,
+				`{row.name} ({row.class}) handling {string.format("%.2f", row.handling)}, `
+					.. `window {string.format("%.2f", spec.handling.min)}-{string.format("%.2f", spec.handling.max)}`
+			)
+		end
+
+		if row.reach < spec.reach.min - 1e-6 or row.reach > spec.reach.max + 1e-6 then
+			table.insert(
+				problems,
+				`{row.name} ({row.class}) reach {Scale.describe(row.reach)}, `
+					.. `window {math.floor(spec.reach.min)}-{math.floor(spec.reach.max)} studs`
+			)
+		end
+	end
+
+	return problems
+end
+
+-- Titus's anti-VGSS rule as a number: no shotgun may need more than three shots
+-- to kill at 40 studs (43 ft). *"up to 5 feet your god then all the sudden your
+-- throwing mac and cheese at them."*
+function Balance.shotgunReach(): { string }
+	local problems: { string } = {}
+	local index = table.find(Balance.bands, 40)
+	if not index then
+		return { "no 40-stud band, so the shotgun rule cannot be checked" }
+	end
+
+	for _, row in rows("Torso") do
+		if row.class ~= "Shotgun" then
+			continue
+		end
+		local shots = row.stk[index]
+		if shots > ClassCharter.shotgunMaxShotsAt40 then
+			table.insert(
+				problems,
+				`{row.name} needs {if shots == math.huge then "∞" else tostring(shots)} shots at `
+					.. `{Scale.describe(40)}, limit is {ClassCharter.shotgunMaxShotsAt40}`
+			)
+		end
+	end
+	return problems
+end
+
 function Balance.flat(): { string }
 	local flagged: { string } = {}
 	for _, row in rows("Torso") do
@@ -350,6 +460,16 @@ function Balance.validate()
 	end
 	if #unjustified > 0 then
 		table.insert(problems, `{#unjustified} gun(s) with no reason to exist: {table.concat(unjustified, ", ")}`)
+	end
+
+	local charter = Balance.charter()
+	if #charter > 0 then
+		table.insert(problems, `{#charter} charter violation(s): {table.concat(charter, " · ")}`)
+	end
+
+	local shotguns = Balance.shotgunReach()
+	if #shotguns > 0 then
+		table.insert(problems, `VGSS: {table.concat(shotguns, " · ")}`)
 	end
 
 	if #flat > 0 then
