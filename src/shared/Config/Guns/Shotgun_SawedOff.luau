@@ -1,19 +1,23 @@
 --!strict
--- Shortcake — the sawn-off. The shortest one-shot window anywhere and the
--- fastest handling of any primary in the game.
+-- Shortcake (sawed-off) — the smallest weapon in the game and the fastest hands
+-- in the class by a distance. Nine pellets, one shot inside 12 ft, two rounds,
+-- and the shortest reach of anything that shoots.
 return {
 	name = "Shortcake",
+	archetype = "Sawed-off",
 	class = "Shotgun",
 	slot = "Primary",
-	rarity = "Epic",
-	price = 7800,
-	why = "Draws faster than a pistol and one-shots inside 9 studs; past 32 its pellets do not exist at all.",
+	rarity = "Uncommon",
+	price = 1500,
+	unlockLevel = 9,
+	why = "Up and firing faster than any other shotgun and lethal inside 12 ft — carried by people who intend to be around a corner, not down a corridor.",
 	stats = {
-		damageNear = 13, damageFar = 4, rangeNear = 9, rangeFar = 20, pellets = 8,
-		headshotMult = 1.25, rpm = 130, auto = false, magSize = 2, reloadSeconds = 0.9,
-		spreadDeg = 11.0, adsSpreadDeg = 7.5,
-		recoilVert = 1.45, recoilHoriz = 0.40, recoilRecovery = 11,
-		velocity = 780, drop = 54, moveSpeedMult = 1.05,
-		equipTime = 0.26, sprintToFire = 0.08, adsTime = 0.17,
+		damageNear = 24, damageFar = 4, rangeNear = 8, rangeFar = 44, pellets = 9,
+		headshotMult = 1.35, rpm = 180, auto = false, magSize = 2, reloadSeconds = 2.6,
+		spreadDeg = 5.0, adsSpreadDeg = 3.4,
+		recoilVert = 1.40, recoilHoriz = 0.42, recoilRecovery = 8,
+		-- walk 17.0, sprint 24.0 — it weighs nothing
+		velocity = 820, drop = 82, moveSpeedMult = 1.00, sprintSpeedMult = 1.00,
+		equipTime = 0.30, sprintToFire = 0.12, adsTime = 0.20,
 	},
 }

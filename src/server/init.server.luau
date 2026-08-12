@@ -48,6 +48,7 @@ Diagnostics.expect(
 	"CharacterService",
 	"MapService",
 	"LobbyService",
+	"LobbyLights",
 	"PlayerDataService",
 	"EconomyService",
 	"ShopService",
@@ -96,6 +97,7 @@ local WeaponService: any = Diagnostics.load("WeaponService", script.Services.Wea
 local CharacterService: any = Diagnostics.load("CharacterService", script.Services.CharacterService)
 local MapService: any = Diagnostics.load("MapService", script.Services.MapService)
 local LobbyService: any = Diagnostics.load("LobbyService", script.Services.LobbyService)
+local LobbyLights: any = Diagnostics.load("LobbyLights", script.Systems.LobbyLights)
 local PlayerDataService: any = Diagnostics.load("PlayerDataService", script.Services.PlayerDataService)
 local EconomyService: any = Diagnostics.load("EconomyService", script.Services.EconomyService)
 local ShopService: any = Diagnostics.load("ShopService", script.Services.ShopService)
@@ -259,6 +261,10 @@ local BOOT_ORDER: { { name: string, module: any } } = {
 	-- is what proves FireWeapon/ReloadWeapon/SwapWeapon actually got claimed.
 	{ name = "WeaponService", module = WeaponService },
 	{ name = "LobbyService", module = LobbyService },
+	-- After LobbyService, which destroys the retired generated plaza. Lighting
+	-- lamps inside a folder that is about to be deleted lights nothing and
+	-- reports a count that was never true.
+	{ name = "LobbyLights", module = LobbyLights },
 	{ name = "PlayerDataService", module = PlayerDataService },
 	{ name = "EconomyService", module = EconomyService },
 	{ name = "ShopService", module = ShopService },

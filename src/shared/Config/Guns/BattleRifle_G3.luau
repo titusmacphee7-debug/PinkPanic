@@ -8,8 +8,8 @@ return {
 	class = "BattleRifle",
 	slot = "Primary",
 	rarity = "Uncommon",
-	price = 2600,
-	unlockLevel = 20,
+	price = 0,
+	unlockLevel = 1,
 	why = "The forgiving battle rifle: five shots instead of four, but the quickest to fire and the easiest to control, so a missed round is not a lost fight.",
 	stats = {
 		damageNear = 32, damageFar = 24, rangeNear = 50, rangeFar = 135,

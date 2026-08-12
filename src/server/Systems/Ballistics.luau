@@ -154,6 +154,46 @@ local function spreadDirection(direction: Vector3, spreadDeg: number): Vector3
 	return (direction + right * (offset * math.cos(phi)) + up * (offset * math.sin(phi))).Unit
 end
 
+-- **The pellet rosette — fixed, never rolled (NOD-148).**
+--
+-- The most repeated complaint about shotguns in every shooter that has them is
+-- not that they are weak, it is that they are UNPREDICTABLE: *"sometimes 3 shots
+-- instant kill, 10 shots wouldn't"*, *"2-4 hitmarkers to the chest but other
+-- times shooting a foot results in a kill"*. The cause is that every pellet is
+-- sampled independently, so the same shot at the same range lands a different
+-- number of pellets every time and the player is given no way to learn anything.
+--
+-- Buffing damage does not fix that — it makes an inconsistent gun inconsistently
+-- stronger. The fix is to remove the roll: pellets sit at FIXED positions in the
+-- cone, so range is the only thing that decides how many connect. Same aim, same
+-- distance, same result, every single time.
+--
+-- Positions come from a Vogel spiral, which is uniform over the cone's AREA —
+-- the same distribution the random version sampled, so nothing about the balance
+-- moves. Only the variance goes away.
+--
+-- The anti-cheat property from the header survives: pellet 1 sits at radius
+-- sqrt(0.5/n) of the cone, not at its centre, so no pellet is ever exactly on
+-- the aim vector and there is no pinpoint round to farm.
+local GOLDEN_ANGLE = math.pi * (3 - math.sqrt(5))
+
+local function pelletDirection(direction: Vector3, spreadDeg: number, index: number, count: number): Vector3
+	if spreadDeg <= 0 then
+		return direction
+	end
+
+	local seed = if math.abs(direction.Y) > 0.99 then Vector3.xAxis else Vector3.yAxis
+	local right = direction:Cross(seed).Unit
+	local up = right:Cross(direction).Unit
+
+	local radius = math.sqrt((index - 0.5) / count)
+	local theta = math.rad(spreadDeg) * radius
+	local phi = index * GOLDEN_ANGLE
+	local offset = math.tan(theta)
+
+	return (direction + right * (offset * math.cos(phi)) + up * (offset * math.sin(phi))).Unit
+end
+
 local function characterOf(instance: Instance): Model?
 	local current: Instance? = instance
 	while current and current ~= workspace do
@@ -286,9 +326,18 @@ function Ballistics.fire(shooter: Player, weaponId: string, origin: Vector3, dir
 	local spread = if resolveSpread then resolveSpread(shooter, stats) else stats.spreadDeg
 	local filter = { character }
 
-	for _ = 1, pellets do
-		-- Every pellet, including the first. See the header.
-		local aim = spreadDirection(direction, spread)
+	for index = 1, pellets do
+		-- Multi-pellet weapons get the FIXED rosette; single-projectile weapons
+		-- keep the roll.
+		--
+		-- The distinction matters. For a shotgun the roll is noise the player
+		-- cannot learn from, so removing it is pure gain. For a rifle the same
+		-- offset applied every shot would not be "consistent", it would be a
+		-- permanent aim error baked into the gun — every bullet landing in the
+		-- same wrong place, which is worse than scatter, not better.
+		local aim = if pellets > 1
+			then pelletDirection(direction, spread, index, pellets)
+			else spreadDirection(direction, spread)
 		table.insert(projectiles, {
 			shooter = shooter,
 			weaponId = weaponId,
