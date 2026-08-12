@@ -154,12 +154,71 @@ export type PlayerData = {
 }
 
 local CameraConfig = require(script.Parent.Parent.Config.CameraConfig)
+local GunCatalog = require(script.Parent.Parent.Config.GunCatalog)
 
 local PlayerDataSchema = {}
 
+-- ---------------------------------------------------------------------------
+-- Starters
+--
+-- Titus: *"they need to have a starter option in each class at least — they
+-- can't be going against a fucking AK with a Glock, they will barely be able to
+-- level up."*
+--
+-- That is a progression trap, not just an unfairness: you level a class by
+-- PLAYING it, so gating a class behind a level means gating it behind the very
+-- thing you need the class to do. Every class therefore owns one gun that costs
+-- nothing and unlocks at level 1. `Balance.starters()` fails the boot if a class
+-- ever loses its free option.
+--
+-- Ownership is DERIVED, not seeded. `ensureStarters` runs on every profile load
+-- rather than inside a migration, so adding a starter later grants it to
+-- everyone who already exists without a schema bump — and a schema bump is a
+-- chance to damage somebody's collection for no reason.
+-- ---------------------------------------------------------------------------
+
+local function starterIds(): { string }
+	local list: { string } = {}
+	for id, def in GunCatalog.guns do
+		if def.price <= 0 and def.unlockLevel <= 1 then
+			table.insert(list, id)
+		end
+	end
+	table.sort(list)
+	return list
+end
+
+PlayerDataSchema.starterIds = starterIds
+
+local function grant(list: { string }, id: string)
+	if not table.find(list, id) then
+		table.insert(list, id)
+	end
+end
+
+local function ensureStarters(data: any)
+	local starters = starterIds()
+	for _, id in starters do
+		if type(data.ownedGuns) == "table" then
+			grant(data.ownedGuns, id)
+		end
+		if type(data.owned) == "table" and type(data.owned.guns) == "table" then
+			grant(data.owned.guns, id)
+		end
+	end
+end
+
 PlayerDataSchema.VERSION = 3
 
-local STARTER_GUN = "Pistol_1"
+-- The two guns everybody owns from their first second. Both are priced 0 and
+-- unlock at level 1; these constants and those two facts have to agree, and
+-- `PlayerDataSchema.validate` checks that they do rather than trusting it.
+--
+-- IDs are `Class_Archetype` since the roster rework (NOD-148). The retired ones
+-- (`Pistol_1`, `AssaultRifle_1`, …) are remapped by Migrations[3] below, because
+-- a profile pointing at a gun the catalog no longer has cannot spawn.
+local STARTER_GUN = "Pistol_Glock17"
+local STARTER_PRIMARY = "Rifle_M4A1"
 
 local function emptyClass(name: string): ClassLoadout
 	return {
@@ -191,17 +250,17 @@ function PlayerDataSchema.default(): PlayerData
 			charms = {},
 		},
 
-		ownedGuns = { STARTER_GUN },
+		ownedGuns = { STARTER_GUN, STARTER_PRIMARY },
 		ownedGunSkins = {},
 		ownedCamos = {},
-		loadout = { primary = nil, secondary = STARTER_GUN },
+		loadout = { primary = STARTER_PRIMARY, secondary = STARTER_GUN },
 		gunCosmetics = {},
 
 		classes = { emptyClass("Class 1") },
 		activeClass = 1,
 		weaponProgress = {},
 		owned = {
-			guns = { STARTER_GUN },
+			guns = { STARTER_GUN, STARTER_PRIMARY },
 			gunSkins = {},
 			attachments = {},
 			camos = {},
@@ -441,6 +500,21 @@ function PlayerDataSchema.migrate(data: any): PlayerData
 	end
 
 	reconcile(data, PlayerDataSchema.default())
+
+	-- Every load, not just on a version change. See the note above starterIds.
+	ensureStarters(data)
+
+	-- A loadout pointing at a gun the catalog no longer has cannot spawn, and
+	-- the roster rework (NOD-148) retired every pre-existing id. Repaired here
+	-- rather than migrated, for the same reason as the starters: this survives
+	-- the next rename too.
+	if not GunCatalog.get(data.loadout.secondary) then
+		data.loadout.secondary = STARTER_GUN
+	end
+	if data.loadout.primary ~= nil and not GunCatalog.get(data.loadout.primary) then
+		data.loadout.primary = STARTER_PRIMARY
+	end
+
 	return data :: PlayerData
 end
 

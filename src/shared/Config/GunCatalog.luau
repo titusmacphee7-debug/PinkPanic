@@ -32,8 +32,13 @@
 -- true. What replaced them is BattleRifle (an AR that reaches, at the cost of
 -- ADS), LMG (suppress and hold, worst handling, huge magazine) and Marksman
 -- (semi-auto precision, flat damage, two or three rounds).
+-- Twelve now, not nine (NOD-148). MachinePistol, Launcher and Melee joined when
+-- the roster went to 50: a full-auto sidearm is not a pistol with a higher rpm,
+-- it is a different decision at the loadout screen, and that is the test for
+-- whether something deserves to be a class.
 export type GunClass =
 	"Pistol"
+	| "MachinePistol"
 	| "Revolver"
 	| "SMG"
 	| "Shotgun"
@@ -42,6 +47,8 @@ export type GunClass =
 	| "LMG"
 	| "Marksman"
 	| "Sniper"
+	| "Launcher"
+	| "Melee"
 export type GunSlot = "Primary" | "Secondary"
 local RarityConfig = require(script.Parent.Rarity)
 

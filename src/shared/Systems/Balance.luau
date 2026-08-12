@@ -412,6 +412,38 @@ function Balance.shotgunReach(): { string }
 	return problems
 end
 
+-- Every class must have one gun that costs nothing and unlocks at level 1.
+--
+-- Titus: *"they can't be going against a fucking AK with a Glock, they will
+-- barely be able to level up."* That is the trap this check exists for — you
+-- level a class by playing it, so a class with no free entry point is a class
+-- nobody can ever earn their way into. It reads as a balance problem and is
+-- actually a progression deadlock.
+--
+-- Checked rather than trusted because it breaks by ACCIDENT: nothing about
+-- pricing one gun looks like locking a class, and the person doing it is
+-- thinking about coins.
+function Balance.starters(): { string }
+	local hasFree: { [string]: boolean } = {}
+	local classes: { [string]: boolean } = {}
+
+	for _, def in GunCatalog.guns do
+		classes[def.class] = true
+		if def.price <= 0 and def.unlockLevel <= 1 then
+			hasFree[def.class] = true
+		end
+	end
+
+	local missing: { string } = {}
+	for class in classes do
+		if not hasFree[class] then
+			table.insert(missing, class)
+		end
+	end
+	table.sort(missing)
+	return missing
+end
+
 function Balance.flat(): { string }
 	local flagged: { string } = {}
 	for _, row in rows("Torso") do
@@ -432,11 +464,25 @@ function Balance.validate()
 	-- a lobby quit, because there was nothing the victim could have done
 	-- differently. This is the check, rather than "one-shots at 100 studs" — that
 	-- would flag every sniper in the game forever and teach everyone to ignore it.
+	-- Measured per PROJECTILE, not per trigger pull.
+	--
+	-- The first version used `shotsToKill(..., "Limb")`, which multiplies by
+	-- pellet count — so it flagged three shotguns for a case that requires all
+	-- eight to ten pellets to land on one leg. That is not the failure this rule
+	-- is about, and a check that fires on something impossible is a check people
+	-- learn to scroll past, which is worse than not having it.
+	--
+	-- One round, one limb, dead: that is the claim, and a single pellet is the
+	-- honest unit for it.
 	local limbDeleters: { string } = {}
 	for _, row in list do
 		local stats = CombatStats.forGun(row.id)
-		if stats and Balance.shotsToKill(stats, Balance.bands[1], "Limb") <= 1 then
-			table.insert(limbDeleters, row.name)
+		if stats then
+			local perProjectile = CombatStats.pelletDamageAt(stats, Balance.bands[1])
+				* BallisticsConfig.limbMult
+			if perProjectile >= HealthConfig.maxHealth then
+				table.insert(limbDeleters, row.name)
+			end
 		end
 	end
 
@@ -470,6 +516,15 @@ function Balance.validate()
 	local shotguns = Balance.shotgunReach()
 	if #shotguns > 0 then
 		table.insert(problems, `VGSS: {table.concat(shotguns, " · ")}`)
+	end
+
+	local starterless = Balance.starters()
+	if #starterless > 0 then
+		table.insert(
+			problems,
+			`{#starterless} class(es) with no free level-1 gun — unreachable for a new player: `
+				.. table.concat(starterless, ", ")
+		)
 	end
 
 	if #flat > 0 then

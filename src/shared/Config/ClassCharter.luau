@@ -78,7 +78,7 @@ ClassCharter.classes = {
 			[3] = { min = 0.50, max = 1.15 },
 			[4] = { min = 1.10, max = 3.00 },
 		},
-		handling = { min = 0.68, max = 0.98 },
+		handling = { min = 1.20, max = 2.00 },
 		reach = { min = 70, max = 100 },
 		note = "Deletes people in a room and still works across one. Dies in the open, never at 43 ft.",
 	},
@@ -90,20 +90,31 @@ ClassCharter.classes = {
 			[3] = { min = 0.38, max = 0.62 },
 			[4] = { min = 0.70, max = 1.20 },
 		},
-		handling = { min = 0.42, max = 0.70 },
+		-- The best hands in the game, and nothing else comes close: a rifle starts
+		-- at 1.16. Titus: *"quick fire rate, low damage, great handling and
+		-- movement."* Every SMG also moves you FASTER than standing still with a
+		-- rifle would, which is the other half of the class.
+		handling = { min = 0.68, max = 1.14 },
 		reach = { min = 95, max = 135 },
-		note = "Fastest kill in the game up close and the best handling. Pays for it past 43 ft.",
+		note = "Fastest kill in the game up close and the best handling. Bullets stop existing before 117 ft.",
 	},
 
 	MachinePistol = {
+		-- The floor at [1] is 0.34 and not lower for a structural reason: a
+		-- SECONDARY in the top third of close kill speed is a primary you did not
+		-- have to choose, and `Balance.validate` fails the build for it. These sit
+		-- deliberately just underneath the SMG class (0.22-0.32) — faster than any
+		-- pistol, never competitive with the thing you brought as your main gun.
 		ttk = {
-			[1] = { min = 0.28, max = 0.44 },
+			[1] = { min = 0.34, max = 0.48 },
 			[2] = { min = 0.36, max = 0.58 },
 			[3] = { min = 0.58, max = 0.95 },
 		},
-		handling = { min = 0.32, max = 0.55 },
-		reach = { min = 70, max = 100 },
-		note = "An SMG you carry as a sidearm. Nearly the speed, none of the range.",
+		handling = { min = 0.66, max = 0.92 },
+		-- Under 70 studs on purpose: the class must be DEAD at the 70-stud band,
+		-- and a bullet is only gone once `travelMax` is strictly below it.
+		reach = { min = 58, max = 68 },
+		note = "An SMG you carry as a sidearm. Nearly the speed, none of the range, and it stops existing at 75 ft.",
 	},
 
 	Pistol = {
@@ -113,8 +124,11 @@ ClassCharter.classes = {
 			[3] = { min = 0.58, max = 0.95 },
 			[4] = { min = 0.90, max = 1.50 },
 		},
-		handling = { min = 0.34, max = 0.58 },
-		reach = { min = 80, max = 115 },
+		handling = { min = 0.78, max = 1.26 },
+		-- Capped under 110 so the window cannot contradict the TTK table: a
+		-- pistol whose bullets still exist at the last band would be required to
+		-- be dead there and permitted to reach it at the same time.
+		reach = { min = 80, max = 108 },
 		note = "The gun you finish a fight with, never the one you start it with.",
 	},
 
@@ -126,7 +140,7 @@ ClassCharter.classes = {
 			[4] = { min = 0.68, max = 1.10 },
 			[5] = { min = 0.95, max = 1.70 },
 		},
-		handling = { min = 0.52, max = 0.82 },
+		handling = { min = 1.00, max = 1.68 },
 		reach = { min = 110, max = 155 },
 		note = "Two or three hits, and you feel every miss. The only secondary that reaches.",
 	},
@@ -188,7 +202,11 @@ ClassCharter.classes = {
 			[4] = { min = 0.44, max = 0.62 },
 			[5] = { min = 0.48, max = 0.70 },
 		},
-		handling = { min = 1.38, max = 1.90 },
+		-- By far the worst in the game, and most of it is the RELOAD: five to seven
+		-- seconds, counted at quarter weight, is most of a second of pure cost
+		-- that no other class carries. That is the LMG trade stated honestly —
+		-- the magazine is the strength and the magazine is also the price.
+		handling = { min = 2.95, max = 3.75 },
 		reach = { min = 170, max = 215 },
 		note = "Worst kill speed and worst handling in the game. Holds a lane nothing else can.",
 	},
@@ -201,7 +219,7 @@ ClassCharter.classes = {
 			[4] = { min = 0.32, max = 0.48 },
 			[5] = { min = 0.32, max = 0.48 },
 		},
-		handling = { min = 1.02, max = 1.42 },
+		handling = { min = 1.94, max = 2.52 },
 		reach = { min = 220, max = 275 },
 		note = "Flat everywhere: two or three hits at any distance, and no forgiveness for a miss.",
 	},
@@ -222,7 +240,7 @@ ClassCharter.classes = {
 			[4] = { min = 0.00, max = 0.00 },
 			[5] = { min = 0.00, max = 0.00 },
 		},
-		handling = { min = 1.65, max = 2.35 },
+		handling = { min = 3.00, max = 3.80 },
 		reach = { min = 280, max = 380 },
 		note = "One shot at any range. Paid for entirely in ADS time, sprint-to-fire and move speed.",
 	},
