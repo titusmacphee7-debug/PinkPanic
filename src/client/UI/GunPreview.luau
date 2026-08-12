@@ -174,36 +174,105 @@ end
 --
 -- There is no in-game outfit system yet; this shows the player's real
 -- Roblox avatar.
+-- The character you actually play, rendered live.
+--
+-- This used to be GetUserThumbnailAsync — the player's own Roblox avatar. That
+-- was correct right up until NOD-167 made everyone a standard R15 rig with
+-- LoadCharacterAppearance off: the loadout was then showing you a character
+-- you can never be, complete with whatever hair and shirt you happen to own,
+-- while the one in the lobby behind the panel looked like everyone else's.
+--
+-- Cloning the live character is also the surface the character creator
+-- (NOD-168) writes to, so this column starts telling the truth for free the
+-- moment outfits exist.
 function GunPreview.createCharacter(parent: GuiObject): GuiObject?
 	local player = Players.LocalPlayer
 
-	local image = Instance.new("ImageLabel")
-	image.Size = UDim2.fromScale(1, 1)
-	image.BackgroundColor3 = Theme.color.surfaceSunken
-	image.BackgroundTransparency = 0.25
-	image.ScaleType = Enum.ScaleType.Fit
-	image.Image = ""
-	image.Parent = parent
+	local viewport = Instance.new("ViewportFrame")
+	viewport.Size = UDim2.fromScale(1, 1)
+	viewport.BackgroundColor3 = Theme.color.surfaceSunken
+	viewport.BackgroundTransparency = 0.25
+	viewport.Ambient = Theme.color.viewportAmbient
+	viewport.LightColor = Color3.new(1, 1, 1)
+	viewport.Parent = parent
 
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, Theme.radius.card)
-	corner.Parent = image
+	corner.Parent = viewport
 
-	-- GetUserThumbnailAsync yields, so never block the caller's rebuild on it.
-	task.spawn(function()
-		local ok, content = pcall(function()
-			return Players:GetUserThumbnailAsync(
-				player.UserId,
-				Enum.ThumbnailType.AvatarThumbnail,
-				Enum.ThumbnailSize.Size420x420
-			)
-		end)
-		if ok and content and image.Parent then
-			image.Image = content
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 32
+	camera.Parent = viewport
+	viewport.CurrentCamera = camera
+
+	local function mount(character: Model)
+		if not viewport.Parent then
+			return
 		end
-	end)
+		for _, child in viewport:GetChildren() do
+			if child:IsA("Model") then
+				child:Destroy()
+			end
+		end
 
-	return image
+		-- Roblox ships player characters with Archivable = false, so Clone()
+		-- returns nil rather than erroring — the preview came up as an empty
+		-- well with no message anywhere. Flipped for the one call and put back.
+		local archivable = character.Archivable
+		character.Archivable = true
+		local ok, clone = pcall(function()
+			return character:Clone()
+		end)
+		character.Archivable = archivable
+		if not ok or not clone then
+			return
+		end
+
+		-- Nothing in a preview should run. Anchoring every part is what makes
+		-- the pose deterministic: a ViewportFrame has no physics, so unanchored
+		-- limbs simply keep the world CFrames they were cloned with, and the
+		-- Humanoid's state machine would spend frames deciding it is falling.
+		local humanoid = clone:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+			humanoid.EvaluateStateMachine = false
+		end
+		for _, descendant in clone:GetDescendants() do
+			if descendant:IsA("BasePart") then
+				descendant.Anchored = true
+				descendant.CanCollide = false
+				-- First person sets this to 1 on every part of your own body.
+				-- It survives the clone, so without this the preview is an
+				-- empty well any time the panel is opened from in-round.
+				descendant.LocalTransparencyModifier = 0
+			elseif descendant:IsA("BaseScript") or descendant:IsA("Animator") then
+				descendant:Destroy()
+			end
+		end
+
+		clone.Parent = viewport
+		clone:PivotTo(CFrame.new())
+
+		local bounds, size = clone:GetBoundingBox()
+		local centre = bounds.Position
+		local extent = math.max(size.Y, size.X * 1.4)
+		local distance = (extent / 2) / math.tan(math.rad(camera.FieldOfView / 2)) * 1.25
+
+		-- A character pivoted to the identity CFrame looks down -Z, so the
+		-- camera has to stand on that side to see its face rather than its back.
+		camera.CFrame = CFrame.lookAt(centre + Vector3.new(0, size.Y * 0.04, -distance), centre)
+	end
+
+	local character = player.Character
+	if character then
+		mount(character)
+	else
+		task.spawn(function()
+			mount(player.CharacterAdded:Wait())
+		end)
+	end
+
+	return viewport
 end
 
 return GunPreview

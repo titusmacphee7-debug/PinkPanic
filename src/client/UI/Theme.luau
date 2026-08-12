@@ -86,6 +86,30 @@ Theme.text = {
 }
 
 -- ---------------------------------------------------------------------------
+-- Glyphs.
+--
+-- Roblox renders a character FredokaOne cannot supply as NOTHING — no box, no
+-- fallback, no warning. The coin readout said "100" with a gap where the coin
+-- should be, and every close button in the game was a blank pink circle,
+-- because 🪙 (U+1FA99) and ✕ (U+2715) are both missing. Nobody notices a
+-- symbol that was never there.
+--
+-- So symbols live here, checked once, instead of being typed inline in nine
+-- places. Verify a new one in Studio before using it: put it in a TextLabel at
+-- TextSize 24 and read TextBounds.X. Emoji that render measure 23. A missing
+-- glyph measures exactly 10.
+-- ---------------------------------------------------------------------------
+
+Theme.glyph = {
+	coin = "💰", -- 🪙 does not exist in this font
+	close = "X", -- ✕ and ✗ do not either
+	equipped = "✓",
+	locked = "🔒",
+	bow = "🎀",
+	heart = "💗",
+}
+
+-- ---------------------------------------------------------------------------
 -- Spacing — a 4pt scale. Use these instead of arbitrary offsets so panels
 -- line up with each other without anyone measuring.
 -- ---------------------------------------------------------------------------
@@ -110,7 +134,7 @@ Theme.radius = {
 Theme.locked = {
 	scrimTransparency = 0.45,
 	contentTransparency = 0.35,
-	icon = "🔒",
+	icon = Theme.glyph.locked,
 }
 
 -- ---------------------------------------------------------------------------

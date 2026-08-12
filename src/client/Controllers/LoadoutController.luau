@@ -14,6 +14,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
 local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
@@ -27,6 +28,14 @@ local StatBlock = require(script.Parent.Parent.UI.StatBlock)
 
 local TOP_BAR = 64
 local CARD = Vector2.new(204, 186)
+-- How far the panel sits in from the screen edge. The loadout used to be a
+-- full-bleed sheet pinned to all four corners, which is why it read as "not
+-- properly rounded" — a rounded corner is invisible when there is nothing
+-- behind it and no edge for it to curve away from.
+local MARGIN = 44
+-- Ultrawides otherwise stretch the three columns further apart than they are
+-- tall, and the panel stops looking like an object.
+local MAX_PANEL = Vector2.new(1440, 900)
 local CLASSES = { "Pistol", "Revolver", "SMG", "Shotgun", "Rifle", "Carbine", "Bullpup", "Sniper" }
 
 local LoadoutController = {}
@@ -43,6 +52,9 @@ local lastSignature: string? = nil
 -- instances -----------------------------------------------------------------
 local gui: ScreenGui? = nil
 local modal: TextButton? = nil
+-- The panel's open bounce. Held here rather than looked up by name so nothing
+-- in the tree can be renamed out from under it.
+local panelScale: UIScale? = nil
 local coinLabel: TextLabel? = nil
 local messageLabel: TextLabel? = nil
 local tabButtons: { [string]: TextButton } = {}
@@ -262,7 +274,7 @@ local function buildSkins(parent: Instance, gunId: string, order: number)
 				then "equipped"
 				elseif isStock then "default"
 				elseif owned then "owned"
-				else `{entry.price} 🪙`,
+				else `{entry.price} {Theme.glyph.coin}`,
 			size = Theme.text.caption,
 			color = if equipped
 				then Theme.color.textOnPrimary
@@ -382,7 +394,7 @@ local function buildCamos(parent: Instance, gunId: string, order: number)
 				then "coming soon"
 				elseif equipped then "equipped"
 				elseif owned then "owned"
-				else `{def.price} 🪙`,
+				else `{def.price} {Theme.glyph.coin}`,
 			size = Theme.text.caption,
 			color = if unreleased
 				then Theme.color.textMuted
@@ -798,7 +810,8 @@ local function gunCard(parent: Instance, gunId: string, def: any, order: number)
 	else
 		footer.BackgroundColor3 = Theme.color.scrim
 		footer.BackgroundTransparency = 0.18
-		footerText, footerColour = `🔒 {comma(def.price)} 🪙`, Theme.color.coin
+		footerText, footerColour =
+			`{Theme.glyph.locked} {comma(def.price)} {Theme.glyph.coin}`, Theme.color.coin
 	end
 
 	Components.text(footer, {
@@ -1022,7 +1035,7 @@ local function refreshDetail()
 		position = UDim2.new(0, 0, 1, -102),
 	})
 	Components.text(left, {
-		text = if owned then "Owned" else `{comma(def.price)} 🪙`,
+		text = if owned then "Owned" else `{comma(def.price)} {Theme.glyph.coin}`,
 		size = Theme.text.body,
 		color = if owned then Theme.color.textMuted else Theme.color.coin,
 		align = Enum.TextXAlignment.Right,
@@ -1039,7 +1052,7 @@ local function refreshDetail()
 		text = if equipped
 			then `✓ Equipped in {if primary == gunId then "Primary" else "Secondary"}`
 			elseif owned then `Equip to {def.slot}`
-			else `Buy · {comma(def.price)} 🪙`,
+			else `Buy · {comma(def.price)} {Theme.glyph.coin}`,
 	})
 	if equipped then
 		cta.BackgroundColor3 = Theme.color.surface
@@ -1089,8 +1102,11 @@ function showScreen(name: string)
 	for key, button in tabButtons do
 		-- The Armory tab stays lit while inspecting a gun.
 		local lit = key == name or (key == "armory" and name == "detail")
-		button.BackgroundColor3 = if lit then Theme.color.primary else Theme.color.surfaceRaised
-		button.TextColor3 = if lit then Theme.color.textOnPrimary else Theme.color.textMuted
+		-- An unlit tab used to be surfaceRaised text-muted ON the surfaceRaised
+		-- bar, which is the same colour twice: the Armory tab was invisible
+		-- until you happened to click where it was.
+		button.BackgroundColor3 = if lit then Theme.color.primary else Theme.color.surface
+		button.TextColor3 = if lit then Theme.color.textOnPrimary else Theme.color.text
 	end
 	busy = false
 	if name == "loadout" then
@@ -1135,7 +1151,7 @@ local function refreshCoins()
 	end
 	local snap = ClientData.snapshot
 	local coins = if type(snap) == "table" and type(snap.coins) == "number" then snap.coins else 0
-	label.Text = `🪙 {comma(coins)}`
+	label.Text = `{Theme.glyph.coin} {comma(coins)}`
 end
 
 function LoadoutController.setOpen(open: boolean)
@@ -1159,6 +1175,15 @@ function LoadoutController.setOpen(open: boolean)
 		activeSlot = if primary then "Primary" else "Secondary"
 		refreshCoins()
 		showScreen("loadout")
+
+		-- Opens with a small overshoot. Theme.easing.enter is the same curve
+		-- every other panel appears on, so the loadout does not arrive
+		-- differently from the shop.
+		local scale = panelScale
+		if scale then
+			scale.Scale = 0.94
+			TweenService:Create(scale, Theme.easing.enter, { Scale = 1 }):Play()
+		end
 	end
 end
 
@@ -1188,11 +1213,42 @@ local function buildGui()
 
 	modal = Components.modalBlocker(screen)
 
+	-- The world behind the panel, dimmed. This is half of why the loadout never
+	-- read as rounded: a blush sheet covering the whole screen has nothing to
+	-- sit on top of, so there is no edge for a corner radius to curve away from.
+	local scrim = Instance.new("Frame")
+	scrim.Name = "Scrim"
+	scrim.Size = UDim2.fromScale(1, 1)
+	scrim.BackgroundColor3 = Theme.color.scrim
+	scrim.BackgroundTransparency = 0.4
+	scrim.BorderSizePixel = 0
+	scrim.Parent = screen
+
+	-- A floating panel, not a screen takeover.
+	--
+	-- ClipsDescendants is what makes the rounding real rather than decorative:
+	-- the top bar and the page frames below run the full width of this frame,
+	-- and their square corners would otherwise punch straight back out through
+	-- the radius. Roblox clips to the UICorner shape, so this rounds them too.
 	local root = Instance.new("Frame")
-	root.Size = UDim2.fromScale(1, 1)
+	root.Name = "Panel"
+	root.AnchorPoint = Vector2.new(0.5, 0.5)
+	root.Position = UDim2.fromScale(0.5, 0.5)
+	root.Size = UDim2.new(1, -MARGIN * 2, 1, -MARGIN * 2)
 	root.BackgroundColor3 = Theme.color.surface
 	root.BorderSizePixel = 0
+	root.ClipsDescendants = true
 	root.Parent = screen
+	Components.corner(root, Theme.radius.panel)
+	Components.stroke(root, Theme.color.primary, 2, 0.45)
+
+	local bounds = Instance.new("UISizeConstraint")
+	bounds.MaxSize = MAX_PANEL
+	bounds.Parent = root
+
+	local scale = Instance.new("UIScale")
+	scale.Parent = root
+	panelScale = scale
 
 	-- Top bar
 	local bar = Instance.new("Frame")
@@ -1250,20 +1306,27 @@ local function buildGui()
 	Components.corner(coinPill, Theme.radius.pill)
 	Components.stroke(coinPill, Theme.color.coin, 2, 0.25)
 	coinLabel = Components.text(coinPill, {
-		text = "🪙 0",
+		text = `{Theme.glyph.coin} 0`,
 		size = Theme.text.body,
 		color = Theme.color.text,
 		align = Enum.TextXAlignment.Center,
 		area = UDim2.fromScale(1, 1),
 	})
 
+	-- Same problem the tabs had: surfaceRaised on a surfaceRaised bar. The close
+	-- button was there the whole time and could not be seen.
 	local close = Components.button(bar, {
-		text = "✕",
+		-- Was "✕" (U+2715), which FredokaOne does not have — Roblox renders a
+		-- missing glyph as nothing, so this looked like an empty pink circle.
+		text = Theme.glyph.close,
 		area = UDim2.fromOffset(38, 38),
 		position = UDim2.new(1, -52, 0, 13),
 		radius = Theme.radius.pill,
 		size = Theme.text.heading,
+		color = Theme.color.surface,
+		textColor = Theme.color.primaryDeep,
 	})
+	Components.stroke(close, Theme.color.primary, 2, 0.45)
 	close.Activated:Connect(function()
 		LoadoutController.setOpen(false)
 	end)
@@ -1305,15 +1368,19 @@ local function buildGui()
 	charHolder.Parent = col1
 	charWell = charHolder
 
-	-- Reserved space for a future outfit system. Deliberately inert — no
-	-- controls, because no outfit system exists yet.
-	Components.text(col1, {
-		text = "Room reserved for outfit slots",
+	-- Reserved space for the character creator's outfits (NOD-168). Deliberately
+	-- inert — no controls, because no outfit system exists yet. Wrapped because
+	-- the label is wider than the 96px rail and was rendering as "Room
+	-- reserved for outf".
+	local reserved = Components.text(col1, {
+		text = "Outfit slots",
 		size = Theme.text.caption,
 		color = Theme.color.textMuted,
+		align = Enum.TextXAlignment.Center,
 		area = UDim2.fromOffset(96, 28),
 		position = UDim2.new(1, -pad - 96, 0, pad + 34),
 	})
+	reserved.TextWrapped = true
 	for slotIndex = 1, 4 do
 		local ghost = Instance.new("Frame")
 		ghost.Size = UDim2.new(0, 96, 0.2, -8)

@@ -651,7 +651,8 @@ local function buildUi()
 	closeButton.Font = Enum.Font.FredokaOne
 	closeButton.TextSize = 14
 	closeButton.TextColor3 = Color3.new(1, 1, 1)
-	closeButton.Text = "✕"
+	-- Was "✕" (U+2715), which FredokaOne does not have; it rendered as nothing.
+	closeButton.Text = Theme.glyph.close
 	round(closeButton, 14)
 	closeButton.MouseButton1Click:Connect(closeInspect)
 	closeButton.Parent = inspectPanel

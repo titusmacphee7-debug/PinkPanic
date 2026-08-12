@@ -239,7 +239,8 @@ local function buildGui()
 	close.Font = Enum.Font.FredokaOne
 	close.TextSize = 16
 	close.TextColor3 = Color3.new(1, 1, 1)
-	close.Text = "✕"
+	-- Was "✕" (U+2715), which FredokaOne does not have; it rendered as nothing.
+	close.Text = Theme.glyph.close
 	round(close, 15)
 	close.MouseButton1Click:Connect(function()
 		SettingsController.setOpen(false)

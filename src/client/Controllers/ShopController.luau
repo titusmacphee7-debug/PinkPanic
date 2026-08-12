@@ -265,7 +265,9 @@ local function buildGui()
 	close.Font = Enum.Font.FredokaOne
 	close.TextSize = 18
 	close.TextColor3 = Color3.new(1, 1, 1)
-	close.Text = "✕"
+	-- Was "✕" (U+2715), which FredokaOne does not have — Roblox renders a
+	-- missing glyph as nothing, so this button was a blank pink circle.
+	close.Text = Theme.glyph.close
 	round(close, 16)
 	close.MouseButton1Click:Connect(function()
 		ShopController.setOpen(false)

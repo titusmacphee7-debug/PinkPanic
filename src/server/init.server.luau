@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-12-C · scored spawns and respawn (NOD-135)"
+local BUILD_TAG = "2026-08-12-D · loadout is a rounded panel, HUD rebuilt"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
