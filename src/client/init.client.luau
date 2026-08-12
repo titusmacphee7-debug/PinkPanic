@@ -9,7 +9,7 @@ local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-12-I · omnimovement: 8-way sprint and stance (NOD-140)"
+local CLIENT_BUILD_TAG = "2026-08-12-J · slide, dive and mantle (NOD-141)"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false

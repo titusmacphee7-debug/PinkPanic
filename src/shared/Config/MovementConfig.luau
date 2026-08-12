@@ -136,10 +136,128 @@ MovementConfig.stanceDrop = {
 -- Character attributes other systems read. Named here so nothing has to
 -- hardcode the string, and listed together so the set is visible at a glance.
 MovementConfig.attributes = {
+	-- The state machine's current state, by name. The booleans below predate it
+	-- and stay because things are written against them; this one is what you
+	-- read when the question is "what is this player actually doing".
+	state = "PPMoveState",
 	sprinting = "PPSprinting",
 	crouching = "PPCrouching",
 	prone = "PPProne",
 	sliding = "PPSliding",
+}
+
+-- ---------------------------------------------------------------------------
+-- Slide (NOD-141)
+--
+-- A slide is a COMMITMENT: you trade control for distance. You steer it, but you
+-- cannot stop it early and you cannot re-enter one without re-earning the
+-- sprint, which is what keeps it fair to shoot at.
+-- ---------------------------------------------------------------------------
+
+MovementConfig.slide = {
+	-- Entry speed, as a multiple of the sprint you came in at. Clamped to
+	-- `speed.Slide` above, so raising this cannot outrun the server's check.
+	entryMultiplier = 1.35,
+	-- Longest a slide can last. The curve below is sampled across exactly this.
+	maxSeconds = 0.85,
+	-- Shortest. Below this you cannot cancel out, so a slide is never a
+	-- one-frame speed tap.
+	minSeconds = 0.22,
+	-- Ends early once it has decayed to here — a slide that trails off into a
+	-- crawl reads as the game sticking rather than as a slide finishing.
+	exitSpeed = 13,
+	-- How long after a slide before another may start. With `sprintChargeSeconds`
+	-- this is what stops slide-chaining down a corridor.
+	cooldownSeconds = 0.8,
+	-- How long you must have been sprinting before a slide is available.
+	sprintChargeSeconds = 0.25,
+	-- Steering: degrees per second the slide heading may turn toward your input.
+	-- It CURVES, it does not pivot — a slide you can spin on the spot is a slide
+	-- that dodges bullets, and the whole trade is supposed to be that you cannot.
+	turnRateDeg = 190,
+	-- Camera roll, degrees, applied at PinkPanicSlideRoll in the render chain.
+	rollDegrees = 7,
+	rollInSeconds = 0.1,
+	rollOutSeconds = 0.22,
+}
+
+-- The decay curve, hand-tunable: speed as a fraction of the entry speed, sampled
+-- at even intervals from the start of the slide to `maxSeconds` and interpolated
+-- between. Bump a number, feel the change — no formula to re-derive.
+--
+-- Every entry must be ≤ the one before it. `Movement.validate` enforces that: a
+-- slide that speeds up partway through is the readability rule broken, and it
+-- would be found by a player long before it was found by anyone reading this.
+MovementConfig.slideCurve = { 1, 0.98, 0.9, 0.78, 0.62, 0.45, 0.3 }
+
+-- ---------------------------------------------------------------------------
+-- Dive (NOD-141)
+--
+-- The omnimovement signature move: an arc with real airtime, in any of the eight
+-- directions. You are helpless in the air and you land prone — that is the
+-- price, and it is what stops a dive from being a free reposition.
+-- ---------------------------------------------------------------------------
+
+MovementConfig.dive = {
+	-- Horizontal launch, studs/s, before direction scaling. Clamped to
+	-- `speed.Dive`.
+	launchSpeed = 33,
+	-- Apex of the arc above where you left the ground.
+	heightStuds = 5.2,
+	-- Flat on your face at the far end. You may start getting up the moment this
+	-- expires; you may not act during it.
+	recoverySeconds = 0.5,
+	-- Diving into a wall costs more, because otherwise a wall is a free way to
+	-- stop a dive short and skip the distance you were supposed to pay for.
+	wallRecoveryBonus = 0.45,
+	wallProbeStuds = 3.5,
+	-- Airborne for at least this long before a landing counts, so leaving the
+	-- ground and immediately re-touching it does not end the dive on frame one.
+	minAirborneSeconds = 0.12,
+	-- The other end of the same guard: if the jump was refused (a low ceiling, a
+	-- Humanoid mid-state-change) the dive would wait forever for a landing that
+	-- already happened. Comfortably longer than any real arc.
+	maxAirSeconds = 2,
+	cooldownSeconds = 0.9,
+}
+
+-- Per-direction arc tuning, same five angles as `directional`. Diving backwards
+-- covers less ground than diving forwards, for the same reason sprinting
+-- backwards does.
+MovementConfig.diveDirectional = {
+	forward = 1,
+	diagonalForward = 0.94,
+	strafe = 0.82,
+	diagonalBack = 0.7,
+	backward = 0.6,
+}
+
+-- ---------------------------------------------------------------------------
+-- Mantle (NOD-141)
+--
+-- Auto-mantle: no key. If you jump at a ledge you can reach, you go over it.
+-- A mantle key is a key people forget they have.
+-- ---------------------------------------------------------------------------
+
+MovementConfig.mantle = {
+	-- How far in front of you a wall may be and still be mantled.
+	reachStuds = 2.8,
+	-- The height band, measured from the floor you left. Below the minimum it is
+	-- a step and the Humanoid already walks up it; above the maximum it is a
+	-- wall, and climbing walls is not a thing this game has.
+	minHeightStuds = 2.4,
+	maxHeightStuds = 7,
+	-- How much flat top surface the ledge needs before it counts as somewhere to
+	-- stand rather than an edge to clip through.
+	ledgeDepthStuds = 1.5,
+	-- Headroom above the landing. Without this you mantle into a pipe.
+	clearanceStuds = 5,
+	-- Steepest the top surface may be. Steeper than this is a roof, not a ledge.
+	maxSlopeDegrees = 40,
+	-- The traversal itself. Long enough to read as a movement, short enough that
+	-- being uncontrollable does not feel like being frozen.
+	durationSeconds = 0.34,
+	cooldownSeconds = 0.45,
 }
 
 -- ---------------------------------------------------------------------------
@@ -210,19 +328,25 @@ MovementConfig.jumpCooldownSeconds = 0.18
 -- ---------------------------------------------------------------------------
 -- Profiles
 --
--- The lobby camera is fixed and hand-placed. Slide, dive and mantle all move
--- the camera in ways that look wrong under it, so the lobby simply does not
--- have them — which is a rule about the CAMERA, not about the moves.
+-- Which moves a room has. There is exactly one difference between them now, and
+-- it is about the CAMERA rather than about the moves.
 -- ---------------------------------------------------------------------------
 
 export type ProfileName = "lobby" | "combat"
 
 MovementConfig.profiles = {
-	-- Crouch and prone ARE in the lobby, and the exclusions are the reason: what
-	-- the fixed camera cannot show is an ARC — a slide, a dive, a mantle.
-	-- Stances are not arcs. Leaving them out would mean the crouch and prone
-	-- keys do nothing in the only place currently testable, which teaches the
-	-- player that they are broken.
+	-- The lobby used to exclude slide, dive and mantle, on the grounds that its
+	-- fixed hand-placed camera could not show an arc. That was a rule about the
+	-- camera written as a rule about the moves, and it had a consequence nobody
+	-- had priced in: there is no round loop until M9 and a round needs two
+	-- players, so "not in the lobby" meant "nowhere", and all three would have
+	-- shipped as code that has never once run. That is the exact failure this
+	-- rebuild exists to stop — the old slide was in the codebase, compiled, and
+	-- never fired, and nobody knew for days.
+	--
+	-- So the lobby has all of it, and the camera fixes the camera: the slide roll
+	-- is skipped while the fixed lobby shot owns the CFrame, because rolling a
+	-- pinned shot of the storefront row tilts the storefront, not the player.
 	lobby = {
 		allowed = {
 			Idle = true,
@@ -231,7 +355,10 @@ MovementConfig.profiles = {
 			TacSprint = true,
 			Crouch = true,
 			Prone = true,
+			Slide = true,
+			Dive = true,
 			Air = true,
+			Mantle = true,
 			Stun = true,
 		},
 	},
@@ -284,5 +411,14 @@ MovementConfig.auditStrikes = 4
 -- ---------------------------------------------------------------------------
 
 MovementConfig.overlayKey = Enum.KeyCode.F3
+
+-- How often the trigger counts for slide, dive and mantle are printed. The old
+-- slide was present, compiled, and never fired once, and nothing in the game
+-- could tell the difference — so the counts say so out loud on a timer, and
+-- "0, never fired" is a line you can read from across the room.
+--
+-- Only printed when a count has CHANGED, plus once at the first interval, so a
+-- session where nobody moves says so exactly once and then goes quiet.
+MovementConfig.moveReportSeconds = 90
 
 return MovementConfig

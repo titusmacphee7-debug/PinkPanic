@@ -1,30 +1,38 @@
 --!strict
 -- MovementController — reads input, runs the state machine, drives the
--- actuator (NOD-139).
+-- character (NOD-139, NOD-140, NOD-141).
 --
 -- The split is deliberate and it is the whole shape of M2:
 --
---   Movement  (shared)  what states exist and which transitions are legal
---   Actuator  (client)  how force reaches the character without flinging it
+--   Movement  (shared)  what states exist, which transitions are legal, and how
+--                       fast each one may be — the server reads the same answers
+--   Traversal (client)  is there a ledge in front of me, and is it safe
+--   Actuator  (client)  a bounded force, for the day something needs one
 --   this file (client)  input, ground, and the frame loop that joins them
 --
--- Only the core lands here. Omnimovement (NOD-140), slide and dive (NOD-141)
--- and the camera rig (NOD-142) are the rest of the milestone; their states are
--- already declared and legal in the transition table, with nothing driving them
--- yet. That is on purpose — a state you can enter before anyone has decided how
--- it feels is a state that gets designed by accident.
+-- **Everything is moved through the Humanoid, and that is measured rather than
+-- assumed.** A live Humanoid's own controller cannot be out-argued by a finite
+-- force; only `math.huge` beats it, and `math.huge` is precisely what threw
+-- Titus across the lobby. So instead of fighting it, every move here drives it:
 --
--- **Ground locomotion is driven through Humanoid.WalkSpeed, not the actuator,
--- and that is a measured decision rather than a shortcut.** A live Humanoid's
--- controller cannot be out-argued by a finite force; only `math.huge` beats it,
--- and `math.huge` is precisely what threw Titus across the lobby. The numbers
--- are in Actuator.luau's header. What matters here is that the speed still
--- comes from `Movement.speedFor` — the same function the server's plausibility
--- check reads — so there is exactly one answer to how fast a state is, and the
--- actuator is waiting, bounded, for the momentum states that actually need it.
+--   ground   Humanoid.WalkSpeed, from the shared speed resolver
+--   slide    Humanoid:Move(locked heading) + a decaying WalkSpeed
+--   dive     ChangeState(Jumping) for the arc, Move + WalkSpeed for the length
+--   mantle   PlatformStand, then the root's CFrame written along a checked path
 --
--- **It fails toward being able to walk.** If the rig is missing, the character
--- is mid-respawn, or anything else goes wrong, the Humanoid keeps its speed and
+-- Measured 2026-08-12: `Humanoid:Move` bound at Input+1 fully overrides the
+-- default control script (22.3 studs in one second at WalkSpeed 24, MoveDirection
+-- exactly as written), a jump-plus-Move arc holds its horizontal speed for the
+-- whole 0.5s of airtime, and a CFrame-written mantle lands 0.05 studs from where
+-- it was aimed. Setting velocity directly while GROUNDED does not work at all —
+-- the Running controller ate a 30-stud impulse inside one frame — which is why
+-- the dive launches through the jump rather than through a shove.
+--
+-- Because the Humanoid stays the mover, a wall still stops you. That is not a
+-- detail: it is the entire reason the fling is gone.
+--
+-- **It fails toward being able to walk.** If the rig is missing, the character is
+-- mid-respawn, or anything else goes wrong, the Humanoid keeps its speed and
 -- Roblox's own movement carries on. A movement system that is broken should
 -- leave the player able to move, not standing still wondering.
 
@@ -35,16 +43,17 @@ local UserInputService = game:GetService("UserInputService")
 
 local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 local Movement = require(ReplicatedStorage.Shared.Systems.Movement)
-local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
 local Config = require(ReplicatedStorage.Shared.Config.MovementConfig)
 local ClientData = require(script.Parent.Parent.ClientData)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local Components = require(script.Parent.Parent.UI.Components)
 local Actuator = require(script.Parent.Parent.Movement.Actuator)
+local Traversal = require(script.Parent.Parent.Movement.Traversal)
 local Firing = require(script.Parent.Parent.Systems.Firing)
 
 local SYSTEM = "MovementController"
 local BIND = "PinkPanicMovement"
+local ROLL_BIND = "PinkPanicSlideRoll"
 
 local MovementController = {}
 
@@ -85,6 +94,37 @@ local lastSprintPressAt = -math.huge
 local stanceReadyAt = 0
 local pendingRise: Movement.State? = nil
 
+-- Requests raised by the input callbacks and consumed by the frame. An input
+-- handler that transitions the machine directly runs at whatever moment the key
+-- happened to arrive, which is how a move ends up depending on frame timing.
+local slideRequested = false
+local diveRequested = false
+local jumpRequested = false
+
+-- Slide (NOD-141)
+local slideHeading = Vector3.zAxis
+local slideEntrySpeed = 0
+local slideCooldownUntil = -math.huge
+local slideHopCapUntil = -math.huge
+-- When the current sprint began. A slide has to be EARNED: you cannot tap
+-- sprint and immediately slide, and you cannot slide out of a slide.
+local sprintSince = math.huge
+
+-- Dive (NOD-141)
+local diveHeading = Vector3.zAxis
+local diveSpeed = 0
+local diveLeftGround = false
+local diveLanded = false
+local diveHitWall = false
+local diveRecoveryUntil = 0
+local diveCooldownUntil = -math.huge
+
+-- Mantle (NOD-141)
+local mantleFrom = Vector3.zero
+local mantleTarget = Vector3.zero
+local mantleRotation = CFrame.identity
+local mantleCooldownUntil = -math.huge
+local mantleWhyNot = "—"
 
 -- Ground state, from our own probes rather than Humanoid.FloorMaterial: the
 -- Humanoid's answer lags a frame on ramps and lies on the edge of a platform,
@@ -159,6 +199,29 @@ local function proneWanted(): boolean
 	return proneToggled
 end
 
+local function sprinting(state: Movement.State): boolean
+	return state == "Sprint" or state == "TacSprint"
+end
+
+-- Where the player is asking to go, flattened and unit, or nil if they are not
+-- asking. Falls back to facing where a heading is required and none was given —
+-- a dive with no input still has to go somewhere, and "where you are looking" is
+-- the only answer that is never surprising.
+local function inputHeading(current: Actuator.Rig): Vector3?
+	local direction = current.humanoid.MoveDirection
+	local flat = Vector3.new(direction.X, 0, direction.Z)
+	if flat.Magnitude < 0.05 then
+		return nil
+	end
+	return flat.Unit
+end
+
+local function facingHeading(current: Actuator.Rig): Vector3
+	local look = current.root.CFrame.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	return if flat.Magnitude > 1e-4 then flat.Unit else Vector3.zAxis
+end
+
 local function desiredState(moving: boolean): Movement.State
 	if not grounded and clock - leftGroundAt > Config.coyoteSeconds then
 		return "Air"
@@ -230,9 +293,18 @@ local function publishStance(current: Actuator.Rig, state: Movement.State)
 		return
 	end
 	local names = Config.attributes
-	character:SetAttribute(names.sprinting, state == "Sprint" or state == "TacSprint")
+	-- The state itself, by name. The four booleans below are the stance flags
+	-- other systems were already written against; this is the whole answer, and
+	-- it exists because "why did my slide end after half a second" was not
+	-- answerable from outside the controller — every observer could see four
+	-- flags go false at once and none of them could see what replaced them.
+	character:SetAttribute(names.state, state)
+	character:SetAttribute(names.sprinting, sprinting(state))
 	character:SetAttribute(names.crouching, state == "Crouch")
-	character:SetAttribute(names.prone, state == "Prone")
+	-- A dive is prone from the moment it lands, not from the moment it starts:
+	-- you are in the air for the first half of it, and anything reading "prone"
+	-- to decide how tall you are would be wrong for exactly that half.
+	character:SetAttribute(names.prone, state == "Prone" or (state == "Dive" and diveLanded))
 	character:SetAttribute(names.sliding, state == "Slide")
 end
 
@@ -258,6 +330,306 @@ local function applyStanceHeight(current: Actuator.Rig, state: Movement.State)
 	current.humanoid.CameraOffset = Vector3.new(0, -drop, 0)
 end
 
+local function enter(current: Actuator.Rig, state: Movement.State): boolean
+	local from = machine.state
+	if not Movement.transition(machine, state) or machine.state == from then
+		return false
+	end
+	applyStanceHeight(current, machine.state)
+	publishStance(current, machine.state)
+	return true
+end
+
+-- ---------------------------------------------------------------------------
+-- Slide (NOD-141)
+--
+-- A slide is a commitment. You steer it — Titus asked for that in his first
+-- message and it survived every revision — but you cannot stop it early, you
+-- cannot spin on the spot, and you cannot have another one until you have earned
+-- another sprint.
+-- ---------------------------------------------------------------------------
+
+local function slideAvailable(): boolean
+	return clock >= slideCooldownUntil and clock - sprintSince >= Config.slide.sprintChargeSeconds
+end
+
+local function beginSlide(current: Actuator.Rig): boolean
+	if not grounded or not slideAvailable() then
+		return false
+	end
+	local heading = inputHeading(current) or facingHeading(current)
+	-- The speed you were actually carrying, not the speed the state allows.
+	-- Entering a slide out of a hard turn should not hand you a boost you had
+	-- not built up.
+	local carried = math.max(Actuator.planarSpeed(current), Config.speed.Walk)
+
+	if not enter(current, "Slide") then
+		return false
+	end
+
+	slideHeading = heading
+	slideEntrySpeed = Movement.slideEntrySpeed(carried, weight())
+	slideCooldownUntil = clock + Config.slide.maxSeconds + Config.slide.cooldownSeconds
+	sprintSince = math.huge -- re-earn the sprint before the next one
+	Diagnostics.count(SYSTEM, "slide")
+	return true
+end
+
+-- Rotate `from` toward `to` by at most `maxRadians`, around Y.
+--
+-- A cap, not a lerp: a lerp is fastest when the turn is biggest, which is
+-- exactly backwards for a slide. The cap is what makes it CURVE rather than
+-- pivot, and a slide you can pivot on is a slide that dodges bullets.
+local function turnToward(from: Vector3, to: Vector3, maxRadians: number): Vector3
+	local dot = math.clamp(from:Dot(to), -1, 1)
+	local angle = math.acos(dot)
+	if angle <= maxRadians then
+		return to
+	end
+	-- Which way round. `CFrame.Angles(0, +θ, 0)` turns +X toward −Z, and the Y of
+	-- that same cross product is positive, so the sign carries straight across —
+	-- written this way rather than as a hand-rolled sin/cos pair precisely
+	-- because getting that sign backwards makes a slide steer away from your
+	-- input, which reads as the controls being inverted.
+	local sign = if from:Cross(to).Y >= 0 then 1 else -1
+	local turned = CFrame.Angles(0, maxRadians * sign, 0) * from
+	return Vector3.new(turned.X, 0, turned.Z).Unit
+end
+
+local function endSlide(current: Actuator.Rig)
+	slideCooldownUntil = clock + Config.slide.cooldownSeconds
+	if proneWanted() then
+		enter(current, "Prone")
+	elseif crouchWanted() then
+		enter(current, "Crouch")
+	else
+		enter(current, if inputHeading(current) then "Walk" else "Idle")
+	end
+end
+
+local function stepSlide(current: Actuator.Rig, deltaTime: number)
+	local slide = Config.slide
+	local elapsed = machine.elapsed
+	local speed = Movement.slideSpeed(slideEntrySpeed, elapsed)
+
+	-- The slide-hop. It cancels cleanly and grants NO speed: the cap below runs
+	-- for a moment after take-off and pulls anything above ground sprint back
+	-- down to it. Speed is earned on the ground and spent in the air, and a hop
+	-- that let you keep the slide boost would be the bunny-hop chain the
+	-- readability rule exists to prevent.
+	if jumpRequested then
+		jumpRequested = false
+		slideHopCapUntil = clock + 0.35
+		Diagnostics.count(SYSTEM, "slideHop")
+		-- Jumping is standing up. Leaving the crouch latched meant the slide
+		-- ended INTO a crouch, the Humanoid braked to crouch speed on the ground
+		-- before the jump had left it, and the hop arrived in the air at 9.2
+		-- studs/s against a sprint's 24 — measured. "Cancels cleanly and grants
+		-- no speed" is a ceiling, not a tax: you keep a sprint out of it, and the
+		-- cap in the frame loop is what stops you keeping any more than that.
+		crouchToggled = false
+		proneToggled = false
+		endSlide(current)
+		current.humanoid.WalkSpeed = Movement.speedFor("Sprint", weight())
+		return
+	end
+
+	if elapsed >= slide.maxSeconds or speed <= slide.exitSpeed then
+		endSlide(current)
+		return
+	end
+	-- Coyote-tolerant, deliberately: the same grace the walk path uses. A slide
+	-- crosses lips, kerbs and the gaps between hand-built lobby parts, and every
+	-- one of those un-grounds you for a frame or two. Cancelling on the raw probe
+	-- makes a slide over ordinary geometry end at a random point partway
+	-- through, which reads as the slide being unreliable rather than as the
+	-- floor being uneven.
+	if not grounded and clock - leftGroundAt > Config.coyoteSeconds then
+		enter(current, "Air")
+		return
+	end
+	-- Standing up out of it, once you have paid the minimum. Below the minimum
+	-- a slide would be a one-frame speed tap you could spam.
+	if elapsed >= slide.minSeconds and not crouchWanted() and not proneWanted() then
+		endSlide(current)
+		return
+	end
+
+	local wanted = inputHeading(current)
+	if wanted then
+		slideHeading = turnToward(slideHeading, wanted, math.rad(slide.turnRateDeg) * deltaTime)
+	end
+
+	current.humanoid.WalkSpeed = speed
+	current.humanoid:Move(slideHeading, false)
+end
+
+-- ---------------------------------------------------------------------------
+-- Dive (NOD-141)
+--
+-- The omnimovement signature move: an arc with real airtime in any of eight
+-- directions. You are helpless in the air, and you land on your face. That is
+-- the price, and it is what stops a dive from being a free reposition.
+-- ---------------------------------------------------------------------------
+
+local function beginDive(current: Actuator.Rig): boolean
+	if not grounded or clock < diveCooldownUntil then
+		return false
+	end
+	local heading = inputHeading(current) or facingHeading(current)
+	local facing = facingHeading(current)
+	local dot = math.clamp(facing:Dot(heading), -1, 1)
+
+	if not enter(current, "Dive") then
+		return false
+	end
+
+	diveHeading = heading
+	diveSpeed = Movement.diveLaunchSpeed(dot, weight())
+	diveLeftGround = false
+	diveLanded = false
+	diveHitWall = false
+	diveRecoveryUntil = 0
+	diveCooldownUntil = clock + Config.dive.cooldownSeconds
+
+	-- The arc comes from the Humanoid's own jump. A velocity impulse does not
+	-- work here at all: measured on 2026-08-12, the Running controller ate a
+	-- 30-stud shove inside a single frame. The jump is a code path it cannot
+	-- argue with, and JumpHeight is restored the moment the dive ends.
+	current.humanoid.JumpHeight = Config.dive.heightStuds
+	current.humanoid.WalkSpeed = diveSpeed
+	current.humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+	Diagnostics.count(SYSTEM, "dive")
+	return true
+end
+
+local diveWallParams = RaycastParams.new()
+diveWallParams.FilterType = Enum.RaycastFilterType.Exclude
+diveWallParams.IgnoreWater = true
+
+local function stepDive(current: Actuator.Rig, _deltaTime: number)
+	local dive = Config.dive
+	local humanoid = current.humanoid
+
+	if diveLanded then
+		-- Recovery. Flat on your face and worth nothing to anyone, which is the
+		-- half of the dive that makes the first half fair.
+		humanoid.WalkSpeed = 0
+		if clock >= diveRecoveryUntil then
+			humanoid.JumpHeight = Config.jumpHeightStuds
+			-- You land prone, and the latch decides whether you stay there: the
+			-- key still down means you meant it, the key released means get up.
+			-- That IS "the option to get up immediately" — no separate input.
+			enter(current, "Prone")
+		end
+		return
+	end
+
+	-- A dive that never leaves the ground would otherwise wait forever for a
+	-- landing that already happened. Jumping can be denied — a low ceiling, a
+	-- Humanoid mid-state-change — and "stuck at dive speed with no way out" is
+	-- exactly the class of bug that gets reported as "movement broke".
+	if machine.elapsed >= dive.maxAirSeconds then
+		diveLanded = true
+		diveRecoveryUntil = clock + dive.recoverySeconds
+		humanoid.WalkSpeed = 0
+		Diagnostics.count(SYSTEM, "diveTimedOut")
+		return
+	end
+
+	if not grounded then
+		diveLeftGround = true
+		-- Skip the servo's ramp-in. Measured, the Humanoid takes about 0.3s to
+		-- reach a new WalkSpeed, and a dive that spends a third of its airtime
+		-- accelerating reads as a hop rather than a launch. In the AIR the
+		-- velocity write sticks — it is only on the ground that it gets eaten.
+		local velocity = current.root.AssemblyLinearVelocity
+		local planar = Vector3.new(velocity.X, 0, velocity.Z)
+		if planar.Magnitude < diveSpeed - 0.5 then
+			local wanted = diveHeading * diveSpeed
+			current.root.AssemblyLinearVelocity = Vector3.new(wanted.X, velocity.Y, wanted.Z)
+		end
+
+		diveWallParams.FilterDescendantsInstances = { current.root.Parent :: Instance }
+		local ahead = workspace:Raycast(current.root.Position, diveHeading * dive.wallProbeStuds, diveWallParams)
+		if ahead and math.abs(ahead.Normal.Y) < 0.5 then
+			diveHitWall = true
+		end
+	end
+
+	humanoid.WalkSpeed = diveSpeed
+	humanoid:Move(diveHeading, false)
+
+	-- Landing. The airborne gate is what stops the frame you leave the ground
+	-- from counting as the frame you arrive back on it.
+	if diveLeftGround and grounded and machine.elapsed >= dive.minAirborneSeconds then
+		diveLanded = true
+		diveRecoveryUntil = clock + dive.recoverySeconds + (if diveHitWall then dive.wallRecoveryBonus else 0)
+		humanoid.WalkSpeed = 0
+		publishStance(current, "Dive")
+		Diagnostics.count(SYSTEM, if diveHitWall then "diveIntoWall" else "diveLanded")
+	end
+end
+
+-- ---------------------------------------------------------------------------
+-- Mantle (NOD-141)
+--
+-- Auto-mantle: no key. If you jump at a ledge you can reach, you go over it. A
+-- mantle key is a key people forget they have.
+-- ---------------------------------------------------------------------------
+
+-- Every other frame while airborne. Six raycasts is cheap; six raycasts sixty
+-- times a second for the whole of a fall is not, and a ledge does not appear
+-- and vanish inside 16 milliseconds.
+local mantleProbeFrame = 0
+
+local function tryMantle(current: Actuator.Rig): boolean
+	if clock < mantleCooldownUntil then
+		return false
+	end
+	mantleProbeFrame += 1
+	if mantleProbeFrame % 2 == 1 then
+		return false
+	end
+
+	local velocity = current.root.AssemblyLinearVelocity
+	local planar = Vector3.new(velocity.X, 0, velocity.Z)
+	local heading = if planar.Magnitude > 1 then planar.Unit else facingHeading(current)
+
+	local ledge, why = Traversal.findLedge(current.root, current.humanoid, heading)
+	mantleWhyNot = why
+	if not ledge then
+		return false
+	end
+
+	if not enter(current, "Mantle") then
+		return false
+	end
+
+	mantleFrom = current.root.Position
+	mantleTarget = ledge.target
+	mantleRotation = current.root.CFrame.Rotation
+	current.humanoid.PlatformStand = true
+	Diagnostics.count(SYSTEM, "mantle")
+	return true
+end
+
+local function stepMantle(current: Actuator.Rig)
+	local alpha = machine.elapsed / Config.mantle.durationSeconds
+	local point = Traversal.pathPoint(mantleFrom, mantleTarget, alpha)
+
+	current.root.CFrame = CFrame.new(point) * mantleRotation
+	-- Zeroed every frame, or the fall you were in the middle of is waiting for
+	-- you at the top and yanks you straight back off the ledge.
+	current.root.AssemblyLinearVelocity = Vector3.zero
+
+	if alpha >= 1 then
+		current.humanoid.PlatformStand = false
+		mantleCooldownUntil = clock + Config.mantle.cooldownSeconds
+		enter(current, if inputHeading(current) then "Walk" else "Idle")
+	end
+end
+
 -- ---------------------------------------------------------------------------
 -- Frame
 -- ---------------------------------------------------------------------------
@@ -266,6 +638,8 @@ local function releaseControl()
 	local current = rig
 	if current then
 		Actuator.release(current)
+		current.humanoid.PlatformStand = false
+		current.humanoid.JumpHeight = Config.jumpHeightStuds
 		current.humanoid.WalkSpeed = Config.speed.Walk
 	end
 end
@@ -284,12 +658,45 @@ local function step(deltaTime: number)
 	if ClientData.menuOpen() then
 		sprintHeld = false
 		tacRequested = false
+		slideRequested = false
+		diveRequested = false
+		jumpRequested = false
 	end
 
 	local wasGrounded = grounded
 	grounded = probeGround(current)
 	if wasGrounded and not grounded then
 		leftGroundAt = clock
+	end
+
+	-- The slide-hop cap. Anything above ground sprint gets pulled back to it for
+	-- a moment after take-off, so a hop out of a slide arrives in the air at
+	-- exactly the speed a sprint-jump would have. This is the "grants no speed"
+	-- subtask, and it is enforced here rather than trusted to the decay curve.
+	if clock < slideHopCapUntil then
+		local ceiling = Movement.speedFor("Sprint", weight())
+		local velocity = current.root.AssemblyLinearVelocity
+		local planar = Vector3.new(velocity.X, 0, velocity.Z)
+		if planar.Magnitude > ceiling then
+			local capped = planar.Unit * ceiling
+			current.root.AssemblyLinearVelocity = Vector3.new(capped.X, velocity.Y, capped.Z)
+		end
+	end
+
+	-- The three committed states each own their frame outright. That is what
+	-- "commitment" means mechanically: while one is running, the stance keys,
+	-- the sprint key and the ordinary speed resolver do not get a vote.
+	if machine.state == "Mantle" then
+		stepMantle(current)
+		return
+	end
+	if machine.state == "Dive" then
+		stepDive(current, deltaTime)
+		return
+	end
+	if machine.state == "Slide" then
+		stepSlide(current, deltaTime)
+		return
 	end
 
 	local direction = current.humanoid.MoveDirection
@@ -309,17 +716,38 @@ local function step(deltaTime: number)
 		tacCharge = math.min(tacCharge + deltaTime / tac.rechargeSeconds, 1)
 	end
 
+	-- Entries. Checked before the ordinary state path so that sprint+crouch is a
+	-- slide rather than a crouch that happens to be fast.
+	if slideRequested then
+		slideRequested = false
+		if sprinting(machine.state) and beginSlide(current) then
+			return
+		end
+	end
+	if diveRequested then
+		diveRequested = false
+		if sprinting(machine.state) and beginDive(current) then
+			return
+		end
+	end
+	jumpRequested = false
+
+	if machine.state == "Air" and tryMantle(current) then
+		return
+	end
+
+	local wanted = desiredState(moving)
+
 	-- Going DOWN is instant; coming UP takes time.
 	--
 	-- That asymmetry is the whole of "the get-up delay that makes going prone a
 	-- commitment". Delaying the way down would just feel like the game
 	-- swallowing the input you press when you are being shot at. Delaying the
-	-- way up means the thirty-five hundredths of a second you spend flat is a
-	-- price, and dropping prone is a decision rather than a free crouch.
+	-- way up means the time you spend flat is a price, and dropping prone is a
+	-- decision rather than a free crouch.
 	--
 	-- It is also what kills crouch spam: you can drop instantly as often as you
 	-- like, but every one of those costs you the rise.
-	local wanted = desiredState(moving)
 	local currentState = machine.state
 	if STANCE_STATES[wanted] and STANCE_STATES[currentState] and wanted ~= currentState then
 		local rising = stanceRank(wanted) < stanceRank(currentState)
@@ -340,9 +768,14 @@ local function step(deltaTime: number)
 		pendingRise = nil
 	end
 
-	if Movement.transition(machine, wanted) and machine.state ~= currentState then
-		applyStanceHeight(current, machine.state)
-		publishStance(current, machine.state)
+	if enter(current, wanted) and sprinting(machine.state) and not sprinting(currentState) then
+		-- A fresh sprint re-arms the slide. Tracked here rather than off the key
+		-- because holding sprint through a slide should not hand you the next
+		-- one for free — you have to actually be sprinting again.
+		sprintSince = clock
+	end
+	if not sprinting(machine.state) then
+		sprintSince = math.huge
 	end
 
 	-- Air keeps whatever speed you left the ground with, so the Humanoid's
@@ -381,6 +814,95 @@ local function step(deltaTime: number)
 	end
 end
 
+-- ---------------------------------------------------------------------------
+-- Camera roll (PinkPanicSlideRoll, Camera+3 in the documented chain)
+--
+-- The roll IS the carve. It is proportional to how far the slide heading has
+-- turned away from where you are looking, so a straight slide gets none and a
+-- slide you are steering leans into it — which makes the steering visible, and
+-- the steering is the part of a slide players are supposed to feel.
+-- ---------------------------------------------------------------------------
+
+local rollNow = 0
+
+local function slideRoll(deltaTime: number)
+	local camera = workspace.CurrentCamera
+	if not camera then
+		return
+	end
+
+	local target = 0
+	local current = rig
+	-- Skipped in the lobby on purpose: there the camera is a fixed hand-placed
+	-- shot of the storefront row, and rolling it tilts the storefront rather
+	-- than the player. That is the whole of what "the lobby cannot show an arc"
+	-- ever really meant, and it is a rule about this function, not about slides.
+	if current and machine.state == "Slide" and not ClientData.inLobby() then
+		local right = current.root.CFrame.RightVector
+		local flat = Vector3.new(right.X, 0, right.Z)
+		if flat.Magnitude > 1e-4 then
+			target = math.rad(Config.slide.rollDegrees) * math.clamp(flat.Unit:Dot(slideHeading), -1, 1)
+		end
+	end
+
+	local rate = if math.abs(target) > math.abs(rollNow) then Config.slide.rollInSeconds else Config.slide.rollOutSeconds
+	rollNow += (target - rollNow) * (1 - math.exp(-deltaTime / math.max(rate, 1e-3)))
+	if math.abs(rollNow) < 1e-4 then
+		rollNow = 0
+		return
+	end
+	camera.CFrame = camera.CFrame * CFrame.Angles(0, 0, rollNow)
+end
+
+-- ---------------------------------------------------------------------------
+-- Trigger counts
+--
+-- The old build had a slide that never fired. It was in the code, it compiled,
+-- it did nothing, and nobody knew for days. So the counts say so out loud: one
+-- line, printed when something changes and once at the first interval, with
+-- "never fired" spelled out rather than left as a zero to notice.
+-- ---------------------------------------------------------------------------
+
+local lastReport: { [string]: number } = {}
+
+local function countsNow(): { [string]: number }
+	return {
+		slide = Diagnostics.getCount(SYSTEM, "slide"),
+		dive = Diagnostics.getCount(SYSTEM, "dive"),
+		mantle = Diagnostics.getCount(SYSTEM, "mantle"),
+	}
+end
+
+function MovementController.report(force: boolean?): string
+	local counts = countsNow()
+
+	local changed = force == true
+	for name, value in counts do
+		if lastReport[name] ~= value then
+			changed = true
+		end
+	end
+	lastReport = counts
+
+	local parts: { string } = {}
+	local dead: { string } = {}
+	for _, name in { "slide", "dive", "mantle" } do
+		table.insert(parts, `{name} {counts[name]}`)
+		if counts[name] == 0 then
+			table.insert(dead, name)
+		end
+	end
+	local line = table.concat(parts, " · ")
+	if #dead > 0 then
+		line ..= ` — {table.concat(dead, ", ")} {if #dead == 1 then "has" else "have"} NEVER FIRED`
+	end
+
+	if changed then
+		print(`[PinkPanic] 🏃 moves: {line}`)
+	end
+	return line
+end
+
 -- Sprinting is cancelled by shooting, aiming, or reloading — not merely
 -- ignored. Public because the trigger lives in WeaponController and this is the
 -- seam between them; a controller reaching into another controller's input
@@ -409,6 +931,7 @@ local function bind(character: Model)
 	built.humanoid.WalkSpeed = Config.speed.Walk
 	built.humanoid.UseJumpPower = false
 	built.humanoid.JumpHeight = Config.jumpHeightStuds
+	built.humanoid.PlatformStand = false
 
 	built.humanoid.CameraOffset = Vector3.zero
 
@@ -420,11 +943,19 @@ local function bind(character: Model)
 	tacCharge = 1
 	stanceReadyAt = 0
 	pendingRise = nil
+	slideRequested = false
+	diveRequested = false
+	jumpRequested = false
+	sprintSince = math.huge
+	slideCooldownUntil = -math.huge
+	diveCooldownUntil = -math.huge
+	mantleCooldownUntil = -math.huge
+	diveLanded = false
 	publishStance(built, "Idle")
 
 	-- Attached but silent. The constraint exists from the first frame with its
-	-- force ceiling already set, so slide and dive (NOD-141) have somewhere to
-	-- push from and nobody has to rediscover why math.huge is not an option.
+	-- force ceiling already set — nothing drives it today, and the header in
+	-- Actuator.luau is the measurement that says why.
 	Actuator.release(built)
 
 	built.humanoid.Died:Connect(function()
@@ -458,7 +989,7 @@ local function buildOverlay()
 	local panel = Instance.new("Frame")
 	panel.AnchorPoint = Vector2.new(0, 1)
 	panel.Position = UDim2.new(0, Theme.space.lg, 1, -Theme.space.lg)
-	panel.Size = UDim2.fromOffset(250, 96)
+	panel.Size = UDim2.fromOffset(290, 130)
 	panel.BackgroundColor3 = Theme.color.scrim
 	panel.BackgroundTransparency = 0.25
 	panel.BorderSizePixel = 0
@@ -491,8 +1022,8 @@ local function buildOverlay()
 			end
 			local current = rig
 			local speed = if current then Actuator.planarSpeed(current) else 0
-			local force = if current then current.mover.MaxForce else 0
 			local walk = if current then current.humanoid.WalkSpeed else 0
+			local counts = countsNow()
 			label.Text = table.concat({
 				`state    {machine.state}  (from {machine.previous})`,
 				`profile  {machine.profile}`,
@@ -500,7 +1031,8 @@ local function buildOverlay()
 				`ceiling  {string.format("%.1f", Movement.speedFor(machine.state, weight()))} forward, this state`,
 				`grounded {tostring(grounded)}   tac {math.floor(tacCharge * 100)}%`,
 				`stance   crouch={tostring(crouchWanted())} prone={tostring(proneWanted())}`,
-				`force    {string.format("%.0f", force)}  (idle until NOD-141; never huge)`,
+				`moves    slide {counts.slide} · dive {counts.dive} · mantle {counts.mantle}`,
+				`ledge    {mantleWhyNot}`,
 				`refused  {machine.refused}`,
 			}, "\n")
 		end
@@ -527,6 +1059,11 @@ function MovementController.init()
 			end
 			lastSprintPressAt = clock
 			sprintHeld = true
+		elseif key == Enum.KeyCode.Space then
+			-- Only ever read by a slide, to cancel it. Ordinary jumping stays the
+			-- Humanoid's, because it already works and a second jump path is a
+			-- double jump waiting to happen.
+			jumpRequested = true
 		elseif key == Enum.KeyCode.LeftControl or key == Enum.KeyCode.C then
 			-- The stance engages on the PRESS, not on the release. Waiting for
 			-- the key to come up before crouching is a whole keystroke of lag
@@ -537,11 +1074,16 @@ function MovementController.init()
 			-- Crouching cancels prone on the way past: Ctrl from prone means
 			-- "get up a bit", not "nothing happens".
 			proneToggled = false
+			-- The same press is a SLIDE if you were sprinting. The frame decides
+			-- whether it takes it; an input handler that transitions the machine
+			-- itself runs at whatever moment the key happened to arrive.
+			slideRequested = true
 		elseif key == Enum.KeyCode.X then
 			pronePressedAt = clock
 			proneWasLatched = proneToggled
 			proneToggled = true
 			crouchToggled = false
+			diveRequested = true
 		end
 	end)
 
@@ -590,16 +1132,28 @@ function MovementController.init()
 	-- writes Humanoid.MoveDirection; binding at the same number leaves the order
 	-- between them down to whoever registered first, and reading MoveDirection
 	-- one frame stale is a whole frame of input lag that comes and goes between
-	-- sessions. One above it is always after.
+	-- sessions. One above it is always after — which is also what lets
+	-- `Humanoid:Move` override the control script during a slide or a dive.
 	RunService:BindToRenderStep(BIND, Enum.RenderPriority.Input.Value + 1, step)
+	-- Camera+3, between the aim recoil and the viewmodel. Documented in
+	-- CLAUDE.md; breaking that order is the jitter that looks like a physics bug.
+	RunService:BindToRenderStep(ROLL_BIND, Enum.RenderPriority.Camera.Value + 3, slideRoll)
 
 	buildOverlay()
+
+	task.spawn(function()
+		while true do
+			task.wait(Config.moveReportSeconds)
+			MovementController.report()
+		end
+	end)
 
 	Diagnostics.ok(
 		SYSTEM,
 		`walk {Config.speed.Walk} sprint {Config.speed.Sprint} crouch {Config.speed.Crouch} · `
 			.. `8-way sprint, back at {math.floor(Config.directional.backward * 100)}% · `
 			.. `tac-sprint {Config.tacSprint.seconds}s on double-shift · crouch Ctrl/C, prone X · `
+			.. `slide sprint+Ctrl ({Config.slide.maxSeconds}s, steer + hop) · dive sprint+X · auto-mantle {Config.mantle.minHeightStuds}-{Config.mantle.maxHeightStuds} studs · `
 			.. `overlay {Config.overlayKey.Name}`
 	)
 end

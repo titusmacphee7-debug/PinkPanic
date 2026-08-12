@@ -111,8 +111,8 @@ learnable, never a fight.
 
 Several systems write the camera every frame. They are chained deliberately —
 breaking this order causes jitter that looks like a physics bug. This is what
-currently EXISTS; `PinkPanicSlideRoll`, `PinkPanicViewmodel` and `PinkPanicSkid`
-went with the combat rewrite and come back with M2/M11.
+currently EXISTS; `PinkPanicViewmodel` and `PinkPanicSkid` went with the combat
+rewrite and come back with M11.
 
 ```
 PinkPanicMovement      Input+1   (after Roblox's control script, which
@@ -120,6 +120,7 @@ PinkPanicMovement      Input+1   (after Roblox's control script, which
 engine Camera (200)
   → PinkPanicCamera      +1
   → PinkPanicAim         +2      (recoil)
+  → PinkPanicSlideRoll   +3      (slide lean; skipped in the lobby)
 PinkPanicMouseUnlock   Last
 ```
 
@@ -148,7 +149,9 @@ Titus tags hand-built content instead of us generating it:
 - `CameraAnchor` part inside `workspace.Lobby`, with `MaxYawDeg` / `MaxPitchDeg`
 - Armory displays: `GunDisplay`, `ArmoryMat`
 - Arena: a Workspace folder named exactly `Arena`, `ArenaOrigin` attribute
-- Runtime stance flags: `PPSliding`, `PPCrouching`
+- Runtime movement state: `PPMoveState`, the state machine's state by name —
+  read this one. `PPSprinting` / `PPCrouching` / `PPProne` / `PPSliding` are the
+  older booleans, kept because things are written against them.
 
 ## Hard-won gotchas
 
@@ -220,10 +223,27 @@ driving a `LinearVelocity` at 24 studs/s for one second on a 14-mass rig:
 converges — `math.huge` is a different path through the solver, not a big
 number, and it is the only value that works. It is also what resolves the
 character out of any geometry it touches at whatever speed that takes. So
-ground locomotion runs on `Humanoid.WalkSpeed` (with the speed still resolved
-by `shared/Systems/Movement.speedFor`, never a local constant), and the
-mass-bounded actuator in `client/Movement/Actuator.luau` is reserved for slide
-and dive, where the Humanoid controller gets switched off for the duration.
+ground locomotion runs on `Humanoid.WalkSpeed`, with the speed still resolved by
+`shared/Systems/Movement.speedFor`, never a local constant.
+
+**So don't fight the Humanoid — drive it.** Every move in M2 does, and each one
+was measured on 2026-08-12:
+
+- `Humanoid:Move(worldDirection, false)` called from a render step bound at
+  `Input+1` **fully overrides Roblox's control script** — 22.3 studs in one
+  second at WalkSpeed 24, with `MoveDirection` exactly as written and no input
+  touched. That is the slide: a locked heading plus a decaying WalkSpeed.
+- Writing `AssemblyLinearVelocity` while **grounded does nothing** — the Running
+  controller ate a 30-stud shove inside a single frame. Airborne, the same write
+  sticks. So a dive launches with `ChangeState(Jumping)` (a code path the
+  controller can't argue with) and only kicks its horizontal speed once it is
+  off the ground.
+- `PlatformStand = true` plus writing `root.CFrame` every frame lands within
+  **0.05 studs** of where it was aimed, and releases cleanly. That is the mantle.
+
+Because the Humanoid stays the mover in all three, a wall still stops you. The
+mass-bounded actuator in `client/Movement/Actuator.luau` is attached and
+bounded but drives nothing — it never needed to.
 
 **A fixed sampling interval can be phase-locked.** `MoveAudit` originally
 sampled positions every 0.5s and read a character teleporting 260 studs back
@@ -241,7 +261,13 @@ walking somewhere can never drop you into a match.
 The consequence: **a solo Studio session can't start a round**, so combat,
 respawn, scoring and payouts are only testable with `Test → Players → 2
 Players`. The lobby itself (camera, cursor, pads, armory, loadout) is still
-fully testable alone.
+fully testable alone — and so is **all** of movement, because the lobby profile
+now allows slide, dive and mantle. It used to exclude them on the grounds that
+the fixed lobby camera could not show an arc, which was a rule about the camera
+written as a rule about the moves: with no round loop until M9, "not in the
+lobby" meant "nowhere", and all three would have shipped never having run. The
+camera fixes the camera — `PinkPanicSlideRoll` skips the lean while the fixed
+lobby shot owns the CFrame.
 
 ## Git
 

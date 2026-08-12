@@ -144,29 +144,85 @@ end
 -- **Every multiplier is ≤ 1.** That is the readability rule, and it is what
 -- makes "sprint in eight directions" add expression rather than speed: there is
 -- no direction, and no sequence of directions, that goes faster than forward.
+-- Interpolated between the five named angles rather than five hard sectors.
+-- Sectors put a step change in your speed mid-turn, which reads as the character
+-- catching on something that is not there.
+type DirectionalTable = { forward: number, diagonalForward: number, strafe: number, diagonalBack: number, backward: number }
+
+local ROOT_HALF = 0.70710678
+
+local function byAngle(d: DirectionalTable, dot: number): number
+	local clamped = math.clamp(dot, -1, 1)
+	if clamped >= ROOT_HALF then -- 0° .. 45°
+		local t = (1 - clamped) / (1 - ROOT_HALF)
+		return d.forward + (d.diagonalForward - d.forward) * t
+	elseif clamped >= 0 then -- 45° .. 90°
+		local t = (ROOT_HALF - clamped) / ROOT_HALF
+		return d.diagonalForward + (d.strafe - d.diagonalForward) * t
+	elseif clamped >= -ROOT_HALF then -- 90° .. 135°
+		local t = -clamped / ROOT_HALF
+		return d.strafe + (d.diagonalBack - d.strafe) * t
+	else -- 135° .. 180°
+		local t = (-clamped - ROOT_HALF) / (1 - ROOT_HALF)
+		return d.diagonalBack + (d.backward - d.diagonalBack) * t
+	end
+end
+
 function Movement.directionalScale(state: State, dot: number): number
 	if not Config.directionalStates[state] then
 		return 1
 	end
+	return byAngle(Config.directional, dot)
+end
 
-	local d = Config.directional
-	-- Interpolated between the five named angles rather than five hard sectors.
-	-- Sectors put a step change in your speed mid-turn, which reads as the
-	-- character catching on something that is not there.
-	local clamped = math.clamp(dot, -1, 1)
-	if clamped >= 0.70710678 then -- 0° .. 45°
-		local t = (1 - clamped) / (1 - 0.70710678)
-		return d.forward + (d.diagonalForward - d.forward) * t
-	elseif clamped >= 0 then -- 45° .. 90°
-		local t = (0.70710678 - clamped) / 0.70710678
-		return d.diagonalForward + (d.strafe - d.diagonalForward) * t
-	elseif clamped >= -0.70710678 then -- 90° .. 135°
-		local t = -clamped / 0.70710678
-		return d.strafe + (d.diagonalBack - d.strafe) * t
-	else -- 135° .. 180°
-		local t = (-clamped - 0.70710678) / (1 - 0.70710678)
-		return d.diagonalBack + (d.backward - d.diagonalBack) * t
+-- ---------------------------------------------------------------------------
+-- Slide and dive (NOD-141)
+--
+-- Both are shared for the same reason the speed table is: the server's
+-- plausibility check has to know what a legal slide looks like, and a second
+-- implementation of the curve is a second answer.
+-- ---------------------------------------------------------------------------
+
+-- Where a slide starts, given the speed you carried into it. Clamped to the
+-- Slide ceiling in Config.speed, so raising `entryMultiplier` can never quietly
+-- outrun the check that watches it.
+function Movement.slideEntrySpeed(carriedSpeed: number, weight: number?): number
+	local boosted = carriedSpeed * Config.slide.entryMultiplier
+	return math.min(boosted, Movement.speedFor("Slide", weight))
+end
+
+-- Speed at `elapsed` seconds into a slide that began at `entrySpeed`.
+--
+-- The curve is a list of evenly spaced samples across `maxSeconds`, interpolated
+-- between — a shape you tune by moving a number rather than by re-deriving a
+-- formula. Past the end it holds the last value, so a slide that outlives its
+-- curve decays rather than snapping back to full speed.
+function Movement.slideSpeed(entrySpeed: number, elapsed: number): number
+	local curve = Config.slideCurve
+	local count = #curve
+	if count == 0 then
+		return entrySpeed
 	end
+
+	local t = math.clamp(elapsed / Config.slide.maxSeconds, 0, 1)
+	local position = t * (count - 1) + 1
+	local low = math.clamp(math.floor(position), 1, count)
+	local high = math.clamp(low + 1, 1, count)
+	local blend = position - low
+
+	return entrySpeed * (curve[low] + (curve[high] - curve[low]) * blend)
+end
+
+-- How much of the dive launch you get, going that way relative to your facing.
+-- Same five angles as sprinting, tuned separately: the arc is what is being
+-- shaped here, not a walk speed.
+function Movement.diveScale(dot: number): number
+	return byAngle(Config.diveDirectional, dot)
+end
+
+function Movement.diveLaunchSpeed(dot: number, weight: number?): number
+	local scaled = Config.dive.launchSpeed * Movement.diveScale(dot)
+	return math.min(scaled, Movement.speedFor("Dive", weight))
 end
 
 -- The full answer: state, weapon weight, and which way you are pointing.
@@ -346,6 +402,35 @@ function Movement.validate()
 		end
 	end
 
+	-- Same rule, applied to the dive arc (NOD-141).
+	for name, value in Config.diveDirectional do
+		if value > 1 then
+			table.insert(problems, `diveDirectional.{name} is {value}, above 1 — that dive goes further than forward`)
+		end
+		if value <= 0 then
+			table.insert(problems, `diveDirectional.{name} is {value} — a direction you cannot dive in`)
+		end
+	end
+
+	-- A slide DECAYS. Every sample must be at or below the one before it: a
+	-- slide that speeds up partway through is an accelerator, and the curve is
+	-- exactly the kind of hand-tuned table where one number gets nudged the
+	-- wrong way and nobody notices until a player is outrunning bullets.
+	local curve = Config.slideCurve
+	if #curve == 0 then
+		table.insert(problems, "slideCurve is empty — a slide with no curve has no speed")
+	elseif curve[1] > 1 then
+		table.insert(problems, `slideCurve starts at {curve[1]} — a slide may not begin above its entry speed`)
+	end
+	for index = 2, #curve do
+		if curve[index] > curve[index - 1] then
+			table.insert(
+				problems,
+				`slideCurve[{index}] is {curve[index]}, above [{index - 1}] at {curve[index - 1]} — the slide accelerates`
+			)
+		end
+	end
+
 	if #problems > 0 then
 		Diagnostics.warn(SYSTEM, `state graph: {table.concat(problems, " · ")}`)
 		return
@@ -363,7 +448,8 @@ function Movement.validate()
 		SYSTEM,
 		`{#STATES} states, {edges} legal transitions, all reachable · `
 			.. `walk {Config.speed.Walk} sprint {Config.speed.Sprint} · `
-			.. `back-sprint {math.floor(Config.directional.backward * 100)}% of forward, nothing above 100%`
+			.. `back-sprint {math.floor(Config.directional.backward * 100)}% of forward, nothing above 100% · `
+			.. `slide decays to {math.floor(Config.slideCurve[#Config.slideCurve] * 100)}% over {Config.slide.maxSeconds}s`
 	)
 end
 
