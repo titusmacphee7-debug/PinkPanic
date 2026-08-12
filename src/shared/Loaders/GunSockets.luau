@@ -62,8 +62,48 @@ local PURPOSE: { [string]: string } = {
 	MagWell = "where the magazine sits",
 }
 
+-- Attachment mount points (NOD-149). Optional, and reported rather than
+-- demanded: a gun with no under-barrel rail is a design decision, not a broken
+-- model. What the report is for is telling you WHICH attachment slots a gun can
+-- physically accept before M4 tries to hang something off a socket that is not
+-- there.
+local MOUNTS: { string } = {
+	"Mount_Optic",
+	"Mount_Barrel",
+	"Mount_Under",
+	"Mount_Laser",
+	"Mount_Stock",
+	"Mount_Charm",
+}
+
+-- ---------------------------------------------------------------------------
+-- Skin regions (NOD-149)
+--
+-- **A camo textures part of the gun and colours the rest.** Like CoD, but pink:
+-- there are no grey-and-metal weapons in this game. `Body` and `Panel` take the
+-- camo texture; `Grip`, `Hardware` and `Accent` take the camo's palette, or the
+-- equipped skin's colour when the camo does not name one.
+--
+-- The consequence is a MODELLING requirement, which is why it is checked here
+-- and not in the shop: if a modeller merges the grip into the body to save a
+-- part, that grip gets textured with the receiver, the skin under it disappears,
+-- and there is no layer left to make it pink. Regions must survive into the
+-- built model as separate parts, so the validator counts them.
+local TEXTURED: { string } = { "Body", "Panel" }
+local COLOURED: { string } = { "Grip", "Hardware", "Accent" }
+
+-- The parts the viewmodel cycles: slide blowback, pump strokes, cylinder
+-- notches, mag drops on reload. A part that is not named does not move.
+-- Optional per gun — a revolver has no slide — so these are reported, never
+-- demanded.
+local MOVING: { string } = { "Slide", "Bolt", "Pump", "Cylinder", "Mag" }
+
 GunSockets.REQUIRED = REQUIRED
 GunSockets.PURPOSE = PURPOSE
+GunSockets.MOUNTS = MOUNTS
+GunSockets.TEXTURED = TEXTURED
+GunSockets.COLOURED = COLOURED
+GunSockets.MOVING = MOVING
 
 -- ---------------------------------------------------------------------------
 -- Reading
@@ -109,6 +149,65 @@ function GunSockets.tagged(model: Instance): boolean
 	return #GunSockets.missing(model) == 0
 end
 
+-- Which mount points a model actually carries, so M4 knows what it may offer.
+function GunSockets.mounts(model: Instance): { string }
+	local found: { string } = {}
+	for _, name in MOUNTS do
+		if GunSockets.get(model, name) then
+			table.insert(found, name)
+		end
+	end
+	return found
+end
+
+-- Parts, not attachments. A region IS geometry — that is the whole point of
+-- requiring it to survive as its own part — so unlike the sockets this looks
+-- for BaseParts and honours the per-part `TakesCamo` override.
+local function partsNamed(model: Instance, names: { string }): { string }
+	local wanted: { [string]: boolean } = {}
+	for _, name in names do
+		wanted[name] = true
+	end
+	local seen: { [string]: boolean } = {}
+	local found: { string } = {}
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("BasePart") and wanted[descendant.Name] and not seen[descendant.Name] then
+			seen[descendant.Name] = true
+			table.insert(found, descendant.Name)
+		end
+	end
+	return found
+end
+
+export type Regions = {
+	textured: { string },
+	coloured: { string },
+	moving: { string },
+	-- The two failure modes NOD-149 names, both of which produce a gun that is
+	-- in the shop and cannot be dressed:
+	problems: { string },
+}
+
+function GunSockets.regions(model: Instance): Regions
+	local textured = partsNamed(model, TEXTURED)
+	local coloured = partsNamed(model, COLOURED)
+	local problems: { string } = {}
+
+	if #textured == 0 then
+		table.insert(problems, "no Body or Panel — this gun can never wear a camo")
+	end
+	if #coloured == 0 then
+		table.insert(problems, "no Grip/Hardware/Accent — nothing for a palette to colour, so it reads as bare metal")
+	end
+
+	return {
+		textured = textured,
+		coloured = coloured,
+		moving = partsNamed(model, MOVING),
+		problems = problems,
+	}
+end
+
 -- ---------------------------------------------------------------------------
 -- Where the models live
 -- ---------------------------------------------------------------------------
@@ -136,6 +235,8 @@ export type Row = {
 	gunId: string,
 	hasModel: boolean,
 	missing: { string },
+	regions: Regions?,
+	mounts: { string }?,
 }
 
 export type Report = {
@@ -146,6 +247,10 @@ export type Report = {
 	-- Socket name -> how many models are missing it. This is the number that
 	-- says whether the roster needs one pass per socket or one pass per gun.
 	missingBySocket: { [string]: number },
+	-- Models that can never be dressed: no camo-taking region, or nothing left
+	-- for a palette to colour. Separate from sockets because it is a different
+	-- job for the modeller — splitting a merged part, not adding an attachment.
+	regionProblems: { string },
 }
 
 function GunSockets.audit(gunIds: { string }): Report
@@ -155,6 +260,7 @@ function GunSockets.audit(gunIds: { string }): Report
 		withoutModel = 0,
 		fullyTagged = 0,
 		missingBySocket = {},
+		regionProblems = {},
 	}
 
 	table.sort(gunIds)
@@ -163,7 +269,10 @@ function GunSockets.audit(gunIds: { string }): Report
 		local model = GunSockets.model(gunId)
 		if not model then
 			report.withoutModel += 1
-			table.insert(report.rows, { gunId = gunId, hasModel = false, missing = GunSockets.REQUIRED })
+			-- Cloned, not aliased. Handing out REQUIRED itself means any caller
+			-- that sorts or trims a row's `missing` list silently rewrites the
+			-- socket spec for the rest of the session.
+			table.insert(report.rows, { gunId = gunId, hasModel = false, missing = table.clone(REQUIRED) })
 			continue
 		end
 
@@ -174,7 +283,19 @@ function GunSockets.audit(gunIds: { string }): Report
 		for _, name in gaps do
 			report.missingBySocket[name] = (report.missingBySocket[name] or 0) + 1
 		end
-		table.insert(report.rows, { gunId = gunId, hasModel = true, missing = gaps })
+
+		local regions = GunSockets.regions(model)
+		for _, problem in regions.problems do
+			table.insert(report.regionProblems, `{gunId}: {problem}`)
+		end
+
+		table.insert(report.rows, {
+			gunId = gunId,
+			hasModel = true,
+			missing = gaps,
+			regions = regions,
+			mounts = GunSockets.mounts(model),
+		})
 	end
 
 	return report
@@ -204,7 +325,27 @@ function GunSockets.formatReport(report: Report): { string }
 		for _, name in GunSockets.REQUIRED do
 			table.insert(marks, if gaps[name] then `{name}?` else name)
 		end
-		table.insert(lines, `  {row.gunId}  {table.concat(marks, "  ")}`)
+		local line = `  {row.gunId}  {table.concat(marks, "  ")}`
+
+		local regions = row.regions
+		if regions then
+			line ..= `  |  skin {#regions.textured}T/{#regions.coloured}C`
+			if #regions.moving > 0 then
+				line ..= ` · moves: {table.concat(regions.moving, ",")}`
+			end
+			if #row.mounts :: number > 0 then
+				line ..= ` · mounts: {#row.mounts :: number}/{#GunSockets.MOUNTS}`
+			end
+		end
+		table.insert(lines, line)
+	end
+
+	if #report.regionProblems > 0 then
+		table.insert(lines, "")
+		table.insert(lines, "  CANNOT BE DRESSED — these need a part split, not an attachment:")
+		for _, problem in report.regionProblems do
+			table.insert(lines, `    {problem}`)
+		end
 	end
 
 	return lines
@@ -233,6 +374,8 @@ function GunSockets.printReport()
 		print(line)
 	end
 	print("  a name followed by ? is the socket that model is missing")
+	print("  skin nT/nC = how many camo-TEXTURED and palette-COLOURED regions survived as separate parts")
+	print(`  spec: docs/GUN_MODEL_SPEC.md`)
 end
 
 return GunSockets
