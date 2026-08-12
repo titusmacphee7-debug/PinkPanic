@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-12-G · gun trials + live loadout refresh (NOD-162)"
+local BUILD_TAG = "2026-08-12-H · movement core: actuator + state machine (NOD-139)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,6 +38,8 @@ Diagnostics.expect(
 	"Health",
 	"Score",
 	"Spawns",
+	"Movement",
+	"MoveAudit",
 	"WeaponService",
 	"CharacterService",
 	"MapService",
@@ -64,6 +66,8 @@ local Ballistics: any = Diagnostics.load("Ballistics", script.Systems.Ballistics
 local Health: any = Diagnostics.load("Health", script.Systems.Health)
 local Score: any = Diagnostics.load("Score", script.Systems.Score)
 local Spawns: any = Diagnostics.load("Spawns", script.Systems.Spawns)
+local MovementSystem: any = Diagnostics.load("Movement", ReplicatedStorage.Shared.Systems.Movement)
+local MoveAudit: any = Diagnostics.load("MoveAudit", script.Systems.MoveAudit)
 
 local WeaponService: any = Diagnostics.load("WeaponService", script.Services.WeaponService)
 local CharacterService: any = Diagnostics.load("CharacterService", script.Services.CharacterService)
@@ -100,6 +104,13 @@ end
 -- A typo'd stat name is found here, once, rather than never.
 if CombatStats then
 	Diagnostics.start("CombatStats", CombatStats.validate)
+end
+
+-- The movement state graph: every edge names a real state, and every state is
+-- reachable from Idle. An unreachable state is a move nobody can ever perform,
+-- which is invisible until somebody asks why sliding does nothing.
+if MovementSystem then
+	Diagnostics.start("Movement", MovementSystem.validate)
 end
 
 -- After AssetTree, which creates the folders it scans.
@@ -176,6 +187,16 @@ if Score and PlayerDataService then
 	end)
 end
 
+-- How heavy the gun in a player's hands is, for the speed ceiling MoveAudit
+-- checks against. Injected for the same reason as everything else here: a
+-- System reaching into a Service is the dependency direction backwards.
+if MoveAudit and WeaponService then
+	MoveAudit.setWeightResolver(function(player: Player): number?
+		local state = WeaponService.stateOf(player)
+		return state and state.stats and state.stats.moveSpeedMult
+	end)
+end
+
 local BOOT_ORDER: { { name: string, module: any } } = {
 	-- Ballistics before the services that will feed it, so the remote handler
 	-- exists before any client can reach it.
@@ -195,6 +216,9 @@ local BOOT_ORDER: { { name: string, module: any } } = {
 	-- stale one. Counting spawn points before that runs counts them in a map
 	-- that is about to stop existing, and reports a number that was never true.
 	{ name = "Spawns", module = Spawns },
+	-- After Movement's graph check above, whose maxSpeed it takes its ceiling
+	-- from rather than defining a second one.
+	{ name = "MoveAudit", module = MoveAudit },
 	-- After Ballistics, which it calls into, and before assertHandlers, which
 	-- is what proves FireWeapon/ReloadWeapon/SwapWeapon actually got claimed.
 	{ name = "WeaponService", module = WeaponService },

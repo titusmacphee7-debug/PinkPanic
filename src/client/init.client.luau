@@ -9,7 +9,7 @@ local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-12-G · gun trials + live loadout refresh (NOD-162)"
+local CLIENT_BUILD_TAG = "2026-08-12-H · movement core: actuator + state machine (NOD-139)"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false
@@ -26,6 +26,8 @@ Diagnostics.expect(
 	"LobbyController",
 	"ArmoryController",
 	"CombatHUD",
+	"Movement",
+	"MovementController",
 	"Firing",
 	"WeaponController"
 )
@@ -61,6 +63,13 @@ local controllers: { { name: string, module: any } } = {
 	-- can be pulled. It listens rather than being called, so the order only
 	-- matters for that first frame — but that first frame is a real one.
 	{ name = "CombatHUD", module = Diagnostics.load("CombatHUD", script.Controllers.CombatHUD) },
+	-- MovementController reads the held weapon's weight from Firing, which
+	-- WeaponController starts — but only on the frame loop, never at init, so
+	-- the order between them does not matter and a missing weapon is weight 1.
+	{
+		name = "MovementController",
+		module = Diagnostics.load("MovementController", script.Controllers.MovementController),
+	},
 	-- Last, and after EffectsController, whose muzzle flash and tracer it
 	-- calls the moment a shot is predicted. WeaponController.init also starts
 	-- Firing, so the two report separately: "the trigger is bound" and "the
