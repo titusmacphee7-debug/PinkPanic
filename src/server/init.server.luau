@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-11-W · server ballistics (NOD-133)"
+local BUILD_TAG = "2026-08-12-A · standard character (NOD-167)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,6 +34,7 @@ Diagnostics.expect(
 	"CombatStats",
 	"AssetRegistry",
 	"Ballistics",
+	"CharacterService",
 	"MapService",
 	"LobbyService",
 	"PlayerDataService",
@@ -56,6 +57,7 @@ local AssetRegistry: any = Diagnostics.load("AssetRegistry", ReplicatedStorage.S
 
 local Ballistics: any = Diagnostics.load("Ballistics", script.Systems.Ballistics)
 
+local CharacterService: any = Diagnostics.load("CharacterService", script.Services.CharacterService)
 local MapService: any = Diagnostics.load("MapService", script.Services.MapService)
 local LobbyService: any = Diagnostics.load("LobbyService", script.Services.LobbyService)
 local PlayerDataService: any = Diagnostics.load("PlayerDataService", script.Services.PlayerDataService)
@@ -118,6 +120,10 @@ local BOOT_ORDER: { { name: string, module: any } } = {
 	-- Ballistics before the services that will feed it, so the remote handler
 	-- exists before any client can reach it.
 	{ name = "Ballistics", module = Ballistics },
+	-- Before anything that touches a character. It hooks CharacterAdded, and a
+	-- player who spawns before it is listening keeps their own Roblox avatar
+	-- for that life — which is a different-sized target than everyone else.
+	{ name = "CharacterService", module = CharacterService },
 	{ name = "MapService", module = MapService },
 	{ name = "LobbyService", module = LobbyService },
 	{ name = "PlayerDataService", module = PlayerDataService },
