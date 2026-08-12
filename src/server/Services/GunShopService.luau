@@ -14,10 +14,10 @@ local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local GunSkinCatalog = require(ReplicatedStorage.Shared.Config.GunSkinCatalog)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local EconomyService = require(script.Parent.EconomyService)
--- RoundService and WeaponService were deleted with the combat rewrite. Three
--- things here depended on them and are marked REBUILD below: the two
--- lobby-only guards (loadout and trials are lobby activities), the live
--- refresh of a held weapon after an equip, and gun trials themselves.
+local WeaponService = require(script.Parent.WeaponService)
+-- RoundService is still gone; the two lobby-only guards that depended on it are
+-- marked REBUILD below and come back with M9. WeaponService (NOD-136) exists
+-- again, which is what unblocked the live weapon refresh and gun trials.
 --
 -- Purchases, ownership and equip state are untouched and still fully
 -- server-derived from the profile.
@@ -156,7 +156,15 @@ local function onEquipLoadout(player: Player, primary: any, secondary: any): Res
 		profile.loadout.secondary = secondary
 	end)
 	EconomyService.push(player)
-	-- REBUILD: push the new loadout to the player's held weapon.
+	-- The gun in their hands, not just the gun on their profile. Without this
+	-- an equip in the lobby changes nothing until you next die, which reads as
+	-- the loadout screen being broken rather than as a delay.
+	--
+	-- A trial ends here on purpose: picking a loadout is choosing what you own,
+	-- and holding onto a borrowed gun through it would be the beginning of a
+	-- path to keeping one.
+	WeaponService.endTrial(player)
+	WeaponService.refresh(player)
 	return { ok = true }
 end
 
@@ -206,25 +214,59 @@ local function onEquipGunCosmetics(player: Player, gunId: any, skinId: any, camo
 		profile.gunCosmetics[gunId] = { skinId = skinId, camoId = camoId }
 	end)
 	EconomyService.push(player)
-	-- REBUILD: repaint the player's held weapon with the new cosmetics.
+	-- REBUILD: repaint the player's held weapon with the new cosmetics. Still
+	-- blocked, but no longer on the weapon system — there is no third-person
+	-- gun MODEL to repaint. Nothing in the project creates `character.WorldGun`
+	-- yet; three places read it and none writes it. That lands with NOD-137,
+	-- which is waiting on a gun model with named sockets.
 	return { ok = true }
 end
 
--- REBUILD: gun trials hand the player a real weapon to hold, which needs the
--- weapon system. Validation is kept intact so the remote stays rate-limited
--- and argument-checked rather than becoming an unguarded hole, and it fails
--- closed — a trial has never granted ownership and must never start doing so.
+-- Sixty seconds with a gun you do not own.
+--
+-- **A trial never grants ownership**, and the enforcement is structural rather
+-- than a check that could be forgotten: nothing on this path writes to the
+-- profile. The trial lives in WeaponService's memory, expires on the server's
+-- own clock, and is gone if the server restarts — so rejoining mid-trial leaves
+-- you holding exactly what you own, which is the case the rule is really about.
 local function onTryGun(player: Player, gunId: any): Result
+	-- "Too fast", not "one at a time" — those are two different refusals and
+	-- they used to share a message. The trial guard below is the one that means
+	-- you already have a gun on loan; this one means you are clicking.
 	if not Guard.checkRate(player, "TryGun", 3, 10) then
-		return fail("One trial at a time, cutie!")
+		return fail("Too fast!")
 	end
 	if not Guard.isString(gunId, 50) then
 		return fail("Invalid gun.")
 	end
-	if not GunCatalog.get(gunId) then
+	local def = GunCatalog.get(gunId)
+	if not def then
 		return fail("Unknown gun.")
 	end
-	return fail("Trials are being rebuilt!")
+
+	local data = PlayerDataService.get(player)
+	if not data then
+		return fail("Data still loading.")
+	end
+	if table.find(data.ownedGuns, gunId) then
+		-- Not an error worth a scary message: equip it, it's yours.
+		return fail("You already own that one — equip it!")
+	end
+
+	local remaining = WeaponService.trialRemaining(player)
+	if remaining then
+		return fail(`One trial at a time, cutie — {math.ceil(remaining)}s left 💗`)
+	end
+
+	-- REBUILD: trials are a lobby activity, same as loadout changes — trying a
+	-- sniper for a minute mid-round is a free weapon swap with better stats.
+	-- Restore the round guard here when the round loop exists again. Everything
+	-- is lobby right now, so there is no mid-round to protect against.
+
+	if not WeaponService.startTrial(player, gunId, def.slot, GunCatalog.trialSeconds) then
+		return fail("Can't try a gun right now.")
+	end
+	return { ok = true, seconds = GunCatalog.trialSeconds, name = def.name }
 end
 
 function GunShopService.init()

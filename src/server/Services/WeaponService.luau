@@ -90,7 +90,26 @@ function WeaponService.setLoadoutResolver(
 	resolveLoadout = resolver
 end
 
+-- An active trial, per player. Simulation time, not os.clock, so it runs on the
+-- same clock as everything else here and a stalled server does not burn a
+-- player's minute while nothing was happening.
+--
+-- **This is the whole of a trial's state, and it is deliberately here and not
+-- in the profile.** A trial that touched the profile would be one bug away from
+-- a free gun, so there is nowhere for it to be written and nothing to clean up
+-- if the server dies mid-trial: the player rejoins holding what they own.
+type Trial = { gunId: string, expiresAt: number }
+local trials: { [Player]: Trial } = {}
+
 local function gunFor(player: Player, slot: Slot): (string?, { string }?)
+	local trial = trials[player]
+	if trial then
+		-- A trial replaces whatever that slot would have held. Attachments are
+		-- empty on purpose: you are trying the GUN, and lending someone else's
+		-- attachments with it would misrepresent what they would be buying.
+		return trial.gunId, {}
+	end
+
 	local resolver = resolveLoadout
 	if not resolver then
 		return nil, nil
@@ -173,6 +192,99 @@ function WeaponService.equipSlot(player: Player, slot: Slot): boolean
 	return equip(player, slot)
 end
 
+-- Re-read the loadout for whatever is in hand. Called when the profile's
+-- loadout changes underneath a player who is already holding something —
+-- otherwise equipping a new gun in the lobby does nothing until you die, which
+-- reads as the loadout screen being broken.
+--
+-- Deliberately routed through the same equip() as a weapon swap, so the
+-- magazine rules are the same ones: a gun you have already held this life comes
+-- back with the rounds you left in it, and a gun you have not comes out full.
+-- A separate "refresh" path with its own ammo handling is how equipping your
+-- own gun becomes a free reload.
+function WeaponService.refresh(player: Player): boolean
+	local entry = held[player]
+	if not entry then
+		return false
+	end
+	if equip(player, entry.slot) then
+		return true
+	end
+	-- The slot they were holding no longer has a gun in it.
+	local other: Slot = if entry.slot == "Primary" then "Secondary" else "Primary"
+	return equip(player, other)
+end
+
+-- ---------------------------------------------------------------------------
+-- Trials (NOD-162)
+--
+-- Sixty seconds with a gun you do not own. The only rule that matters is that
+-- it can never become ownership, and the design enforces that by having no path
+-- to the profile at all: a trial is a key in the table above, it dies with the
+-- server, and rejoining mid-trial leaves you holding what you actually own.
+-- ---------------------------------------------------------------------------
+
+-- The slot comes from the caller rather than being derived here, because the
+-- catalog is GunShopService's to know. Passing the gun's real slot is what
+-- stops the ammo readout calling a sniper a secondary.
+function WeaponService.startTrial(player: Player, gunId: string, slot: Slot, seconds: number): boolean
+	local entry = held[player]
+	if entry and entry.state.dead then
+		return false -- no borrowing a gun to respawn with
+	end
+	-- One at a time. Without this, re-trialling simply pushes `expiresAt`
+	-- forward and the sixty seconds is a number on a button rather than a
+	-- limit — a second click every ten seconds keeps any gun in the game
+	-- indefinitely. Not ownership, but not a trial either.
+	if trials[player] then
+		return false
+	end
+
+	trials[player] = { gunId = gunId, expiresAt = clock + seconds }
+
+	-- Straight into their hands: equip() asks gunFor(), which now answers with
+	-- the trial rather than the profile.
+	if not equip(player, slot) then
+		trials[player] = nil
+		return false
+	end
+	Diagnostics.count(SYSTEM, "trials")
+	return true
+end
+
+function WeaponService.endTrial(player: Player)
+	local trial = trials[player]
+	if not trial then
+		return
+	end
+	trials[player] = nil
+
+	if not equip(player, "Primary") then
+		equip(player, "Secondary")
+	end
+
+	-- Forget the trial gun's magazine. Left behind, it would be waiting inside
+	-- the same gun the day they actually buy it, half empty.
+	local entry = held[player]
+	if entry then
+		entry.stowedAmmo[trial.gunId] = nil
+	end
+end
+
+-- Seconds left, or nil if there is no trial. For the shop UI's countdown.
+function WeaponService.trialRemaining(player: Player): number?
+	local trial = trials[player]
+	if not trial then
+		return nil
+	end
+	return math.max(trial.expiresAt - clock, 0)
+end
+
+function WeaponService.trialGun(player: Player): string?
+	local trial = trials[player]
+	return trial and trial.gunId
+end
+
 -- How long to keep trying to put a gun in someone's hands before admitting it
 -- is not going to happen.
 local ARM_TIMEOUT_SECONDS = 15
@@ -194,6 +306,10 @@ function WeaponService.onSpawned(player: Player)
 	-- Both magazines reset. Dying and respawning is not a reload you have to
 	-- earn, and carrying a spent magazine across a death would be.
 	held[player] = nil
+	-- And a new life starts with what you own. A trial is a lobby activity, so
+	-- there is no legitimate way to be mid-trial and mid-respawn at once —
+	-- which is exactly why it should not survive if it somehow happens.
+	trials[player] = nil
 
 	local token = (armToken[player] or 0) + 1
 	armToken[player] = token
@@ -338,6 +454,14 @@ end
 function WeaponService.step(deltaTime: number)
 	clock += deltaTime
 
+	-- Trials first, so a trial that ends this frame hands the profile weapon
+	-- back before the loop below pushes anyone's ammo.
+	for player, trial in trials do
+		if clock >= trial.expiresAt then
+			WeaponService.endTrial(player)
+		end
+	end
+
 	for player, entry in held do
 		local before = entry.state.ammo
 		local reloadingBefore = entry.state.reload ~= "none"
@@ -410,6 +534,9 @@ function WeaponService.init()
 	Players.PlayerRemoving:Connect(function(player)
 		held[player] = nil
 		armToken[player] = nil
+		-- A trial that outlived its player would keep a table key alive AND,
+		-- worse, still be there if the same Player object came back.
+		trials[player] = nil
 	end)
 
 	-- The rejection rate, on a slow loop. A `report` function nothing ever

@@ -69,6 +69,13 @@ local PRICE_MULTIPLIER = 1
 
 local GunCatalog = {}
 
+-- How long a gun trial lasts. Long enough to shoot a magazine through it and
+-- decide; short enough that trialling on a loop is worse than buying.
+--
+-- A trial NEVER grants ownership and never touches the profile. That is not a
+-- balance decision to be revisited — it is the one rule this feature has.
+GunCatalog.trialSeconds = 60
+
 local function gun(name: string, class: GunClass, slot: GunSlot, rarity: Rarity, price: number, stats: GunStats): GunDef
 	return {
 		name = name,

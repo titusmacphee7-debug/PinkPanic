@@ -1124,7 +1124,10 @@ local function refreshDetail()
 
 	if not owned then
 		local try = Components.button(left, {
-			text = "Try it · 60s",
+			-- Read from the catalog, not typed here. The server decides how long
+			-- a trial lasts and a button promising a different number is a small
+			-- lie that nobody would think to check.
+			text = `Try it · {GunCatalog.trialSeconds}s`,
 			area = UDim2.new(0.38, -6, 0, 48),
 			position = UDim2.new(0.62, 6, 1, -56),
 			radius = Theme.radius.pill,
@@ -1134,7 +1137,7 @@ local function refreshDetail()
 		try.Activated:Connect(function()
 			request(function()
 				return Remotes.invoke("TryGun", gunId)
-			end, `Trying {def.name} for 60s — lobby only`)
+			end, `Trying {def.name} for {GunCatalog.trialSeconds}s — lobby only`)
 		end)
 	end
 
