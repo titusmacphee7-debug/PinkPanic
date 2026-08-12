@@ -81,16 +81,11 @@ local EXTRACT: { [string]: Extract } = {
 
 -- Lower is better for these, so the bar inverts — a longer bar always means
 -- "better within this class".
-local INVERT: { [string]: boolean } = {
-	reloadSeconds = true,
-	spreadDeg = true,
-	adsSpreadDeg = true,
-	recoilVert = true,
-	recoilHoriz = true,
-	adsTime = true,
-	equipTime = true,
-	sprintToFire = true,
-}
+--
+-- From CombatStats rather than a copy (Rule 2). The attachment validator needs
+-- the identical answer to tell a trade-off from a free upgrade, and two tables
+-- would have disagreed the first time a stat was added to one of them.
+local INVERT: { [string]: boolean } = CombatStats.LOWER_IS_BETTER
 
 local rangeCache: { [string]: { lo: number, hi: number } } = {}
 

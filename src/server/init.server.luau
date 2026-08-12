@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-12-O · 38-gun roster rebuild, 9 classes (NOD-148)"
+local BUILD_TAG = "2026-08-12-P · attachment slots and the no-strict-upgrade rule (NOD-150)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -42,6 +42,7 @@ Diagnostics.expect(
 	"Handling",
 	"Recoil",
 	"Balance",
+	"Attachments",
 	"MoveAudit",
 	"WeaponService",
 	"CharacterService",
@@ -84,6 +85,11 @@ local RecoilSystem: any = Diagnostics.load("Recoil", ReplicatedStorage.Shared.Sy
 -- as fast at 100 studs as at 10 — a failure nobody can feel in a playtest,
 -- because it reads as "that gun is good".
 local BalanceSystem: any = Diagnostics.load("Balance", ReplicatedStorage.Shared.Systems.Balance)
+-- Attachments (NOD-150). Nothing equips one yet; it is loaded now because its
+-- validate() is the check that no attachment is a strict upgrade, and that rule
+-- is worth enforcing from the second attachment onward rather than after
+-- forty of them exist.
+local AttachmentSystem: any = Diagnostics.load("Attachments", ReplicatedStorage.Shared.Systems.Attachments)
 local MoveAudit: any = Diagnostics.load("MoveAudit", script.Systems.MoveAudit)
 
 local WeaponService: any = Diagnostics.load("WeaponService", script.Services.WeaponService)
@@ -138,6 +144,9 @@ end
 -- After CombatStats, whose resolver it reads every gun through.
 if BalanceSystem then
 	Diagnostics.start("Balance", BalanceSystem.validate)
+end
+if AttachmentSystem then
+	Diagnostics.start("Attachments", AttachmentSystem.validate)
 end
 
 -- After AssetTree, which creates the folders it scans.

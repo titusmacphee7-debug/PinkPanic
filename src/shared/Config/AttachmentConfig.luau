@@ -17,7 +17,19 @@
 -- proof and starting balance sketches.
 
 export type Modifier = { stat: string, mul: number?, add: number? }
-export type AttachmentSlot = "Barrel" | "Grip" | "Mag" | "Stock" | "Sight"
+
+-- Eight slots, five equippable (NOD-150). That constraint IS the design: you
+-- cannot have everything, so every class is a statement about how you want to
+-- play. The limit lives in Systems/Attachments and is enforced on the server.
+export type AttachmentSlot =
+	"Optic"
+	| "Muzzle"
+	| "Barrel"
+	| "Underbarrel"
+	| "Magazine"
+	| "Stock"
+	| "RearGrip"
+	| "Laser"
 
 export type AttachmentDef = {
 	name: string,
@@ -31,7 +43,7 @@ AttachmentConfig.attachments = {
 	-- Examples (inert until the attachments feature ships):
 	Compensator = {
 		name = "Compensator 💨",
-		slot = "Barrel",
+		slot = "Muzzle",
 		modifiers = {
 			{ stat = "recoilVert", mul = 0.8 }, -- calmer climb
 			{ stat = "moveSpeedMult", add = -0.01 },
@@ -39,7 +51,7 @@ AttachmentConfig.attachments = {
 	},
 	AngledGrip = {
 		name = "Angled Grip 🎀",
-		slot = "Grip",
+		slot = "Underbarrel",
 		modifiers = {
 			{ stat = "recoilHoriz", mul = 0.6 }, -- kills the side jitter
 			{ stat = "adsTime", mul = 1.08 },
@@ -66,7 +78,7 @@ AttachmentConfig.attachments = {
 	},
 	ExtendedMag = {
 		name = "Extended Mag 🍬",
-		slot = "Mag",
+		slot = "Magazine",
 		modifiers = {
 			{ stat = "magSize", mul = 1.4 },
 			{ stat = "reloadSeconds", mul = 1.15 },
@@ -75,7 +87,7 @@ AttachmentConfig.attachments = {
 	},
 	QuickdrawGrip = {
 		name = "Quickdraw Grip ⚡",
-		slot = "Grip",
+		slot = "RearGrip",
 		modifiers = {
 			{ stat = "equipTime", mul = 0.8 },
 			{ stat = "sprintToFire", mul = 0.8 },
@@ -85,10 +97,14 @@ AttachmentConfig.attachments = {
 	},
 	LaserSight = {
 		name = "Laser Sight 💘",
-		slot = "Sight",
+		slot = "Laser",
 		modifiers = {
 			{ stat = "spreadDeg", mul = 0.75 }, -- tighter from the hip
-			{ stat = "adsSpreadDeg", mul = 1.0 },
+			-- The housing sits under the barrel and costs you a little on the way
+			-- up. This was `adsSpreadDeg mul = 1.0`, which reads at a glance like a
+			-- downside written down and is in fact a no-op — the boot check caught
+			-- it as the roster's one strict upgrade the first time it ran.
+			{ stat = "adsTime", mul = 1.06 },
 		},
 	},
 } :: { [string]: AttachmentDef }

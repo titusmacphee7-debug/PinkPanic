@@ -118,6 +118,28 @@ local MODIFIABLE: { [string]: boolean } = {
 	adsTime = true,
 }
 
+-- Which way is BETTER, for every modifiable stat (NOD-150).
+--
+-- Listed here rather than wherever it happens to be needed, because two places
+-- already needed it and would have disagreed the first time a stat was added:
+-- the stat bars in the loadout invert so a longer bar always means better, and
+-- the attachment validator has to know whether `recoilVert x 0.8` is a benefit
+-- or a penalty before it can tell a trade-off from a free upgrade.
+--
+-- Absent from this table means higher is better, which is the common case.
+local LOWER_IS_BETTER: { [string]: boolean } = {
+	spreadDeg = true,
+	adsSpreadDeg = true,
+	recoilVert = true,
+	recoilHoriz = true,
+	reloadSeconds = true,
+	equipTime = true,
+	sprintToFire = true,
+	adsTime = true,
+	-- More bullet drop is more lead to guess. Nobody wants it.
+	drop = true,
+}
+
 -- Floors and ceilings so no stack of attachments can produce something absurd.
 -- A negative ADS time is not a very good gun; it is a broken one, and it would
 -- propagate into every timing check that trusts the number.
@@ -145,6 +167,39 @@ local CLAMPS: { [string]: { min: number, max: number? } } = {
 
 local function canonical(stat: string): string
 	return ALIASES[stat] or stat
+end
+
+-- Published so there is exactly one answer to "is this stat modifiable" and
+-- "which way is better" (Rule 2). `canonical` comes with them on purpose: a
+-- caller that checks `rpm` against a table keyed by `fireRate` gets a confident
+-- wrong answer, and every caller outside this file works in the alias space
+-- that the gun files are written in.
+CombatStats.MODIFIABLE = MODIFIABLE
+CombatStats.LOWER_IS_BETTER = LOWER_IS_BETTER
+CombatStats.canonical = canonical
+
+-- Whether a modifier makes the gun better or worse, in one call.
+--
+-- Returns +1 for a benefit, -1 for a penalty, 0 for a modifier that changes
+-- nothing — and the third case is the one that matters, because `mul = 1.0`
+-- reads at a glance as a downside written down and is in fact a no-op.
+function CombatStats.direction(modifier: AttachmentConfig.Modifier): number
+	local stat = canonical(modifier.stat)
+	local delta = 0
+	if modifier.mul then
+		delta += modifier.mul - 1
+	end
+	if modifier.add then
+		delta += modifier.add
+	end
+	if math.abs(delta) < 1e-9 then
+		return 0
+	end
+	local raised = delta > 0
+	if LOWER_IS_BETTER[stat] then
+		return if raised then -1 else 1
+	end
+	return if raised then 1 else -1
 end
 
 -- ---------------------------------------------------------------------------
