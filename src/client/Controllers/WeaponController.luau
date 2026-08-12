@@ -29,6 +29,9 @@ local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 local ClientData = require(script.Parent.Parent.ClientData)
 local Firing = require(script.Parent.Parent.Systems.Firing)
 local EffectsController = require(script.Parent.EffectsController)
+-- One direction only: the trigger tells movement that a sprint is over.
+-- MovementController does not require this file back, so there is no cycle.
+local MovementController = require(script.Parent.MovementController)
 local Theme = require(script.Parent.Parent.UI.Theme)
 local Components = require(script.Parent.Parent.UI.Components)
 
@@ -213,6 +216,12 @@ local function onFireAction(_action: string, inputState: Enum.UserInputState): E
 		if not combatActive() then
 			return Enum.ContextActionResult.Pass
 		end
+		-- Shooting ENDS a sprint rather than being refused during one
+		-- (NOD-140). Refusing the shot means the player pressed fire and
+		-- nothing happened, which they will read as the game dropping their
+		-- input; cancelling the sprint means the shot costs them the
+		-- sprint-to-fire delay, which is a price they can learn.
+		MovementController.cancelSprint()
 		Firing.setTrigger(true)
 	elseif inputState == Enum.UserInputState.End or inputState == Enum.UserInputState.Cancel then
 		Firing.setTrigger(false)
@@ -222,6 +231,10 @@ end
 
 local function onReloadAction(_action: string, inputState: Enum.UserInputState): Enum.ContextActionResult
 	if inputState == Enum.UserInputState.Begin and combatActive() then
+		-- Reload-with-intent: you meant to reload, so you meant to stop
+		-- sprinting. A reload that silently kept you sprinting would finish
+		-- with the gun still down.
+		MovementController.cancelSprint()
 		Firing.reload()
 	end
 	return Enum.ContextActionResult.Sink

@@ -135,9 +135,52 @@ function Movement.speedFor(state: State, weight: number?): number
 	return base * (weight or 1)
 end
 
+-- Omnimovement (NOD-140): how much of your speed you keep moving in a given
+-- direction relative to where you are facing.
+--
+-- `dot` is facing · movement, both unit and both flattened — 1 is straight
+-- ahead, 0 is a pure strafe, -1 is straight backwards.
+--
+-- **Every multiplier is ≤ 1.** That is the readability rule, and it is what
+-- makes "sprint in eight directions" add expression rather than speed: there is
+-- no direction, and no sequence of directions, that goes faster than forward.
+function Movement.directionalScale(state: State, dot: number): number
+	if not Config.directionalStates[state] then
+		return 1
+	end
+
+	local d = Config.directional
+	-- Interpolated between the five named angles rather than five hard sectors.
+	-- Sectors put a step change in your speed mid-turn, which reads as the
+	-- character catching on something that is not there.
+	local clamped = math.clamp(dot, -1, 1)
+	if clamped >= 0.70710678 then -- 0° .. 45°
+		local t = (1 - clamped) / (1 - 0.70710678)
+		return d.forward + (d.diagonalForward - d.forward) * t
+	elseif clamped >= 0 then -- 45° .. 90°
+		local t = (0.70710678 - clamped) / 0.70710678
+		return d.diagonalForward + (d.strafe - d.diagonalForward) * t
+	elseif clamped >= -0.70710678 then -- 90° .. 135°
+		local t = -clamped / 0.70710678
+		return d.strafe + (d.diagonalBack - d.strafe) * t
+	else -- 135° .. 180°
+		local t = (-clamped - 0.70710678) / (1 - 0.70710678)
+		return d.diagonalBack + (d.backward - d.diagonalBack) * t
+	end
+end
+
+-- The full answer: state, weapon weight, and which way you are pointing.
+function Movement.resolvedSpeed(state: State, weight: number?, dot: number?): number
+	return Movement.speedFor(state, weight) * Movement.directionalScale(state, dot or 1)
+end
+
 -- The fastest any legal state could have this player going, for the server's
 -- plausibility check. Reads the table rather than hardcoding "Dive is fastest",
 -- so re-tuning a speed cannot quietly outrun the check that watches it.
+--
+-- Direction is NOT applied: every directional multiplier is ≤ 1, so the fastest
+-- possible case is always straight ahead. If that ever stops being true the
+-- readability rule has already been broken, and `Movement.validate` says so.
 function Movement.maxSpeed(weight: number?): number
 	local best = 0
 	for _, state in STATES do
@@ -287,6 +330,22 @@ function Movement.validate()
 		end
 	end
 
+	-- The readability rule, enforced rather than trusted (NOD-140).
+	--
+	-- "Speed is earned on the ground and spent in the air. It adds directions,
+	-- not speed." That is a design rule with a NUMBER behind it, so the number
+	-- gets checked: a directional multiplier above 1 would mean some angle is
+	-- faster than sprinting forward, and it would be found by a player long
+	-- before it was found by anyone reading the config.
+	for name, value in Config.directional do
+		if value > 1 then
+			table.insert(problems, `directional.{name} is {value}, above 1 — that direction is faster than forward`)
+		end
+		if value <= 0 then
+			table.insert(problems, `directional.{name} is {value} — a direction you cannot move in`)
+		end
+	end
+
 	if #problems > 0 then
 		Diagnostics.warn(SYSTEM, `state graph: {table.concat(problems, " · ")}`)
 		return
@@ -303,7 +362,8 @@ function Movement.validate()
 	Diagnostics.ok(
 		SYSTEM,
 		`{#STATES} states, {edges} legal transitions, all reachable · `
-			.. `walk {Config.speed.Walk} sprint {Config.speed.Sprint} · no math.huge anywhere`
+			.. `walk {Config.speed.Walk} sprint {Config.speed.Sprint} · `
+			.. `back-sprint {math.floor(Config.directional.backward * 100)}% of forward, nothing above 100%`
 	)
 end
 

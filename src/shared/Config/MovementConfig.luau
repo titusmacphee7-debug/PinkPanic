@@ -43,6 +43,106 @@ MovementConfig.speed = {
 }
 
 -- ---------------------------------------------------------------------------
+-- Omnimovement: sprinting in eight directions (NOD-140)
+--
+-- **It adds directions, not speed.** That is the readability rule the whole of
+-- M2 is governed by, and it is Titus's, not a design instinct: Leah will not
+-- play Killstreak because the movement is too crazy, and an average player has
+-- to be able to aim at people. Every multiplier below is ≤ 1, so no input
+-- sequence can produce a speed above plain forward sprint.
+--
+-- Indexed by the angle between where you are FACING and where you are MOVING.
+-- Backwards is meaningfully slower, so retreating while shooting is a real
+-- choice rather than the strictly-best way to fight.
+-- ---------------------------------------------------------------------------
+
+MovementConfig.directional = {
+	forward = 1,
+	-- 45°. Barely a cost, because diagonal is how you actually move in a
+	-- shooter and taxing it would just teach people to zig-zag on the axes.
+	diagonalForward = 0.96,
+	-- 90°, pure strafe.
+	strafe = 0.86,
+	-- 135°.
+	diagonalBack = 0.78,
+	-- 180°.
+	backward = 0.68,
+}
+
+-- Walking is NOT direction-scaled. At walk speed the difference is unreadable,
+-- and scaling it would make aiming while repositioning feel sludgy for no gain
+-- anyone can perceive.
+MovementConfig.directionalStates = { Sprint = true, TacSprint = true }
+
+-- ---------------------------------------------------------------------------
+-- Tactical sprint
+--
+-- Faster, time-limited, and it costs you your gun for longer when it ends.
+-- Draining is what stops it from simply being the sprint speed.
+-- ---------------------------------------------------------------------------
+
+MovementConfig.tacSprint = {
+	-- How long a full tank lasts.
+	seconds = 4,
+	-- How long a full tank takes to refill from empty.
+	rechargeSeconds = 6,
+	-- Dead time after it ends before refilling starts, so tapping in and out
+	-- is not a way to stay in it permanently.
+	rechargeDelaySeconds = 0.8,
+	-- Double-tap the sprint key within this to enter it.
+	doubleTapSeconds = 0.28,
+}
+
+-- ---------------------------------------------------------------------------
+-- Stances
+--
+-- Transitions take real time. Instant crouching is the "crouch spam" that makes
+-- a fight about who can press a key faster, which is exactly the kind of
+-- movement Leah does not want to play against.
+-- ---------------------------------------------------------------------------
+
+MovementConfig.stance = {
+	toStandSeconds = 0.2,
+	toCrouchSeconds = 0.22,
+	toProneSeconds = 0.45,
+	-- Getting up from prone is the slowest thing in the game on purpose: going
+	-- prone has to be a commitment, or it is free cover.
+	fromProneSeconds = 0.65,
+	-- Under this, a press is a TAP and toggles the stance; over it, it is a
+	-- HOLD and the stance ends with the key. Both schemes at once, which is why
+	-- there is no setting to get wrong.
+	tapSeconds = 0.2,
+}
+
+-- How far the character sits below standing, in studs. Applied through
+-- Humanoid.HipHeight and CameraOffset rather than by resizing parts: NOD-167
+-- pins every rig to one size, and a stance that changed part sizes would break
+-- that guarantee AND trip CharacterService's size audit. Lowering the whole
+-- body is a real change to what a shot has to clear.
+MovementConfig.stanceDrop = {
+	Idle = 0,
+	Walk = 0,
+	Sprint = 0,
+	TacSprint = 0,
+	Crouch = 1.4,
+	Prone = 2.2,
+	Slide = 1.6,
+	Dive = 2.2,
+	Air = 0,
+	Mantle = 0,
+	Stun = 0,
+}
+
+-- Character attributes other systems read. Named here so nothing has to
+-- hardcode the string, and listed together so the set is visible at a glance.
+MovementConfig.attributes = {
+	sprinting = "PPSprinting",
+	crouching = "PPCrouching",
+	prone = "PPProne",
+	sliding = "PPSliding",
+}
+
+-- ---------------------------------------------------------------------------
 -- The actuator
 --
 -- Consumed by Actuator.luau, which is attached and bounded from the first frame
@@ -118,13 +218,22 @@ MovementConfig.jumpCooldownSeconds = 0.18
 export type ProfileName = "lobby" | "combat"
 
 MovementConfig.profiles = {
-	-- Crouch IS in the lobby, and the exclusions above are the reason: what the
-	-- fixed camera cannot show is a slide arc, a dive, or a mantle. Crouching is
-	-- just a shorter character. Leaving it out would mean the crouch key does
-	-- nothing in the only place currently testable, which teaches the player
-	-- that it is broken.
+	-- Crouch and prone ARE in the lobby, and the exclusions are the reason: what
+	-- the fixed camera cannot show is an ARC — a slide, a dive, a mantle.
+	-- Stances are not arcs. Leaving them out would mean the crouch and prone
+	-- keys do nothing in the only place currently testable, which teaches the
+	-- player that they are broken.
 	lobby = {
-		allowed = { Idle = true, Walk = true, Sprint = true, Crouch = true, Air = true, Stun = true },
+		allowed = {
+			Idle = true,
+			Walk = true,
+			Sprint = true,
+			TacSprint = true,
+			Crouch = true,
+			Prone = true,
+			Air = true,
+			Stun = true,
+		},
 	},
 	combat = {
 		allowed = {
