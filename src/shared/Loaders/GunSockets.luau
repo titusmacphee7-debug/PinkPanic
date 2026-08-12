@@ -209,6 +209,93 @@ function GunSockets.regions(model: Instance): Regions
 end
 
 -- ---------------------------------------------------------------------------
+-- Attachment models (NOD-149 / NOD-150)
+--
+-- Attachments are commissioned as their own models and welded to a gun's
+-- `Mount_*` socket at runtime — which means a mounted attachment becomes a
+-- DESCENDANT of the gun, and every scan in this file finds parts and
+-- attachments by name. So an attachment carrying a part named `Body` is counted
+-- as one of the gun's camo regions, and one carrying an `Attachment` named
+-- `Muzzle` becomes the gun's muzzle.
+--
+-- That is a naming collision that only appears once something is equipped, on
+-- a model that validated perfectly on its own. It is checked here instead.
+-- ---------------------------------------------------------------------------
+
+-- Every name the gun scans reserve. An attachment may use none of them.
+local RESERVED: { string } = {
+	"Muzzle",
+	"Grip",
+	"EjectPort",
+	"LeftGrip",
+	"Sight",
+	"MagWell",
+	"Body",
+	"Panel",
+	"Hardware",
+	"Accent",
+	"Slide",
+	"Bolt",
+	"Pump",
+	"Cylinder",
+	"Mag",
+}
+
+GunSockets.RESERVED = RESERVED
+
+export type AttachmentReport = {
+	id: string,
+	hasAnchor: boolean,
+	hasAimPoint: boolean,
+	collisions: { string },
+	problems: { string },
+}
+
+-- `isOptic` decides whether `AimPoint` is demanded. Passed in rather than
+-- inferred from the model, because the slot is config (`AttachmentConfig`) and
+-- this file reads content — guessing "it has a lens so it is an optic" is
+-- exactly the kind of inference that put seven guns backwards.
+function GunSockets.auditAttachment(model: Instance, isOptic: boolean): AttachmentReport
+	local report: AttachmentReport = {
+		id = model.Name,
+		hasAnchor = GunSockets.get(model, "Anchor") ~= nil,
+		hasAimPoint = GunSockets.get(model, "AimPoint") ~= nil,
+		collisions = {},
+		problems = {},
+	}
+
+	local reserved: { [string]: boolean } = {}
+	for _, name in RESERVED do
+		reserved[name] = true
+	end
+	local seen: { [string]: boolean } = {}
+	for _, descendant in model:GetDescendants() do
+		if reserved[descendant.Name] and not seen[descendant.Name] then
+			seen[descendant.Name] = true
+			table.insert(report.collisions, descendant.Name)
+		end
+	end
+
+	if not report.hasAnchor then
+		table.insert(report.problems, "no Anchor — nothing to weld to the mount, and no orientation to weld it in")
+	end
+	if isOptic and not report.hasAimPoint then
+		table.insert(
+			report.problems,
+			"no AimPoint — aiming through this optic has no eye position, and there is no number to tune later"
+		)
+	end
+	if #report.collisions > 0 then
+		table.insert(
+			report.problems,
+			`uses reserved name(s) {table.concat(report.collisions, ", ")} — once mounted these are read as the GUN's`
+		)
+	end
+
+	return report
+end
+
+-- ---------------------------------------------------------------------------
 -- Where the models live
 -- ---------------------------------------------------------------------------
 
@@ -225,6 +312,59 @@ function GunSockets.model(gunId: string): Model?
 	local folder = GunSockets.folder()
 	local found = folder and folder:FindFirstChild(gunId)
 	return if found and found:IsA("Model") then found else nil
+end
+
+function GunSockets.attachmentFolder(): Instance?
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	return assets and assets:FindFirstChild("Attachments")
+end
+
+function GunSockets.attachmentModel(id: string): Model?
+	local folder = GunSockets.attachmentFolder()
+	local found = folder and folder:FindFirstChild(id)
+	return if found and found:IsA("Model") then found else nil
+end
+
+-- Every attachment in the config, against its model. Printed on its own rather
+-- than folded into the gun table: they are a different commission, delivered in
+-- a different batch, and "which guns are missing sockets" and "which
+-- attachments are missing an AimPoint" are two different jobs for two different
+-- people.
+function GunSockets.printAttachmentReport()
+	local AttachmentConfig = require(ReplicatedStorage.Shared.Config.AttachmentConfig)
+
+	local ids: { string } = {}
+	for id in AttachmentConfig.attachments do
+		table.insert(ids, id)
+	end
+	table.sort(ids)
+
+	local missing, clean = 0, 0
+	local lines: { string } = {}
+	for _, id in ids do
+		local def = AttachmentConfig.get(id)
+		local model = GunSockets.attachmentModel(id)
+		if not model then
+			missing += 1
+			table.insert(lines, `  {id}  — NO MODEL`)
+			continue
+		end
+		local report = GunSockets.auditAttachment(model, def ~= nil and def.slot == "Optic")
+		if #report.problems == 0 then
+			clean += 1
+			table.insert(lines, `  {id}  ok`)
+		else
+			for _, problem in report.problems do
+				table.insert(lines, `  {id}  {problem}`)
+			end
+		end
+	end
+
+	print(`[PinkPanic] attachment models — {clean}/{#ids} clean, {missing} with no model at all`)
+	for _, line in lines do
+		print(line)
+	end
+	print(`  spec: docs/GUN_MODEL_SPEC.md section 7`)
 end
 
 -- ---------------------------------------------------------------------------
