@@ -15,6 +15,32 @@ when it has a clean row.** Nothing else counts as done.
 
 ---
 
+## 0a. Two tiers, and why the code must not know the difference
+
+Weapons arrive by one of two routes, and the roadmap runs through both:
+
+| | **Tier 1 — sourced** (now) | **Tier 2 — commissioned** (later) |
+| --- | --- | --- |
+| Origin | Free asset, recoloured and relabelled | Built to order |
+| Part split | Required | Required |
+| Sockets and mounts | Added by us in Studio | Same |
+| Shared UV layout | **Impossible** — every asset has its own unwrap | Available if paid for |
+| Poly budget | A rejection ceiling | A target |
+| LODs | Roblox `RenderFidelity = Automatic` | Same |
+
+**The rule that keeps both routes open: nothing load-bearing may depend on a
+Tier 2 property.** A feature that needs a shared UV is a feature that does not
+work for the whole roster today and will not work for any asset sourced later
+either — so it cannot be the mechanism, only an enhancement on top.
+
+That is a real constraint and it changed the camo design; see §5.
+
+Everything in §1–§4 and §7 applies to both tiers unchanged, which is the point.
+A Tier 1 asset and a Tier 2 model are interchangeable to the engine, so the
+roster can be upgraded a weapon at a time rather than all at once.
+
+---
+
 ## 0. The one-paragraph version, for a modeller in a hurry
 
 Build the gun **pink**, out of **separate named parts**, pointing **down −Z**,
@@ -156,18 +182,49 @@ actually has, as separate parts, free of the body.
 
 ---
 
-## 5. Shared UV layout — for the universal camos
+## 5. How camos actually work — and why they do not use UVs
 
-Most camos are **gun-specific**: authored against one weapon's own UV, filed
-under `Assets/Camos/PerGun/<GunId>/`, and they need nothing from this section
-beyond the region names above.
+**A camo is a material plus a palette, not a texture mapped through UVs.**
 
-**Some camos are universal**, and those need every gun laid out identically in
-UV space. Get this right and a universal camo is one texture file for the whole
-roster. Skip it and there are no universal camos: every look has to be redrawn
-per weapon, and a set of 20 becomes 20 × 38.
+`CamoKind = "Palette" | "Texture"`. Everything shipping today is `Palette`:
 
-### The layout
+- a **`MaterialVariant`** applied to the camo-taking regions, and
+- a **colour per region** for the rest.
+
+Roblox material variants tile in **studs, not UV space**. So a palette camo
+lands identically on any mesh regardless of how — or whether — it was
+unwrapped. One camo is one material and five colours, and it applies flawlessly
+to all 38 weapons and all 43 attachments, forever, including assets nobody has
+sourced yet.
+
+> **This replaced a shared-UV texture design, and the replacement is better.**
+> The original plan had every weapon unwrapped to an identical quadrant layout
+> so one texture could skin the roster. That is unachievable for sourced assets
+> — every one arrives with its own unwrap — and unreliable even for
+> commissioned ones without paying for UV discipline across 38 deliveries.
+>
+> A mechanism that works on 60% of the roster is not a mechanism, it is a bug
+> with a schedule. Palette camos work on 100% of it, cannot drift, and cost
+> nothing per weapon.
+>
+> What we give up is photo-real printed patterns. What we get is the guarantee
+> the art direction actually asked for: **every region always correctly
+> coloured, no grey metal, ever.**
+
+### Texture camos remain possible, as an enhancement
+
+If a weapon is later commissioned with the shared layout below, it can carry
+`Texture` camos **in addition**. Those weapons set a `SharedUV` boolean
+attribute on the model; `ContentAudit` reports which weapons can wear which
+camo kind, and a texture camo is simply unavailable on a weapon that cannot
+show it — the same way an attachment is unavailable on a gun with no mount.
+
+Nothing in the equip path may assume `SharedUV`. A palette camo is always
+available, so there is always a valid answer.
+
+### The layout, for Tier 2 only
+
+Only relevant to commissioned models. Skip this entirely for sourced assets.
 
 `Body` and `Panel` are the only regions that receive a texture, so they are the
 only ones that need to agree. Both unwrap into a **single 1024 × 1024 square**,
