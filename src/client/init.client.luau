@@ -9,7 +9,7 @@ local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 
 -- Mirrors BUILD_TAG in src/server/init.server.luau. If the two don't match in
 -- Output, one side is stale.
-local CLIENT_BUILD_TAG = "2026-08-12-D · loadout is a rounded panel, HUD rebuilt"
+local CLIENT_BUILD_TAG = "2026-08-12-E · client firing loop + server ammo (NOD-136)"
 
 -- First-person shooter: the pink crosshair is the cursor.
 UserInputService.MouseIconEnabled = false
@@ -24,7 +24,9 @@ Diagnostics.expect(
 	"LoadoutController",
 	"CameraController",
 	"LobbyController",
-	"ArmoryController"
+	"ArmoryController",
+	"Firing",
+	"WeaponController"
 )
 
 local Remotes: any = Diagnostics.load("Remotes", ReplicatedStorage.Shared.Net.Remotes)
@@ -54,6 +56,14 @@ local controllers: { { name: string, module: any } } = {
 	{ name = "CameraController", module = Diagnostics.load("CameraController", script.Controllers.CameraController) },
 	{ name = "LobbyController", module = Diagnostics.load("LobbyController", script.Controllers.LobbyController) },
 	{ name = "ArmoryController", module = Diagnostics.load("ArmoryController", script.Controllers.ArmoryController) },
+	-- Last, and after EffectsController, whose muzzle flash and tracer it
+	-- calls the moment a shot is predicted. WeaponController.init also starts
+	-- Firing, so the two report separately: "the trigger is bound" and "the
+	-- magazine is being predicted" are different things to be wrong about.
+	{
+		name = "WeaponController",
+		module = Diagnostics.load("WeaponController", script.Controllers.WeaponController),
+	},
 }
 
 -- Each init() is isolated. Previously these ran bare and in order, so a throw

@@ -49,7 +49,22 @@ local Definitions: { [string]: RemoteDef } = {
 	-- it points. No target, no hit, no damage: everything the server would
 	-- have to take the client's word for is absent by design, which is why
 	-- there is nothing here for a modified client to lie about.
-	FireWeapon = { kind = "Event", dir = "ClientToServer", note = "fire intent: origin + unit direction" },
+	FireWeapon = {
+		kind = "Event",
+		dir = "ClientToServer",
+		note = "fire intent: origin + unit direction + the client's own ammo guess",
+	},
+	ReloadWeapon = { kind = "Event", dir = "ClientToServer", note = "start a reload" },
+	SwapWeapon = { kind = "Event", dir = "ClientToServer", note = "hold Primary or Secondary" },
+	-- Client-reported, and safe to be: claiming you are sprinting only ever
+	-- DELAYS your own shots. The server would otherwise have to infer sprint
+	-- from velocity, which is both wrong at the edges and expensive.
+	SprintState = { kind = "Event", dir = "ClientToServer", note = "sprint began/ended (gates sprintToFire)" },
+	-- The correction half of the seam. The client predicts its own magazine;
+	-- this is the server saying what it actually is, sent on anything the
+	-- client could not have predicted and on a slow heartbeat so a dropped
+	-- correction repairs itself.
+	AmmoState = { kind = "Event", dir = "ServerToClient", note = "authoritative ammo/reload/draw state" },
 	-- To the shooter only. The hitmarker is the most important feedback in a
 	-- shooter — it is how you learn whether your aim was right — so the server
 	-- says so the moment it knows, rather than the client inferring it from a

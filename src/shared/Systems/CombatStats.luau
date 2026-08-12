@@ -57,6 +57,9 @@ export type Resolved = {
 	recoilRecovery: number,
 	magSize: number,
 	reloadSeconds: number,
+	shellReload: number?, -- set = loads one shell at a time (NOD-136)
+	burstCount: number?, -- shots per trigger pull; nil/1 = not a burst gun
+	burstRpm: number?, -- cadence inside the burst, not between them
 	velocity: number,
 	drop: number,
 	moveSpeedMult: number,
@@ -246,6 +249,9 @@ local function baseForGun(gunId: string): Resolved?
 		recoilRecovery = s.recoilRecovery,
 		magSize = s.magSize,
 		reloadSeconds = s.reloadSeconds,
+		shellReload = s.shellReload,
+		burstCount = s.burstCount,
+		burstRpm = s.burstRpm,
 		velocity = s.velocity,
 		drop = s.drop,
 		moveSpeedMult = s.moveSpeedMult,

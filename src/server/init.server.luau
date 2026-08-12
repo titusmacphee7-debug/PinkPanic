@@ -14,7 +14,7 @@
 -- error throws at require time — before any init function exists to guard.
 -- That is exactly how the LobbyService parse error took the whole game down.
 
-local BUILD_TAG = "2026-08-12-D · loadout is a rounded panel, HUD rebuilt"
+local BUILD_TAG = "2026-08-12-E · client firing loop + server ammo (NOD-136)"
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -37,6 +37,7 @@ Diagnostics.expect(
 	"Ballistics",
 	"Health",
 	"Spawns",
+	"WeaponService",
 	"CharacterService",
 	"MapService",
 	"LobbyService",
@@ -62,6 +63,7 @@ local Ballistics: any = Diagnostics.load("Ballistics", script.Systems.Ballistics
 local Health: any = Diagnostics.load("Health", script.Systems.Health)
 local Spawns: any = Diagnostics.load("Spawns", script.Systems.Spawns)
 
+local WeaponService: any = Diagnostics.load("WeaponService", script.Services.WeaponService)
 local CharacterService: any = Diagnostics.load("CharacterService", script.Services.CharacterService)
 local MapService: any = Diagnostics.load("MapService", script.Services.MapService)
 local LobbyService: any = Diagnostics.load("LobbyService", script.Services.LobbyService)
@@ -105,19 +107,36 @@ end
 
 -- The weapon a shot is fired with comes from the SERVER's copy of the player's
 -- loadout, never from the request. Injected here rather than required inside
--- Ballistics so the dependency runs Service → System and not back the other
--- way: ballistics has no business knowing that profiles exist.
-if Ballistics and PlayerDataService then
-	Ballistics.setWeaponResolver(function(player: Player): string?
+-- WeaponService so the dependency runs Service → Systems and not back the
+-- other way: the trigger has no business knowing how profiles are stored.
+if WeaponService and PlayerDataService then
+	WeaponService.setLoadoutResolver(function(player: Player)
 		local profile = PlayerDataService.get(player)
 		if not profile then
 			return nil
 		end
+
 		local class = profile.classes and profile.classes[profile.activeClass]
 		if class then
-			return class.primary and class.primary.gunId or class.secondary and class.secondary.gunId
+			local attachments: { [string]: { string } } = {}
+			if class.primary and class.primary.gunId then
+				attachments[class.primary.gunId] = class.primary.attachments
+			end
+			if class.secondary and class.secondary.gunId then
+				attachments[class.secondary.gunId] = class.secondary.attachments
+			end
+			return {
+				primary = class.primary and class.primary.gunId,
+				secondary = class.secondary and class.secondary.gunId,
+				attachments = attachments,
+			}
 		end
-		return profile.loadout and (profile.loadout.primary or profile.loadout.secondary)
+
+		local loadout = profile.loadout
+		if not loadout then
+			return nil
+		end
+		return { primary = loadout.primary, secondary = loadout.secondary }
 	end)
 end
 
@@ -136,6 +155,9 @@ local BOOT_ORDER: { { name: string, module: any } } = {
 	-- stale one. Counting spawn points before that runs counts them in a map
 	-- that is about to stop existing, and reports a number that was never true.
 	{ name = "Spawns", module = Spawns },
+	-- After Ballistics, which it calls into, and before assertHandlers, which
+	-- is what proves FireWeapon/ReloadWeapon/SwapWeapon actually got claimed.
+	{ name = "WeaponService", module = WeaponService },
 	{ name = "LobbyService", module = LobbyService },
 	{ name = "PlayerDataService", module = PlayerDataService },
 	{ name = "EconomyService", module = EconomyService },
@@ -188,6 +210,13 @@ if Health and Spawns then
 			return -- a bot or a prop; nothing to respawn
 		end
 
+		-- The trigger goes dead the instant they do. Without this a shot
+		-- already in flight from the client arrives at a corpse and is
+		-- accepted, which is a free posthumous kill.
+		if WeaponService then
+			WeaponService.onDied(player)
+		end
+
 		task.delay(SpawnConfig.respawnSeconds, function()
 			if player.Parent == nil then
 				return -- left during the timer
@@ -197,8 +226,34 @@ if Health and Spawns then
 			-- gets moved; pivoting first would be undone by ApplyDescription.
 			task.wait()
 			Spawns.place(player)
+			if WeaponService then
+				WeaponService.onSpawned(player)
+			end
 		end)
 	end)
+end
+
+-- The first draw of a life, for every path into a character that is NOT the
+-- respawn loop above: joining, a Studio playtest, an admin reset. Without it a
+-- player who never died would hold nothing and every shot would be rejected as
+-- "noweapon" — which reads exactly like combat being broken.
+if WeaponService then
+	local function armed(player: Player)
+		player.CharacterAdded:Connect(function()
+			-- One frame, for the same reason the respawn path waits: the rig is
+			-- still being standardised.
+			task.wait()
+			WeaponService.onSpawned(player)
+		end)
+		if player.Character then
+			task.spawn(WeaponService.onSpawned, player)
+		end
+	end
+
+	for _, player in Players:GetPlayers() do
+		task.spawn(armed, player)
+	end
+	Players.PlayerAdded:Connect(armed)
 end
 
 -- Must run after every service has had its chance to attach handlers. Any

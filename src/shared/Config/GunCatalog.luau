@@ -36,7 +36,13 @@ export type GunStats = {
 	auto: boolean,
 	magSize: number,
 	reloadSeconds: number,
-	shellReload: number?,
+	shellReload: number?, -- set = the gun loads one shell at a time
+	-- Burst. `burstCount` is shots per trigger pull; `burstRpm` is the cadence
+	-- INSIDE the burst, which is not the gun's rpm — rpm governs the gap
+	-- between bursts. Absent on every gun today: the mode exists and is tested
+	-- so that making one burst is a line here rather than a firing rewrite.
+	burstCount: number?,
+	burstRpm: number?,
 	spreadDeg: number, -- hipfire aim error (and the pellet cone on shotguns)
 	adsSpreadDeg: number, -- aim error while aimed in — always tighter than hip
 	recoilVert: number, -- degrees of camera climb per shot

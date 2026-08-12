@@ -31,8 +31,8 @@ local RunService = game:GetService("RunService")
 
 local Diagnostics = require(ReplicatedStorage.Shared.Systems.Diagnostics)
 local Remotes = require(ReplicatedStorage.Shared.Net.Remotes)
-local Guard = require(ReplicatedStorage.Shared.Net.Guard)
 local CombatStats = require(ReplicatedStorage.Shared.Systems.CombatStats)
+local Weapon = require(ReplicatedStorage.Shared.Systems.Weapon)
 local Config = require(ReplicatedStorage.Shared.Config.BallisticsConfig)
 
 local SYSTEM = "Ballistics"
@@ -57,12 +57,10 @@ type Projectile = {
 	shooter: Player,
 	weaponId: string,
 	stats: CombatStats.Resolved,
-	origin: Vector3, -- kept for the tracer, which is drawn muzzle-to-impact
 	position: Vector3,
 	velocity: Vector3,
 	traveled: number,
 	damageScale: number, -- reduced by every surface penetrated
-	lead: boolean, -- pellet 1: the one that draws the tracer
 	filter: { Instance },
 }
 
@@ -96,6 +94,15 @@ probeParams.IgnoreWater = true
 -- nothing applies them, and the manifest says so rather than letting "combat
 -- does nothing" look like a ballistics failure.
 local hitHandler: ((Hit) -> ())? = nil
+
+-- Notified on every accepted shot. Spawn protection uses this to end the
+-- moment you fire: protection that survives your first shot is a free opening
+-- trade, which is worse than no protection at all.
+local fireListeners: { (Player) -> () } = {}
+
+function Ballistics.onFire(listener: (Player) -> ())
+	table.insert(fireListeners, listener)
+end
 
 function Ballistics.setHitHandler(handler: (Hit) -> ())
 	hitHandler = handler
@@ -242,8 +249,12 @@ function Ballistics.fire(shooter: Player, weaponId: string, origin: Vector3, dir
 	-- cannot know that an LMG may fire eight times a second and a sniper may
 	-- not, so it has to be set loose enough for the fastest gun — which leaves
 	-- every other gun unguarded.
+	--
+	-- Weapon.minInterval, not 1/fireRate: for a burst gun those are different
+	-- numbers and the fire rate is the wrong one. WeaponService already gated
+	-- this shot precisely; this is the floor that still holds if it did not.
 	local now = os.clock()
-	local minInterval = (1 / stats.fireRate) * (1 - Config.fireRateTolerance)
+	local minInterval = Weapon.minInterval(stats) * (1 - Config.fireRateTolerance)
 	local previous = lastShotAt[shooter]
 	if previous and now - previous < minInterval then
 		return false, "faster than the weapon's fire rate"
@@ -260,23 +271,39 @@ function Ballistics.fire(shooter: Player, weaponId: string, origin: Vector3, dir
 	local spread = stats.spreadDeg
 	local filter = { character }
 
-	for index = 1, pellets do
+	for _ = 1, pellets do
 		-- Every pellet, including the first. See the header.
 		local aim = spreadDirection(direction, spread)
 		table.insert(projectiles, {
 			shooter = shooter,
 			weaponId = weaponId,
 			stats = stats,
-			origin = origin,
 			position = origin,
 			velocity = aim * stats.velocity,
 			traveled = 0,
 			damageScale = 1,
-			lead = index == 1,
 			filter = filter,
 		})
 	end
 	liveByPlayer[shooter] = live + pellets
+
+	-- Broadcast at FIRE time, not at impact.
+	--
+	-- This used to be sent from step() when the projectile died, with the
+	-- END POINT in the argument slot EffectsController reads as a direction.
+	-- Two bugs in one line: everyone but the shooter saw the tracer late by
+	-- the bullet's whole flight time, and what they saw was a tracer aimed at
+	-- a world-space coordinate rather than down the barrel.
+	Remotes.fireAllClients(
+		"ShotFired",
+		shooter,
+		origin,
+		direction,
+		stats.velocity,
+		stats.drop,
+		stats.travelMax,
+		pellets
+	)
 
 	for _, listener in fireListeners do
 		local ok = pcall(listener, shooter)
@@ -467,59 +494,11 @@ function Ballistics.step(deltaTime: number)
 		local projectile = projectiles[index]
 		local alive = stepProjectile(projectile, dt)
 		if not alive then
-			if projectile.lead then
-				-- One tracer per shot, not one per pellet. Eight tracers from a
-				-- shotgun is visual noise and eight times the network traffic
-				-- for a worse-looking result.
-				Remotes.fireAllClients("ShotFired", projectile.shooter, projectile.origin, projectile.position)
-			end
 			removeAt(index)
 		end
 	end
 
 	flush()
-end
-
--- ---------------------------------------------------------------------------
--- Remote
--- ---------------------------------------------------------------------------
-
--- The weapon is read from the SERVER's copy of the loadout, never from the
--- request. A client that could name its own weapon could name the one with the
--- best stats regardless of what it owns or holds.
-local resolveWeapon: ((Player) -> string?)? = nil
-
-function Ballistics.setWeaponResolver(resolver: (Player) -> string?)
-	resolveWeapon = resolver
-end
-
--- Notified on every accepted shot. Spawn protection uses this to end the
--- moment you fire: protection that survives your first shot is a free opening
--- trade, which is worse than no protection at all.
-local fireListeners: { (Player) -> () } = {}
-
-function Ballistics.onFire(listener: (Player) -> ())
-	table.insert(fireListeners, listener)
-end
-
-local function onFireWeapon(player: Player, origin: any, direction: any)
-	-- A coarse ceiling above any legitimate fire rate, purely to stop a flood
-	-- of malformed calls reaching the real validation. The per-gun rate check
-	-- inside fire() is the one that matters.
-	if not Guard.checkRate(player, "FireWeapon", 30, 1) then
-		return
-	end
-	if not Guard.isVector3(origin) or not Guard.isUnitVector(direction) then
-		return
-	end
-
-	local resolver = resolveWeapon
-	local weaponId = if resolver then resolver(player) else nil
-	if not weaponId then
-		return
-	end
-
-	Ballistics.fire(player, weaponId, origin, direction)
 end
 
 -- ---------------------------------------------------------------------------
@@ -531,7 +510,6 @@ function Ballistics.liveCount(): number
 end
 
 function Ballistics.init()
-	Remotes.handleEvent("FireWeapon", onFireWeapon)
 	RunService.Heartbeat:Connect(Ballistics.step)
 
 	Players.PlayerRemoving:Connect(function(player)
