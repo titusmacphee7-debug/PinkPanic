@@ -110,17 +110,22 @@ learnable, never a fight.
 ## Render step ordering
 
 Several systems write the camera every frame. They are chained deliberately —
-breaking this order causes jitter that looks like a physics bug:
+breaking this order causes jitter that looks like a physics bug. This is what
+currently EXISTS; `PinkPanicSlideRoll`, `PinkPanicViewmodel` and `PinkPanicSkid`
+went with the combat rewrite and come back with M2/M11.
 
 ```
+PinkPanicMovement      Input+1   (after Roblox's control script, which
+                                  writes MoveDirection at Input)
 engine Camera (200)
   → PinkPanicCamera      +1
-  → PinkPanicAim         +2   (recoil)
-  → PinkPanicSlideRoll   +3
-  → PinkPanicViewmodel   +4
-PinkPanicSkid          Input+1
+  → PinkPanicAim         +2      (recoil)
 PinkPanicMouseUnlock   Last
 ```
+
+Never bind at exactly `Input`: that is where Roblox's own control script lives,
+and sharing a priority leaves the order down to whoever registered first —
+which shows up as a frame of input lag that comes and goes between sessions.
 
 ## Animation
 
@@ -204,6 +209,28 @@ legacy folders are destroyed unconditionally at boot. Do not reintroduce it.
 
 **Locked ≠ anchored.** Imported parts that are Locked but not Anchored will
 explode the moment you press Play.
+
+**A live Humanoid cannot be out-argued by a finite force, and that is why the
+old movement flung people.** The Humanoid's controller is a servo driving
+toward `MoveDirection * WalkSpeed`; with WalkSpeed at 0 that target is 0, so it
+spends whatever it takes to hold the character still. Measured 2026-08-12,
+driving a `LinearVelocity` at 24 studs/s for one second on a 14-mass rig:
+`mass×90` → 0.60 studs, `mass×400` → 2.67, `mass×6400` → 9.93, `math.huge` →
+24.30. Seventy times the force buys a third of the distance and the curve never
+converges — `math.huge` is a different path through the solver, not a big
+number, and it is the only value that works. It is also what resolves the
+character out of any geometry it touches at whatever speed that takes. So
+ground locomotion runs on `Humanoid.WalkSpeed` (with the speed still resolved
+by `shared/Systems/Movement.speedFor`, never a local constant), and the
+mass-bounded actuator in `client/Movement/Actuator.luau` is reserved for slide
+and dive, where the Humanoid controller gets switched off for the duration.
+
+**A fixed sampling interval can be phase-locked.** `MoveAudit` originally
+sampled positions every 0.5s and read a character teleporting 260 studs back
+and forth every 0.25s as *perfectly stationary* — 0.0 studs moved, sixteen
+samples in a row. Every sample landed on the same end of the trip. Any periodic
+server-side check needs jitter, and anything that leaves and returns between two
+samples is invisible to position sampling no matter what.
 
 **Rounds never auto-start, and never start solo.** Titus asked for this
 explicitly on 2026-08-10. `RoundService` holds in `Waiting` until *both*
