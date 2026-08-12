@@ -24,6 +24,50 @@ function Components.corner(instance: GuiObject, radius: number?): UICorner
 	return corner
 end
 
+-- Round only the TOP two corners, or only the BOTTOM two.
+--
+-- Roblox gives you neither for free. UICorner always rounds all four, and
+-- ClipsDescendants clips to the parent's RECTANGLE, not to its rounded shape —
+-- verified in Studio, because assuming otherwise is what made every gun card
+-- in the armory a rounded picture sitting on two square blocks. A child that
+-- touches a rounded parent's edge punches its square corners straight back out
+-- through the radius.
+--
+-- So: round all four, then square off the two that should stay flat with a
+-- patch of the frame's own colour.
+--
+-- Two rules for callers:
+--   · Set BackgroundColor3 and BackgroundTransparency BEFORE calling. The
+--     patch copies them.
+--   · The frame must be OPAQUE. The patch overlaps the rounded frame's own
+--     background, and two semi-transparent layers composite darker than one —
+--     which shows up as a bar that is subtly darker at one end.
+local function halfRound(frame: GuiObject, radius: number?, top: boolean): Frame
+	local r = radius or Theme.radius.card
+	Components.corner(frame, r)
+
+	local patch = Instance.new("Frame")
+	patch.Name = if top then "SquareBottom" else "SquareTop"
+	patch.Size = UDim2.new(1, 0, 0, r)
+	patch.Position = if top then UDim2.new(0, 0, 1, -r) else UDim2.fromOffset(0, 0)
+	patch.BackgroundColor3 = frame.BackgroundColor3
+	patch.BackgroundTransparency = frame.BackgroundTransparency
+	patch.BorderSizePixel = 0
+	-- Same ZIndex as the frame, so real content (which sits higher) still draws
+	-- over it and only the empty corner region is filled.
+	patch.ZIndex = frame.ZIndex
+	patch.Parent = frame
+	return patch
+end
+
+function Components.roundTop(frame: GuiObject, radius: number?): Frame
+	return halfRound(frame, radius, true)
+end
+
+function Components.roundBottom(frame: GuiObject, radius: number?): Frame
+	return halfRound(frame, radius, false)
+end
+
 function Components.stroke(
 	instance: GuiObject,
 	color: Color3?,

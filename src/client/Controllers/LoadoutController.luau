@@ -27,7 +27,15 @@ local GunPreview = require(script.Parent.Parent.UI.GunPreview)
 local StatBlock = require(script.Parent.Parent.UI.StatBlock)
 
 local TOP_BAR = 64
-local CARD = Vector2.new(204, 186)
+-- Card geometry, in one place because the pieces have to add up: the art, three
+-- lines of text and the footer all have to fit inside CARD.Y without the text
+-- sliding under the footer.
+local CARD = Vector2.new(204, 204)
+local WELL_HEIGHT = 100
+local FOOTER_HEIGHT = 34
+-- The PRIMARY / SECONDARY header on a loadout slot card. Sized to at least
+-- twice the corner radius so its rounded top corners have room to draw.
+local SLOT_STRIP = 36
 -- How far the panel sits in from the screen edge. The loadout used to be a
 -- full-bleed sheet pinned to all four corners, which is why it read as "not
 -- properly rounded" — a rounded corner is invisible when there is nothing
@@ -139,14 +147,31 @@ end
 -- Shared bits
 -- ---------------------------------------------------------------------------
 
-local function previewWell(parent: GuiObject, gunId: string, rarity: string, spin: boolean): GunPreview.Handle?
+-- `flush` = this well sits against the top edge of a rounded card, so it must
+-- round its top corners into the card's and leave its bottom square. A well
+-- floating inside a card (the loadout slots) rounds all four instead — rounding
+-- only the top of something with space all around it just looks broken.
+--
+-- Getting this wrong in the other direction is what made the armory read as a
+-- rounded picture stuck onto a square block.
+local function previewWell(
+	parent: GuiObject,
+	gunId: string,
+	rarity: string,
+	spin: boolean,
+	flush: boolean?
+): GunPreview.Handle?
 	local well = Instance.new("Frame")
-	well.Size = UDim2.new(1, 0, 0, 96)
+	well.Size = if flush then UDim2.new(1, 0, 0, WELL_HEIGHT) else UDim2.fromScale(1, 1)
 	well.BackgroundColor3 = Theme.color.surfaceSunken
 	well.BorderSizePixel = 0
 	well.ClipsDescendants = true
 	well.Parent = parent
-	Components.corner(well, Theme.radius.card)
+	if flush then
+		Components.roundTop(well, Theme.radius.card)
+	else
+		Components.corner(well, Theme.radius.card)
+	end
 
 	-- Rarity-tinted backdrop, so a Legendary reads as special before you've
 	-- read a single word.
@@ -469,12 +494,16 @@ local function slotCard(parent: Instance, slot: string, gunId: string?, order: n
 		if selected then 0 else 0.5
 	)
 
+	-- 36 tall rather than 22, and opaque. Both are the square-off patch's
+	-- doing: it needs the strip to be at least twice the corner radius to fit
+	-- the curve, and it copies transparency, so a half-transparent strip would
+	-- composite darker along its lower edge.
 	local strip = Instance.new("Frame")
-	strip.Size = UDim2.new(1, 0, 0, 22)
+	strip.Size = UDim2.new(1, 0, 0, SLOT_STRIP)
 	strip.BackgroundColor3 = if selected then Theme.color.primary else Theme.color.surfaceSunken
-	strip.BackgroundTransparency = if selected then 0 else 0.1
 	strip.BorderSizePixel = 0
 	strip.Parent = card
+	Components.roundTop(strip, Theme.radius.card)
 
 	Components.text(strip, {
 		text = string.upper(slot),
@@ -497,8 +526,8 @@ local function slotCard(parent: Instance, slot: string, gunId: string?, order: n
 	if gunId then
 		local def = GunCatalog.get(gunId)
 		local holder = Instance.new("Frame")
-		holder.Size = UDim2.new(1, -20, 1, -22 - 46 - 10)
-		holder.Position = UDim2.fromOffset(10, 28)
+		holder.Size = UDim2.new(1, -20, 1, -SLOT_STRIP - 46 - 16)
+		holder.Position = UDim2.fromOffset(10, SLOT_STRIP + 6)
 		holder.BackgroundTransparency = 1
 		holder.Parent = card
 		previewWell(holder, gunId, if def then def.rarity else "Common", true)
@@ -757,24 +786,28 @@ local function gunCard(parent: Instance, gunId: string, def: any, order: number)
 	local primary, secondary = ClientData.loadout()
 	local equipped = primary == gunId or secondary == gunId
 
+	-- ONE rounded card. Every piece that touches an edge — the art at the top,
+	-- the price bar at the bottom, the locked scrim over all of it — carries the
+	-- card's own radius on the corners it shares with it, because
+	-- ClipsDescendants clips to this frame's RECTANGLE and will not do it for us.
 	local card = Instance.new("TextButton")
 	card.Size = UDim2.fromOffset(CARD.X, CARD.Y)
 	card.LayoutOrder = order
 	card.AutoButtonColor = false
 	card.Text = ""
 	card.BackgroundColor3 = Theme.color.surfaceRaised
-	card.ClipsDescendants = true
 	card.Parent = parent
 	Components.corner(card, Theme.radius.card)
 
-	previewWell(card, gunId, def.rarity, false)
+	previewWell(card, gunId, def.rarity, false, true)
 
+	local textTop = WELL_HEIGHT + Theme.space.sm
 	Components.text(card, {
 		text = def.name,
 		size = Theme.text.body,
 		color = Theme.color.text,
 		area = UDim2.new(1, -20, 0, 18),
-		position = UDim2.fromOffset(10, 102),
+		position = UDim2.fromOffset(10, textTop),
 		truncate = true,
 	})
 	Components.text(card, {
@@ -782,20 +815,21 @@ local function gunCard(parent: Instance, gunId: string, def: any, order: number)
 		size = Theme.text.caption,
 		color = Theme.rarityColor(def.rarity),
 		area = UDim2.new(1, -20, 0, 14),
-		position = UDim2.fromOffset(10, 122),
+		position = UDim2.fromOffset(10, textTop + 20),
 	})
 	Components.text(card, {
 		text = statLine(gunId),
 		size = Theme.text.caption,
 		color = Theme.color.textMuted,
 		area = UDim2.new(1, -20, 0, 14),
-		position = UDim2.fromOffset(10, 138),
+		position = UDim2.fromOffset(10, textTop + 36),
 	})
 
-	-- Footer sits ABOVE the scrim so a locked price is always fully legible.
+	-- The buy bar. Sits ABOVE the scrim so a locked price is always fully
+	-- legible, and rounds its bottom two corners into the card's.
 	local footer = Instance.new("Frame")
-	footer.Size = UDim2.new(1, 0, 0, 26)
-	footer.Position = UDim2.new(0, 0, 1, -26)
+	footer.Size = UDim2.new(1, 0, 0, FOOTER_HEIGHT)
+	footer.Position = UDim2.new(0, 0, 1, -FOOTER_HEIGHT)
 	footer.BorderSizePixel = 0
 	footer.ZIndex = 12
 	footer.Parent = card
@@ -803,16 +837,21 @@ local function gunCard(parent: Instance, gunId: string, def: any, order: number)
 	local footerText, footerColour
 	if equipped then
 		footer.BackgroundColor3 = Theme.color.primary
-		footerText, footerColour = "✓ EQUIPPED", Theme.color.textOnPrimary
+		footerText, footerColour = `{Theme.glyph.equipped} EQUIPPED`, Theme.color.textOnPrimary
 	elseif owned then
 		footer.BackgroundColor3 = Theme.color.surfaceSunken
 		footerText, footerColour = "Owned", Theme.color.text
 	else
+		-- Opaque, not 0.18 transparent. The square-off patch that keeps the top
+		-- corners flat overlaps the frame's own background, and two
+		-- semi-transparent layers composite darker than one — which reads as a
+		-- price bar that is subtly two-tone.
 		footer.BackgroundColor3 = Theme.color.scrim
-		footer.BackgroundTransparency = 0.18
 		footerText, footerColour =
 			`{Theme.glyph.locked} {comma(def.price)} {Theme.glyph.coin}`, Theme.color.coin
 	end
+	-- After the colour is chosen: the patch copies it.
+	Components.roundBottom(footer, Theme.radius.card)
 
 	Components.text(footer, {
 		text = footerText,
@@ -824,23 +863,35 @@ local function gunCard(parent: Instance, gunId: string, def: any, order: number)
 	})
 
 	if not owned then
-		-- Covers the art only, never the footer. Locked reads as aspirational.
+		-- The ART only, exactly the well's shape. Two earlier versions were
+		-- both wrong: one stopped short of the footer, which put a pair of
+		-- rounded corners across the MIDDLE of the card and made it read as
+		-- stacked blocks; the other covered everything, which is one clean
+		-- silhouette but leaves the name and stats as dark text on a dark
+		-- scrim. Dimming what you cannot have yet is aspirational. Dimming
+		-- what it does is just hiding it.
+		-- All four corners, NOT roundTop. roundTop squares off the bottom with a
+		-- patch that copies the frame's colour AND its transparency, and two
+		-- half-transparent layers composite darker than one — on a scrim that
+		-- shows up as a band along the seam. Rounding all four costs two small
+		-- notches of undimmed art at the bottom of the well instead, which is
+		-- inside the card and never touches its silhouette.
 		local scrim = Instance.new("Frame")
-		scrim.Size = UDim2.new(1, 0, 1, -26)
+		scrim.Size = UDim2.new(1, 0, 0, WELL_HEIGHT)
 		scrim.BackgroundColor3 = Theme.color.scrim
-		scrim.BackgroundTransparency = 0.55
+		scrim.BackgroundTransparency = 0.5
 		scrim.BorderSizePixel = 0
 		scrim.ZIndex = 10
 		scrim.Parent = card
 		Components.corner(scrim, Theme.radius.card)
 
 		Components.text(scrim, {
-			text = "🔒",
-			size = 26,
+			text = Theme.glyph.locked,
+			size = 28,
 			color = Theme.color.textOnPrimary,
 			align = Enum.TextXAlignment.Center,
-			area = UDim2.new(1, 0, 0, 30),
-			position = UDim2.new(0, 0, 0.28, 0),
+			area = UDim2.new(1, 0, 0, 32),
+			position = UDim2.new(0, 0, 0.5, -16),
 			zIndex = 11,
 		})
 	end
@@ -1250,12 +1301,15 @@ local function buildGui()
 	scale.Parent = root
 	panelScale = scale
 
-	-- Top bar
+	-- Top bar. Rounds its own top corners into the panel's: ClipsDescendants
+	-- clips to the panel's RECTANGLE, so a square bar across the top squares
+	-- off the whole panel no matter what radius the panel carries.
 	local bar = Instance.new("Frame")
 	bar.Size = UDim2.new(1, 0, 0, TOP_BAR)
 	bar.BackgroundColor3 = Theme.color.surfaceRaised
 	bar.BorderSizePixel = 0
 	bar.Parent = root
+	Components.roundTop(bar, Theme.radius.panel)
 
 	local divider = Instance.new("Frame")
 	divider.Size = UDim2.new(1, 0, 0, 2)

@@ -223,21 +223,11 @@ local function buildGui()
 	modalUnlock.Modal = false
 	modalUnlock.Parent = screen
 
-	-- Bottom-left open button
-	local openButton = Instance.new("TextButton")
-	openButton.AnchorPoint = Vector2.new(0, 1)
-	openButton.Position = UDim2.new(0, 12, 1, -12)
-	openButton.Size = UDim2.fromOffset(140, 42)
-	openButton.BackgroundColor3 = Theme.color.primary
-	openButton.Font = Enum.Font.FredokaOne
-	openButton.TextSize = 18
-	openButton.TextColor3 = Color3.new(1, 1, 1)
-	openButton.Text = "🛍️ Shop  [B]"
-	round(openButton, 21)
-	openButton.MouseButton1Click:Connect(function()
-		ShopController.setOpen(not panel.Visible)
-	end)
-	openButton.Parent = screen
+	-- No bottom-left open button. Titus asked for it gone: the shop is a PLACE —
+	-- you walk onto The Bow-tique pad and it opens — and a floating button
+	-- offering the same thing from anywhere makes the lobby he built into
+	-- scenery. The [B] keybind below still works, and LobbyController still
+	-- opens this on the pad.
 
 	-- Shop panel
 	panel = Instance.new("Frame")

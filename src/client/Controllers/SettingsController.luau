@@ -199,20 +199,10 @@ local function buildGui()
 	modalUnlock.Modal = false
 	modalUnlock.Parent = screen
 
-	local openButton = Instance.new("TextButton")
-	openButton.AnchorPoint = Vector2.new(0, 1)
-	openButton.Position = UDim2.new(0, 160, 1, -12)
-	openButton.Size = UDim2.fromOffset(42, 42)
-	openButton.BackgroundColor3 = Theme.color.primary
-	openButton.Font = Enum.Font.FredokaOne
-	openButton.TextSize = 20
-	openButton.TextColor3 = Color3.new(1, 1, 1)
-	openButton.Text = "⚙️"
-	round(openButton, 21)
-	openButton.MouseButton1Click:Connect(function()
-		SettingsController.setOpen(not panel.Visible)
-	end)
-	openButton.Parent = screen
+	-- No floating gear button. Titus asked for it gone along with the shop
+	-- button — settings is not a thing you want on screen while you play, and
+	-- two chrome buttons parked over his lobby art was the whole complaint. The
+	-- keybind below is how you open it.
 
 	panel = Instance.new("Frame")
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -313,6 +303,15 @@ end
 
 function SettingsController.init()
 	buildGui()
+
+	-- The gear button WAS the only way in. Removing it without this would have
+	-- made sensitivity and volume unreachable — chrome nobody wanted traded for
+	-- settings nobody can open. O for options, same pattern as the shop's [B].
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if not gameProcessed and input.KeyCode == Enum.KeyCode.O then
+			SettingsController.setOpen(not panel.Visible)
+		end
+	end)
 
 	ClientData.changed:Connect(applySnapshot)
 	if ClientData.snapshot then

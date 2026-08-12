@@ -19,6 +19,10 @@ local GunCatalog = require(ReplicatedStorage.Shared.Config.GunCatalog)
 local Theme = require(script.Parent.Theme)
 local Components = require(script.Parent.Components)
 
+-- The falloff bar's height, which is also its pill radius doubled — the two
+-- segments overlap by half of this so their curves meet.
+local TRACK_HEIGHT = 18
+
 local MAX_HEALTH = 100 -- CombatService.MAX_HEALTH
 
 local StatBlock = {}
@@ -185,7 +189,7 @@ local function falloffCard(parent: Instance, stats: CombatStats.Resolved, order:
 	})
 
 	local track = Instance.new("Frame")
-	track.Size = UDim2.new(1, 0, 0, 18)
+	track.Size = UDim2.new(1, 0, 0, TRACK_HEIGHT)
 	track.Position = UDim2.fromOffset(0, 24)
 	track.BackgroundColor3 = Theme.color.surfaceSunken
 	track.BorderSizePixel = 0
@@ -203,12 +207,17 @@ local function falloffCard(parent: Instance, stats: CombatStats.Resolved, order:
 	near.Parent = track
 	Components.corner(near, Theme.radius.pill)
 
+	-- Pill-rounded like the near segment, and overlapped back by the radius so
+	-- the two curves meet instead of leaving a notch. Without the corner its
+	-- right end was a square edge poking out of a rounded track — the same
+	-- thing that made the gun cards look square, at bar scale.
 	local far = Instance.new("Frame")
-	far.Size = UDim2.new(1 - nearFraction, 0, 1, 0)
-	far.Position = UDim2.fromScale(nearFraction, 0)
+	far.Size = UDim2.new(1 - nearFraction, TRACK_HEIGHT / 2, 1, 0)
+	far.Position = UDim2.new(nearFraction, -TRACK_HEIGHT / 2, 0, 0)
 	far.BackgroundColor3 = Theme.color.primary
 	far.BackgroundTransparency = 0.58
 	far.BorderSizePixel = 0
+	Components.corner(far, Theme.radius.pill)
 	far.Parent = track
 	Components.corner(far, Theme.radius.pill)
 

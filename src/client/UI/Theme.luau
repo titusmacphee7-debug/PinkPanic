@@ -122,10 +122,12 @@ Theme.space = {
 	xl = 32,
 }
 
+-- Rounder than it was. 14 on a 204px card is a radius you have to look for,
+-- and Pink Panic should not have to be looked for.
 Theme.radius = {
-	chip = 10,
-	card = 14,
-	panel = 20,
+	chip = 12,
+	card = 18,
+	panel = 24,
 	pill = 999,
 }
 
